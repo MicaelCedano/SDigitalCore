@@ -67,6 +67,7 @@ export default function SolicitarAccesoPage() {
           <div className="p-2 transition-transform hover:scale-105">
             <Image
               src="/logo.png"
+              unoptimized
               alt="SDigital Logo"
               width={80}
               height={80}

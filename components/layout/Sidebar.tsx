@@ -128,7 +128,7 @@ export function Sidebar({
         <div className={`flex h-[72px] items-center border-b border-[#f0f1f3] ${collapsed ? "justify-center px-3" : "justify-between px-5"}`}>
           <Link href="/dashboard" className="focus-ring flex min-w-0 items-center gap-3 rounded-lg" onClick={onMobileClose}>
             <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-[#e4e7ec] bg-white">
-              <Image src="/logo.png" alt="" width={34} height={34} className="h-8 w-8 object-contain" priority />
+              <Image src="/logo.png" alt="" width={34} height={34} className="h-8 w-8 object-contain" priority unoptimized />
             </span>
             {!collapsed ? <span className="truncate text-[17px] font-bold tracking-[-0.025em] text-[#101828]">SDigitalCore</span> : null}
           </Link>

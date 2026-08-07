@@ -19,7 +19,7 @@ export default function LoginPage() {
 
         <div className="relative z-10 flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] bg-white">
-            <Image src="/logo.png" alt="" width={38} height={38} className="h-9 w-9 object-contain" priority />
+            <Image src="/logo.png" alt="" width={38} height={38} className="h-9 w-9 object-contain" priority unoptimized />
           </span>
           <span className="text-lg font-semibold tracking-[-0.02em]">SDigitalCore</span>
         </div>
@@ -34,7 +34,7 @@ export default function LoginPage() {
         <div className="w-full max-w-[430px] animate-fade-in">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[10px] border border-[#e4e7ec]">
-              <Image src="/logo.png" alt="" width={38} height={38} className="h-9 w-9 object-contain" priority />
+            <Image src="/logo.png" alt="" width={38} height={38} className="h-9 w-9 object-contain" priority unoptimized />
             </span>
             <span className="text-lg font-bold tracking-[-0.025em] text-[#101828]">SDigitalCore</span>
           </div>
