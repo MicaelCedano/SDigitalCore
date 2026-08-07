@@ -450,4 +450,423 @@ export function GoodsReceiptForm({
         {/* Form Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
           {errorMessage && (
-        Û®7¶‰žËkºwµçM½±½É½Õ¹Ñôí½±½É½Õ¹Ð€ôôô€Ä€ü€‰½±½Èˆ€è€‰½±½É•Ì‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€€ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰‰œµlŒÔÜÔÁ˜Åt¼ÄÀÑ•áÐµlŒÔÜÔÁ˜Åt™½¹Ðµ‰½±Áà´ÈÁä´À¸ÔÉ½Õ¹‘•µµˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€í¥Ñ•µQ½Ñ…±EÑåôÕ‘Ì(€€€€€€€€€€€€€€€€€€€€€€€€€€ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆ½¹±¥¬õì¡”¤€ôø”¹ÍÑ½ÁAÉ½Á……Ñ¥½¸ ¥ôø(€€€€€€€€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÑ½±•½±±…ÁÍ”¡¥Ñ•µ%‘à¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ñ•áÐµáÌ™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÔÀÀ¡½Ù•ÈéÑ•áÐµlŒÔÜÔÁ˜ÅtÁà´ÈÁä´ÄÉ½Õ¹‘•¡½Ù•Èé‰œµÍ±…Ñ”´ÄÀÀÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌˆ(€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€í¥Í½±±…ÁÍ•€ü€‰‰É¥Èˆ€è€‰•ÉÉ…È‰ô(€€€€€€€€€€€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø((€€€€€€€€€€€€€€€€€€€€€€€í¥Ñ•µÌ¹±•¹Ñ €ø€Ä€˜˜€ (€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•I•µ½Ù•%Ñ•´¡¥Ñ•µ%‘à¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÐÀÀ¡½Ù•ÈéÑ•áÐµÉ•´ØÀÀÀ´Ä¸Ô¡½Ù•Èé‰œµÉ•´ÔÀÉ½Õ¹‘•µ±œÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”ô‰±¥µ¥¹…È•ÍÑ”µ½‘•±¼ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñQÉ…Í È±…ÍÍ9…µ”ô‰Ü´Ð ´Ðˆ€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€ì¼¨5½‘•°•Ñ…¥±Ì	½‘ä€¡M¡½Ý¸Ý¡•¸9=P½±±…ÁÍ•¤€¨½ô(€€€€€€€€€€€€€€€€€€€ì…¥Í½±±…ÁÍ•€˜˜€ (€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Ðˆø(€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É¥É¥µ½±Ì´ÄÍ´éÉ¥µ½±Ì´ÈµéÉ¥µ½±Ì´Ð…À´Ìˆø(€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÅÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀµˆ´Äˆø(€€€€€€€€€€€€€€€€€€€€€€€€€M-T€¼Í‘¥¼€¡=Á¥½¹…°¤(€€€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰Ñ•áÐˆ(€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí¥Ñ•´¹½‘”ñð€ˆ‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø¡…¹‘±•%Ñ•µ¡…¹”¡¥Ñ•µ%‘à°€‰½‘”ˆ°”¹Ñ…É•Ð¹Ù…±Õ”¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•Èô‰¨¸%@ÄÕA4´ÈÔØˆ(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µ±œÁà´ÌÁä´Ä¸ÔÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´àÀÀÁ±…•¡½±‘•ÈµÍ±…Ñ”´ÐÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•ÈµlŒÔÜÔÁ˜Åtˆ(€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€ì¼¨ÕÑ½½µÁ±•Ñ”5½‘•°•ÍÉ¥ÁÑ¥½¸%¹ÁÕÐ€¨½ô(€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰µé½°µÍÁ…¸´ÈÉ•±…Ñ¥Ù”ˆø(€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÅÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀµˆ´Ä™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸ˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ù5½‘•±¼€¼•ÍÉ¥Á§Í¸€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµÉ•´ÔÀÀˆø¨ð½ÍÁ…¸øð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµlÄÁÁátÑ•áÐµ•µ•É…±´ØÀÀ™½¹Ðµµ•‘¥Õ´™±•à¥Ñ•µÌµ•¹Ñ•È…À´Äˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñMÁ…É­±•Ì±…ÍÍ9…µ”ô‰Ü´Ì ´Ìˆ€¼øÕÑ¼µÕ…É‘„•¸…Ó…±½¼(€€€€€€€€€€€€€€€€€€€€€€€€€€ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰Ñ•áÐˆ(€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí¥Ñ•´¹‘•ÍÉ¥ÁÑ¥½¸ñð€ˆ‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø¡…¹‘±••ÍÉ¥ÁÑ¥½¹¡…¹”¡¥Ñ•µ%‘à°”¹Ñ…É•Ð¹Ù…±Õ”¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€½¹½ÕÌõì ¤€ôøÍ•ÑÑ¥Ù•MÕ•ÍÑ¥½¹%¹‘•à¡¥Ñ•µ%‘à¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•Èô‰¨¸¥A¡½¹”€ÄÔAÉ¼5…à€ÈÔÙˆ(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µ±œÁà´ÌÁä´Ä¸ÔÑ•áÐµáÌ™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´àÀÀÁ±…•¡½±‘•ÈµÍ±…Ñ”´ÐÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•ÈµlŒÔÜÔÁ˜Åtˆ(€€€€€€€€€€€€€€€€€€€€€€€€¼ø((€€€€€€€€€€€€€€€€€€€€€€€ì¼¨É½Á‘½Ý¸MÕ•ÍÑ¥½¹Ì€¨½ô(€€€€€€€€€€€€€€€€€€€€€€€í…Ñ¥Ù•MÕ•ÍÑ¥½¹%¹‘•à€ôôô¥Ñ•µ%‘à€˜˜…Ñ…±½MÕ•ÍÑ¥½¹Ì¹±•¹Ñ €ø€À€˜˜€ (€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰…‰Í½±ÕÑ”±•™Ð´ÀÉ¥¡Ð´ÀÑ½Àµ™Õ±°µÐ´Ä‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µá°Í¡…‘½Üµ±œè´ÌÀµ…àµ ´ÐÀ½Ù•É™±½Üµäµ…ÕÑ¼‘¥Ù¥‘”µä‘¥Ù¥‘”µÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€í…Ñ…±½MÕ•ÍÑ¥½¹Ì¹µ…À ¡ÍÕœ°Í%‘à¤€ôø€ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€­•äõíÍ%‘áô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•M•±•ÑMÕ•ÍÑ¥½¸¡¥Ñ•µ%‘à°ÍÕœ¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°Ñ•áÐµ±•™ÐÁà´ÌÁä´ÈÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´ÜÀÀ¡½Ù•Èé‰œµlŒÔÜÔÁ˜Åt¼ÄÀ¡½Ù•ÈéÑ•áÐµlŒÔÜÔÁ˜Åt™½¹Ðµµ•‘¥Õ´ÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌ™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ùíÍÕôð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµlÄÁÁátÑ•áÐµÍ±…Ñ”´ÐÀÀˆùMÕ•É•¹¥„ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÅÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀµˆ´Äˆù½¹‘¥§Í¸ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€ñÍ•±•Ð(€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí¥Ñ•´¹½¹‘¥Ñ¥½¸ñð€‰9Õ•Ù¼‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø¡…¹‘±•%Ñ•µ¡…¹”¡¥Ñ•µ%‘à°€‰½¹‘¥Ñ¥½¸ˆ°”¹Ñ…É•Ð¹Ù…±Õ”¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µ±œÁà´ÌÁä´Ä¸ÔÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´àÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•ÈµlŒÔÜÔÁ˜Åtˆ(€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸Ù…±Õ”ô‰9Õ•Ù¼ˆù9Õ•Ù¼ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸Ù…±Õ”ô‰UÍ…‘¼€´á•±•¹Ñ”ˆùUÍ…‘¼€´á•±•¹Ñ”ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸Ù…±Õ”ô‰UÍ…‘¼€´	Õ•¹¼ˆùUÍ…‘¼€´	Õ•¹¼ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸Ù…±Õ”ô‰I•™ÕÉ‰¥Í¡•ˆùI•™ÕÉ‰¥Í¡•ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸Ù…±Õ”ô‰A…É„I•ÁÕ•ÍÑ¼ˆùA…É„I•ÁÕ•ÍÑ¼ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€ð½Í•±•Ðø(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€ì¼¨½±½ÉÌ€˜%5%ÌM•Ñ¥½¸€¨½ô(€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´ÌÁÐ´Èˆø(€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸‰œµÍ±…Ñ”´ÄÀÀ¼àÀÁà´ÌÁä´Ä¸ÔÉ½Õ¹‘•µ±œ‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀˆø(€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµlÄÅÁát™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Ä¸Ôˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñA…±•ÑÑ”±…ÍÍ9…µ”ô‰Ü´Ì¸Ô ´Ì¸ÔÑ•áÐµlŒÔÜÔÁ˜Åtˆ€¼øY…É¥…¹Ñ•Ì‘”½±½È”%5%ÌÁ…É„•ÍÑ”5½‘•±¼(€€€€€€€€€€€€€€€€€€€€€€€€ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•‘‘½±½ÉY…É¥…¹Ð¡¥Ñ•µ%‘à¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Áà´È¸ÔÁä´Ä‰œµÝ¡¥Ñ”¡½Ù•Èé‰œµÍ±…Ñ”´ÔÀÑ•áÐµlŒÔÜÔÁ˜Åt‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µµÑ•áÐµlÄÅÁát™½¹ÐµÍ•µ¥‰½±ÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌ™±•à¥Ñ•µÌµ•¹Ñ•È…À´ÄÍ¡…‘½Ü´ÉáÌˆ(€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñA±ÕÌ±…ÍÍ9…µ”ô‰Ü´Ì¸Ô ´Ì¸Ôˆ€¼øÉ•…È½±½È(€€€€€€€€€€€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´ÌÁ°´Èˆø(€€€€€€€€€€€€€€€€€€€€€€€ì¡¥Ñ•´¹½±½ÉY…É¥…¹ÑÌñðmt¤¹µ…À ¡Øè…¹ä°Ù%‘àè¹Õµ‰•È¤€ôø€ (€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€­•äõíÙ%‘áô(€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µ±œÀ´ÌÍÁ…”µä´ÈÉ•±…Ñ¥Ù”ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸Áˆ´Ä¸Ô‰½É‘•Èµˆ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµlÄÅÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Äˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½È€íÙ%‘à€¬€Åôè€ñÍÑÉ½¹œ±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´àÀÀˆùíØ¹½±½Èñð€‰M¥¸•ÍÁ•¥™¥…È‰ôð½ÍÑÉ½¹œø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€í¥Ñ•´¹½±½ÉY…É¥…¹ÑÌ¹±•¹Ñ €ø€Ä€˜˜€ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•I•µ½Ù•½±½ÉY…É¥…¹Ð¡¥Ñ•µ%‘à°Ù%‘à¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÐÀÀ¡½Ù•ÈéÑ•áÐµÉ•´ØÀÀÀ´À¸ÔÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌÑ•áÐµlÄÁÁátˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”ô‰EÕ¥Ñ…È½±½Èˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñQÉ…Í È±…ÍÍ9…µ”ô‰Ü´Ì¸Ô ´Ì¸Ôˆ€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É¥É¥µ½±Ì´ÄÍ´éÉ¥µ½±Ì´Ì…À´Ìˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÁÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀµˆ´À¸Ôˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€9½µ‰É”‘•°½±½È€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµÉ•´ÔÀÀˆø¨ð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰Ñ•áÐˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õíØ¹½±½Èñð€ˆ‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•½±½ÉY…É¥…¹Ñ¡…¹”¡¥Ñ•µ%‘à°Ù%‘à°€‰½±½Èˆ°”¹Ñ…É•Ð¹Ù…±Õ”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•Èô‰¨¸éÕ°Q¥Ñ…¹¥„ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÍ±…Ñ”´ÔÀ‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µµÁà´È¸ÔÁä´ÄÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´àÀÀÁ±…•¡½±‘•ÈµÍ±…Ñ”´ÐÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•ÈµlŒÔÜÔÁ˜Åtˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÁÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀµˆ´À¸Ôˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…¹Ñ¥‘…(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰¹Õµ‰•Èˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ¥¸õìÅô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õíØ¹ÅÕ…¹Ñ¥Ñåô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•½±½ÉY…É¥…¹Ñ¡…¹”¡¥Ñ•µ%‘à°Ù%‘à°€‰ÅÕ…¹Ñ¥Ñäˆ°”¹Ñ…É•Ð¹Ù…±Õ”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÍ±…Ñ”´ÔÀ‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µµÁà´È¸ÔÁä´ÄÑ•áÐµáÌ™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´àÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•ÈµlŒÔÜÔÁ˜Åtˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÁÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ØÀÀµˆ´À¸Ôˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½ÍÑ¼U¹¥Ñ…É¥¼€¡I¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰¹Õµ‰•Èˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ¥¸õìÁô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÑ•ÀôˆÀ¸ÀÄˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õíØ¹Õ¹¥ÑAÉ¥”€üü€ˆ‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•½±½ÉY…É¥…¹Ñ¡…¹”¡¥Ñ•µ%‘à°Ù%‘à°€‰Õ¹¥ÑAÉ¥”ˆ°”¹Ñ…É•Ð¹Ù…±Õ”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•ÈôˆÀ¸ÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÍ±…Ñ”´ÔÀ‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µµÁà´È¸ÔÁä´ÄÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´àÀÀÁ±…•¡½±‘•ÈµÍ±…Ñ”´ÐÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•ÈµlŒÔÜÔÁ˜Åtˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Í´é½°µÍÁ…¸´Ìˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰‰±½¬Ñ•áÐµlÄÁÁát™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀµˆ´À¸Ô™±•à¥Ñ•µÌµ•¹Ñ•È…À´Äˆø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ	…É½‘”±…ÍÍ9…µ”ô‰Ü´Ì ´ÌÑ•áÐµ•µ•É…±´ØÀÀˆ€¼ø%5%Ì€¼M•É¥•ÌÁ…É„•°½±½Éìˆ€‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÑÉ½¹œ±…ÍÍ9…µ”ô‰Ñ•áÐµ•µ•É…±´ÜÀÀˆùíØ¹½±½Èñð€‰Í•±•¥½¹…‘¼‰ôð½ÍÑÉ½¹œø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñÑ•áÑ…É•„(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É½ÝÌõìÉô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õíØ¹¥µ•¥Ìñð€ˆ‰ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡…¹‘±•½±½ÉY…É¥…¹Ñ¡…¹”¡¥Ñ•µ%‘à°Ù%‘à°€‰¥µ•¥Ìˆ°”¹Ñ…É•Ð¹Ù…±Õ”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•ÈôˆÌÔØàäÄÀäÈàÌÜÐØÄ˜ŒÄÀìÌÔØàäÄÀäÈàÌÜÐØÈˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÍ±…Ñ”´ÔÀ‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µµÁà´È¸ÔÁä´ÄÑ•áÐµáÌ™½¹Ðµµ½¹¼Ñ•áÐµ•µ•É…±´àÀÀÁ±…•¡½±‘•ÈµÍ±…Ñ”´ÐÀÀ™½ÕÌé½ÕÑ±¥¹”µ¹½¹”™½ÕÌé‰½É‘•Èµ•µ•É…±´ÔÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€ô¥ô(€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€ð½‘¥Øø(€€€€€€€€ð½‘¥Øø((€€€€€€€ì¼¨½½Ñ•ÈMÕµµ…Éä€˜Ñ¥½¸½¹ÑÉ½±Ì€¨½ô(€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Áà´ØÁä´Ð‰½É‘•ÈµÐ‰½É‘•ÈµÍ±…Ñ”´ÈÀÀ‰œµÍ±…Ñ”´ÔÀ™±•à™±•àµ½°Í´é™±•àµÉ½Ü¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸…À´Ðˆø(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´ØÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´ÜÀÀÜµ™Õ±°Í´éÜµ…ÕÑ¼ˆø(€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÔÀÀ‰±½¬™½¹Ðµµ•‘¥Õ´ˆùQ½Ñ…°U¹¥‘…‘•Ìèð½ÍÁ…¸ø(€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµÍ´™½¹Ðµ‰½±Ñ•áÐµlŒÔÜÔÁ˜ÅtˆùíÑ½Ñ…±EÑåôÕ‘Ìð½ÍÁ…¸ø(€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€íÑ½Ñ…±µ½Õ¹Ð€ø€À€˜˜€ (€€€€€€€€€€€€€€ñ‘¥Øø(€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÔÀÀ‰±½¬™½¹Ðµµ•‘¥Õ´ˆù5½¹Ñ¼ÍÑ¥µ…‘¼èð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€ñÍÁ…¸±…ÍÍ9…µ”ô‰Ñ•áÐµÍ´™½¹Ðµ‰½±Ñ•áÐµ•µ•É…±´ØÀÀˆø(€€€€€€€€€€€€€€€€€IíÑ½Ñ…±µ½Õ¹Ð¹Ñ½1½…±•MÑÉ¥¹œ ‰•Ìµ<ˆ°ìµ¥¹¥µÕµÉ…Ñ¥½¹¥¥ÑÌè€Èô¥ô(€€€€€€€€€€€€€€€€ð½ÍÁ…¸ø(€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€¥ô(€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È…À´È¸ÔÜµ™Õ±°Í´éÜµ…ÕÑ¼©ÕÍÑ¥™äµ•¹ˆø(€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€½¹±¥¬õí¡…¹‘±•áÁ½ÉÑá•±AÉ•Ù¥•Ýô(€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Áà´Ì¸ÔÁä´È‰œµ•µ•É…±´ÔÀ¡½Ù•Èé‰œµ•µ•É…±´ÄÀÀÑ•áÐµ•µ•É…±´ÜÀÀ‰½É‘•È‰½É‘•Èµ•µ•É…±´ÈÀÀÉ½Õ¹‘•µá°Ñ•áÐµáÌ™½¹ÐµÍ•µ¥‰½±ÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Ä¸Ôˆ(€€€€€€€€€€€€€Ñ¥Ñ±”ô‰•Í…É…È‘…Ñ½Ì…ÑÕ…±•Ì•¸…É¡¥Ù¼á•°ˆ(€€€€€€€€€€€€ø(€€€€€€€€€€€€€€ñ¥±•MÁÉ•…‘Í¡••Ð±…ÍÍ9…µ”ô‰Ü´Ð ´ÐÑ•áÐµ•µ•É…±´ØÀÀˆ€¼øá•°(€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø((€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€‘¥Í…‰±•õí±½…‘¥¹ô(€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•MÕ‰µ¥Ð ‰IPˆ¥ô(€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Áà´ÐÁä´È‰œµÝ¡¥Ñ”¡½Ù•Èé‰œµÍ±…Ñ”´ÄÀÀÑ•áÐµÍ±…Ñ”´ÜÀÀ‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÌÀÀÉ½Õ¹‘•µá°Ñ•áÐµáÌ™½¹ÐµÍ•µ¥‰½±ÑÉ…¹Í¥Ñ¥½¸µ½±½ÉÌ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Ä¸Ô‘¥Í…‰±•é½Á…¥Ñä´ÔÀˆ(€€€€€€€€€€€€ø(€€€€€€€€€€€€€€ñM…Ù”±…ÍÍ9…µ”ô‰Ü´Ð ´Ðˆ€¼øÕ…É‘…È	½ÉÉ…‘½È(€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø((€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€‘¥Í…‰±•õí±½…‘¥¹ô(€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•MÕ‰µ¥Ð ‰=5A1Qˆ¥ô(€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Áà´ÔÁä´È‰œµlŒÔÜÔÁ˜Åt¡½Ù•Èé‰œµlŒÐØÍ•ŒÕtÑ•áÐµÝ¡¥Ñ”É½Õ¹‘•µá°Ñ•áÐµáÌ™½¹Ðµ‰½±ÑÉ…¹Í¥Ñ¥½¸µ…±°Í¡…‘½ÜµµÍ¡…‘½ÜµlŒÔÜÔÁ˜Åt¼ÈÀ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Ä¸Ô‘¥Í…‰±•é½Á…¥Ñä´ÔÀˆ(€€€€€€€€€€€€ø(€€€€€€€€€€€€€í±½…‘¥¹œ€ü€ (€€€€€€€€€€€€€€€€ñI•™É•Í¡Ü±…ÍÍ9…µ”ô‰Ü´Ð ´Ð…¹¥µ…Ñ”µÍÁ¥¸ˆ€¼ø(€€€€€€€€€€€€€€¤€è€ (€€€€€€€€€€€€€€€€ñ¡•­¥É±”È±…ÍÍ9…µ”ô‰Ü´Ð ´Ðˆ€¼ø(€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€¥¹…±¥é…ÈI•¥‰¼(€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€ð½‘¥Øø(€€€€€€€€ð½‘¥Øø(€€€€€€ð½‘¥Øø(€€€€ð½‘¥Øø(€€¤ì)ô(
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* General Metadata */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Proveedor <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+                placeholder="Ej. Distribuidora Celulares RD"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Sucursal / AlmacÃ©n Destino
+              </label>
+              <select
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-[#5750f1] transition-colors"
+              >
+                {branchesList.length > 0 ? (
+                  branchesList.map((b) => (
+                    <option key={b.id} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Sucursal Principal">Sucursal Principal</option>
+                    <option value="AlmacÃ©n Central">AlmacÃ©n Central</option>
+                    <option value="Sucursal Bella Vista">Sucursal Bella Vista</option>
+                    <option value="Sucursal Santiago">Sucursal Santiago</option>
+                    <option value="Sucursal Megacentro">Sucursal Megacentro</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Recibido / Registrado Por
+              </label>
+              <input
+                type="text"
+                value={receivedBy}
+                onChange={(e) => setReceivedBy(e.target.value)}
+                placeholder="Tu nombre o usuario"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Observaciones Generales (Opcional)
+            </label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ej. Paquete sellado recibido por envÃ­o expreso sin daÃ±os fÃ­sicos"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 transition-colors"
+            />
+          </div>
+
+          {/* Items Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pt-2">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[#5750f1]" /> Modelos & Colores Recibidos ({items.length})
+              </h3>
+              <div className="flex items-center gap-2">
+                {items.length > 1 && (
+                  <div className="flex items-center gap-1 border-r border-slate-200 pr-2 mr-1">
+                    <button
+                      type="button"
+                      onClick={collapseAll}
+                      className="px-2 py-1 text-slate-500 hover:text-slate-800 text-[11px] font-semibold flex items-center gap-1 hover:bg-slate-100 rounded-md transition-colors"
+                      title="Colapsar todos los modelos"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" /> Colapsar Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={expandAll}
+                      className="px-2 py-1 text-slate-500 hover:text-slate-800 text-[11px] font-semibold flex items-center gap-1 hover:bg-slate-100 rounded-md transition-colors"
+                      title="Expandir todos los modelos"
+                    >
+                      <ChevronsUpDown className="w-3.5 h-3.5" /> Expandir
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="px-3.5 py-1.5 bg-[#5750f1]/10 hover:bg-[#5750f1]/20 text-[#5750f1] border border-[#5750f1]/20 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Plus className="w-4 h-4" /> Agregar Modelo
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {items.map((item, itemIdx) => {
+                const isCollapsed = !!collapsedItems[itemIdx];
+                const colorCount = (item.colorVariants || []).length;
+                const itemTotalQty = (item.colorVariants || []).reduce(
+                  (sum: number, v: any) => sum + (Number(v.quantity) || 1),
+                  0
+                );
+
+                return (
+                  <div
+                    key={itemIdx}
+                    className={`bg-slate-50/90 border rounded-xl shadow-2xs transition-all ${
+                      isCollapsed ? "border-slate-300 bg-white" : "border-slate-200 p-4 space-y-4"
+                    }`}
+                  >
+                    {/* Collapsible Header Bar */}
+                    <div
+                      onClick={() => toggleCollapse(itemIdx)}
+                      className={`flex items-center justify-between cursor-pointer select-none transition-colors ${
+                        isCollapsed ? "px-4 py-3 hover:bg-slate-50 rounded-xl" : "pb-3 border-b border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-1 text-slate-400 group-hover:text-slate-600">
+                          {isCollapsed ? (
+                            <ChevronRight className="w-4 h-4 text-[#5750f1]" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-[#5750f1]" />
+                          )}
+                        </div>
+                        <span className="text-xs font-bold text-[#5750f1] bg-[#5750f1]/10 px-2.5 py-0.5 rounded-full border border-[#5750f1]/20">
+                          Modelo #{itemIdx + 1}
+                        </span>
+
+                        <span className="text-xs font-bold text-slate-800">
+                          {item.description ? item.description : <span className="text-slate-400 italic">Escribir nombre del modelo...</span>}
+                        </span>
+
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <span className="bg-slate-200/70 text-slate-700 font-semibold px-2 py-0.5 rounded-md">
+                            {colorCount} {colorCount === 1 ? "color" : "colores"}
+                          </span>
+                          <span className="bg-[#5750f1]/10 text-[#5750f1] font-bold px-2 py-0.5 rounded-md">
+                            {itemTotalQty} uds
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => toggleCollapse(itemIdx)}
+                          className="text-xs font-semibold text-slate-500 hover:text-[#5750f1] px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+                        >
+                          {isCollapsed ? "Abrir" : "Cerrar"}
+                        </button>
+
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(itemIdx)}
+                            className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar este modelo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Model Details Body (Shown when NOT collapsed) */}
+                    {!isCollapsed && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          SKU / CÃ³digo (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={item.code || ""}
+                          onChange={(e) => handleItemChange(itemIdx, "code", e.target.value)}
+                          placeholder="Ej. IP15PM-256"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                        />
+                      </div>
+
+                      {/* Autocomplete Model Description Input */}
+                      <div className="md:col-span-2 relative">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
+                          <span>Modelo / DescripciÃ³n <span className="text-red-500">*</span></span>
+                          <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> Auto-guarda en catÃ¡logo
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={item.description || ""}
+                          onChange={(e) => handleDescriptionChange(itemIdx, e.target.value)}
+                          onFocus={() => setActiveSuggestionIndex(itemIdx)}
+                          placeholder="Ej. iPhone 15 Pro Max 256GB"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                        />
+
+                        {/* Dropdown Suggestions */}
+                        {activeSuggestionIndex === itemIdx && catalogSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30 max-h-40 overflow-y-auto divide-y divide-slate-100">
+                            {catalogSuggestions.map((sug, sIdx) => (
+                              <button
+                                key={sIdx}
+                                type="button"
+                                onClick={() => handleSelectSuggestion(itemIdx, sug)}
+                                className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-[#5750f1]/10 hover:text-[#5750f1] font-medium transition-colors flex items-center justify-between"
+                              >
+                                <span>{sug}</span>
+                                <span className="text-[10px] text-slate-400">Sugerencia</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">CondiciÃ³n</label>
+                        <select
+                          value={item.condition || "Nuevo"}
+                          onChange={(e) => handleItemChange(itemIdx, "condition", e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                        >
+                          <option value="Nuevo">Nuevo</option>
+                          <option value="Usado - Excelente">Usado - Excelente</option>
+                          <option value="Usado - Bueno">Usado - Bueno</option>
+                          <option value="Refurbished">Refurbished</option>
+                          <option value="Para Repuesto">Para Repuesto</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Colors & IMEIs Section */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between bg-slate-100/80 px-3 py-1.5 rounded-lg border border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                          <Palette className="w-3.5 h-3.5 text-[#5750f1]" /> Variantes de Color e IMEIs para este Modelo
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleAddColorVariant(itemIdx)}
+                          className="px-2.5 py-1 bg-white hover:bg-slate-50 text-[#5750f1] border border-slate-200 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Agregar Color
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 pl-2">
+                        {(item.colorVariants || []).map((v: any, vIdx: number) => (
+                          <div
+                            key={vIdx}
+                            className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 relative"
+                          >
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                              <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                                Color #{vIdx + 1}: <strong className="text-slate-800">{v.color || "Sin especificar"}</strong>
+                              </span>
+                              {item.colorVariants.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveColorVariant(itemIdx, vIdx)}
+                                  className="text-slate-400 hover:text-red-600 p-0.5 transition-colors text-[10px]"
+                                  title="Quitar color"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                                  Nombre del Color <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={v.color || ""}
+                                  onChange={(e) =>
+                                    handleColorVariantChange(itemIdx, vIdx, "color", e.target.value)
+                                  }
+                                  placeholder="Ej. Azul Titania"
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                                  Cantidad
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={v.quantity}
+                                  onChange={(e) =>
+                                    handleColorVariantChange(itemIdx, vIdx, "quantity", e.target.value)
+                                  }
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                                  Costo Unitario (RD$)
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={v.unitPrice ?? ""}
+                                  onChange={(e) =>
+                                    handleColorVariantChange(itemIdx, vIdx, "unitPrice", e.target.value)
+                                  }
+                                  placeholder="0.00"
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-3">
+                                <label className="block text-[10px] font-semibold text-slate-700 mb-0.5 flex items-center gap-1">
+                                  <Barcode className="w-3 h-3 text-emerald-600" /> IMEIs / Series para el color{" "}
+                                  <strong className="text-emerald-700">{v.color || "seleccionado"}</strong>
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={v.imeis || ""}
+                                  onChange={(e) =>
+                                    handleColorVariantChange(itemIdx, vIdx, "imeis", e.target.value)
+                                  }
+                                  placeholder="356891092837461&#10;356891092837462"
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs font-mono text-emerald-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Summary & Action Controls */}
+        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-6 text-xs text-slate-700 w-full sm:w-auto">
+            <div>
+              <span className="text-slate-500 block font-medium">Total Unidades:</span>
+              <span className="text-sm font-bold text-[#5750f1]">{totalQty} uds</span>
+            </div>
+            {totalAmount > 0 && (
+              <div>
+                <span className="text-slate-500 block font-medium">Monto Estimado:</span>
+                <span className="text-sm font-bold text-emerald-600">
+                  RD$ {totalAmount.toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleExportExcelPreview}
+              className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
+              title="Descargar datos actuales en archivo Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleSubmit("DRAFT")}
+              className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> Guardar Borrador
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleSubmit("COMPLETED")}
+              className="px-5 py-2 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {loading ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Finalizar Recibo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
