@@ -356,4 +356,418 @@ export default function ConfiguracionPage() {
                               className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
                                 isEnabled
                                   ? "bg-white border-indigo-200 shadow-2xs text-slate-900"
-                                  : "bg×Ÿv¶‰žËkºwµç@€€€€€€€€€€€ñ	ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€Ù…É¥…¹Ðô‰‘•ÍÑÉÕÑ¥Ù”ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€Í¥é”ô‰Í´ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰ ´àÑ•áÐµáÌÁà´È¸Ôˆ(€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôø¡…¹‘±•I•©•Ð¡É•Ä¹¥¥ô(€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ña¥É±”Í¥é”õìÄÑô€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ùI•¡…é…Èð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€ð½	ÕÑÑ½¸ø((€€€€€€€€€€€€€€€€€€€€€€€€ñ	ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€€€Ù…É¥…¹Ðô‰‘•™…Õ±Ðˆ(€€€€€€€€€€€€€€€€€€€€€€€€€Í¥é”ô‰Í´ˆ(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰ ´àÑ•áÐµáÌÁà´Ì‰œµ¥¹‘¥¼´ØÀÀ¡½Ù•Èé‰œµ¥¹‘¥¼´ÜÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÑM•±•Ñ•‘I•Ä¡É•Ä¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÑM•±•Ñ•‘I½±” ‰Y9QLˆ¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÑM•±•Ñ•‘5½‘Õ±•Í½É9•ÝUÍ•È¡l¸¸¹U1Q}I=1}5=U1Ml‰Y9QL‰ut¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñUÍ•É¡•¬Í¥é”õìÄÑô€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ù½¹™¥ÕÉ…È€˜•ÁÑ…Èð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€€€ð½	ÕÑÑ½¸ø(€€€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€€ð½…É‘½¹Ñ•¹Ðø(€€€€€€€€€€€€€€€€ð½…Éø(€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€¥ô((€€€€€€€€€ì¼¨!¥ÍÑ½É¥…°€¨½ô(€€€€€€€€€í¡¥ÍÑ½ÉåI•ÅÕ•ÍÑÌ¹±•¹Ñ €ø€À€˜˜€ (€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÁÐ´Ø‰½É‘•ÈµÐ‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÍÁ…”µä´Ìˆø(€€€€€€€€€€€€€€ñ Ì±…ÍÍ9…µ”ô‰Ñ•áÐµáÌ™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´ÔÀÀÕÁÁ•É…Í”ÑÉ…­¥¹œµÝ¥‘•Èˆù!¥ÍÑ½É¥…°‘”M½±¥¥ÑÕ‘•Ìð½ Ìø(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰½Ù•É™±½Üµàµ…ÕÑ¼‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µá°ˆø(€€€€€€€€€€€€€€€€ñÑ…‰±”±…ÍÍ9…µ”ô‰Üµ™Õ±°Ñ•áÐµ±•™ÐÑ•áÐµáÌÑ•áÐµÍ±…Ñ”´ØÀÀˆø(€€€€€€€€€€€€€€€€€€ñÑ¡•…±…ÍÍ9…µ”ô‰‰œµÍ±…Ñ”´ÔÀÑ•áÐµÍ±…Ñ”´ÔÀÀ™½¹Ðµ‰½±‰½É‘•Èµˆ‰½É‘•ÈµÍ±…Ñ”´ÈÀÀˆø(€€€€€€€€€€€€€€€€€€€€ñÑÈø(€€€€€€€€€€€€€€€€€€€€€€ñÑ ±…ÍÍ9…µ”ô‰À´Ìˆù9½µ‰É”ð½Ñ ø(€€€€€€€€€€€€€€€€€€€€€€ñÑ ±…ÍÍ9…µ”ô‰À´ÌˆùUÍÕ…É¥¼ð½Ñ ø(€€€€€€€€€€€€€€€€€€€€€€ñÑ ±…ÍÍ9…µ”ô‰À´Ìˆùµ…¥°ð½Ñ ø(€€€€€€€€€€€€€€€€€€€€€€ñÑ ±…ÍÍ9…µ”ô‰À´ÌˆùQ•³¥™½¹¼ð½Ñ ø(€€€€€€€€€€€€€€€€€€€€€€ñÑ ±…ÍÍ9…µ”ô‰À´ÌˆùÍÑ…‘¼ð½Ñ ø(€€€€€€€€€€€€€€€€€€€€€€ñÑ ±…ÍÍ9…µ”ô‰À´ÌˆùI½°Í¥¹…‘¼ð½Ñ ø(€€€€€€€€€€€€€€€€€€€€ð½ÑÈø(€€€€€€€€€€€€€€€€€€ð½Ñ¡•…ø(€€€€€€€€€€€€€€€€€€ñÑ‰½‘ä±…ÍÍ9…µ”ô‰‘¥Ù¥‘”µä‘¥Ù¥‘”µÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€€€€€€í¡¥ÍÑ½ÉåI•ÅÕ•ÍÑÌ¹µ…À ¡È¤€ôø€ (€€€€€€€€€€€€€€€€€€€€€€ñÑÈ­•äõíÈ¹¥‘ô±…ÍÍ9…µ”ô‰¡½Ù•Èé‰œµÍ±…Ñ”´ÔÀˆø(€€€€€€€€€€€€€€€€€€€€€€€€ñÑ±…ÍÍ9…µ”ô‰À´Ì™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´äÀÀˆùíÈ¹¹…µ•ôð½Ñø(€€€€€€€€€€€€€€€€€€€€€€€€ñÑ±…ÍÍ9…µ”ô‰À´Ì™½¹Ðµµ½¹¼™½¹ÐµÍ•µ¥‰½±Ñ•áÐµ¥¹‘¥¼´ØÀÀˆùíÈ¹ÕÍ•É¹…µ•ôð½Ñø(€€€€€€€€€€€€€€€€€€€€€€€€ñÑ±…ÍÍ9…µ”ô‰À´ÌˆùíÈ¹•µ…¥±ôð½Ñø(€€€€€€€€€€€€€€€€€€€€€€€€ñÑ±…ÍÍ9…µ”ô‰À´ÌˆùíÈ¹Á¡½¹•ôð½Ñø(€€€€€€€€€€€€€€€€€€€€€€€€ñÑ±…ÍÍ9…µ”ô‰À´Ìˆø(€€€€€€€€€€€€€€€€€€€€€€€€€íÈ¹ÍÑ…ÑÕÌ€ôôô€‰AAI=Yˆ€ü€ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ	…‘”Ù…É¥…¹Ðô‰ÍÕ•ÍÌˆùÁÉ½‰…‘¼ð½	…‘”ø(€€€€€€€€€€€€€€€€€€€€€€€€€€¤€è€ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€ñ	…‘”Ù…É¥…¹Ðô‰‘•ÍÑÉÕÑ¥Ù”ˆùI•¡…é…‘¼ð½	…‘”ø(€€€€€€€€€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€€€€€€€ð½Ñø(€€€€€€€€€€€€€€€€€€€€€€€€ñÑ±…ÍÍ9…µ”ô‰À´Ì™½¹Ðµµ½¹¼™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀˆùíÈ¹…ÍÍ¥¹•‘I½±”€üü€‹ŠP‰ôð½Ñø(€€€€€€€€€€€€€€€€€€€€€€ð½ÑÈø(€€€€€€€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€€€€€€€ð½Ñ‰½‘äø(€€€€€€€€€€€€€€€€ð½Ñ…‰±”ø(€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€¥ô(€€€€€€€€ð½‘¥Øø(€€€€€€¥ô((€€€€€ì¼¨5=0IHUMUI%<%IQ<€¨½ô(€€€€€íÍ¡½ÝÉ•…Ñ•5½‘…°€˜˜€ (€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™¥á•¥¹Í•Ð´Àè´ÔÀ‰œµÍ±…Ñ”´äÀÀ¼ØÀ‰…­‘É½Àµ‰±ÕÈµáÌ™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹Ñ•ÈÀ´Ð…¹¥µ…Ñ”µ™…‘”µ¥¸ˆø(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•´Éá°µ…àµÜµ±œÜµ™Õ±°À´ØÍ¡…‘½Ü´Éá°ÍÁ…”µä´Ôµ…àµ µläÁÙ¡t½Ù•É™±½Üµäµ…ÕÑ¼ˆø(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸Áˆ´Ì‰½É‘•Èµˆ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€ñ Ì±…ÍÍ9…µ”ô‰Ñ•áÐµ‰…Í”™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´äÀÀ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆø(€€€€€€€€€€€€€€€€ñUÍ•ÉA±ÕÌÍ¥é”õìÈÁô±…ÍÍ9…µ”ô‰Ñ•áÐµ¥¹‘¥¼´ØÀÀˆ€¼ø(€€€€€€€€€€€€€€€€ñÍÁ…¸ùÉ•…ÈUÍÕ…É¥¼¥É•Ñ…µ•¹Ñ”ð½ÍÁ…¸ø(€€€€€€€€€€€€€€ð½ Ìø(€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÍ•ÑM¡½ÝÉ•…Ñ•5½‘…°¡™…±Í”¥ô(€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÐÀÀ¡½Ù•ÈéÑ•áÐµÍ±…Ñ”´ØÀÀÀ´Äˆ(€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€ña¥É±”Í¥é”õìÄáô€¼ø(€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€ñ™½É´½¹MÕ‰µ¥Ðõí¡…¹‘±•É•…Ñ•¥É•ÑUÍ•ÉMÕ‰µ¥Ñô±…ÍÍ9…µ”ô‰ÍÁ…”µä´ÐÑ•áÐµáÌˆø(€€€€€€€€€€€€€ì¼¨9…µ”€¨½ô(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆù9½µ‰É”½µÁ±•Ñ¼ð½±…‰•°ø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É•±…Ñ¥Ù”™±•à¥Ñ•µÌµ•¹Ñ•Èˆø(€€€€€€€€€€€€€€€€€€ñUÍ•È±…ÍÍ9…µ”ô‰…‰Í½±ÕÑ”±•™Ð´ÌÜ´Ð ´ÐÑ•áÐµÍ±…Ñ”´ÐÀÀÁ½¥¹Ñ•Èµ•Ù•¹ÑÌµ¹½¹”ˆ€¼ø(€€€€€€€€€€€€€€€€€€ñ%¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰Ñ•áÐˆ(€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•Èô‰¨¸5…É¥¼M…¹Ñ½Ìˆ(€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí‘¥É•ÑUÍ•É…Ñ„¹¹…µ•ô(€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôøÍ•Ñ¥É•ÑUÍ•É…Ñ„¡ì€¸¸¹‘¥É•ÑUÍ•É…Ñ„°¹…µ”è”¹Ñ…É•Ð¹Ù…±Õ”ô¥ô(€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õíÁ°´ä¸Ô€‘íÉ•…Ñ•ÉÉ½ÉÌ¹¹…µ”€ü€‰‰½É‘•ÈµÉ•´ÔÀÀˆ€è€ˆ‰õô(€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€íÉ•…Ñ•ÉÉ½ÉÌ¹¹…µ”€˜˜€ñÀ±…ÍÍ9…µ”ô‰Ñ•áÐµáÌÑ•áÐµÉ•´ØÀÀµÐ´À¸ÔˆùíÉ•…Ñ•ÉÉ½ÉÌ¹¹…µ•ôð½Àùô(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€ì¼¨UÍ•É¹…µ”€˜A¡½¹”É¥€¨½ô(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É¥É¥µ½±Ì´ÄÍ´éÉ¥µ½±Ì´È…À´Ìˆø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø(€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆùUÍÕ…É¥¼ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É•±…Ñ¥Ù”™±•à¥Ñ•µÌµ•¹Ñ•Èˆø(€€€€€€€€€€€€€€€€€€€€ñÑM¥¸±…ÍÍ9…µ”ô‰…‰Í½±ÕÑ”±•™Ð´ÌÜ´Ð ´ÐÑ•áÐµÍ±…Ñ”´ÐÀÀÁ½¥¹Ñ•Èµ•Ù•¹ÑÌµ¹½¹”ˆ€¼ø(€€€€€€€€€€€€€€€€€€€€ñ%¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰Ñ•áÐˆ(€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•Èô‰µÍ…¹Ñ½Ìˆ(€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí‘¥É•ÑUÍ•É…Ñ„¹ÕÍ•É¹…µ•ô(€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôøÍ•Ñ¥É•ÑUÍ•É…Ñ„¡ì€¸¸¹‘¥É•ÑUÍ•É…Ñ„°ÕÍ•É¹…µ”è”¹Ñ…É•Ð¹Ù…±Õ”ô¥ô(€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õíÁ°´ä¸Ô€‘íÉ•…Ñ•ÉÉ½ÉÌ¹ÕÍ•É¹…µ”€ü€‰‰½É‘•ÈµÉ•´ÔÀÀˆ€è€ˆ‰õô(€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€íÉ•…Ñ•ÉÉ½ÉÌ¹ÕÍ•É¹…µ”€˜˜€ñÀ±…ÍÍ9…µ”ô‰Ñ•áÐµáÌÑ•áÐµÉ•´ØÀÀµÐ´À¸ÔˆùíÉ•…Ñ•ÉÉ½ÉÌ¹ÕÍ•É¹…µ•ôð½Àùô(€€€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø(€€€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆùQ•³¥™½¹¼ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É•±…Ñ¥Ù”™±•à¥Ñ•µÌµ•¹Ñ•Èˆø(€€€€€€€€€€€€€€€€€€€€ñA¡½¹”±…ÍÍ9…µ”ô‰…‰Í½±ÕÑ”±•™Ð´ÌÜ´Ð ´ÐÑ•áÐµÍ±…Ñ”´ÐÀÀÁ½¥¹Ñ•Èµ•Ù•¹ÑÌµ¹½¹”ˆ€¼ø(€€€€€€€€€€€€€€€€€€€€ñ%¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰Ñ•°ˆ(€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•ÈôˆàÀä´ÔÔÔ´ÀÄääˆ(€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí‘¥É•ÑUÍ•É…Ñ„¹Á¡½¹•ô(€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôøÍ•Ñ¥É•ÑUÍ•É…Ñ„¡ì€¸¸¹‘¥É•ÑUÍ•É…Ñ„°Á¡½¹”è”¹Ñ…É•Ð¹Ù…±Õ”ô¥ô(€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õíÁ°´ä¸Ô€‘íÉ•…Ñ•ÉÉ½ÉÌ¹Á¡½¹”€ü€‰‰½É‘•ÈµÉ•´ÔÀÀˆ€è€ˆ‰õô(€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€€€íÉ•…Ñ•ÉÉ½ÉÌ¹Á¡½¹”€˜˜€ñÀ±…ÍÍ9…µ”ô‰Ñ•áÐµáÌÑ•áÐµÉ•´ØÀÀµÐ´À¸ÔˆùíÉ•…Ñ•ÉÉ½ÉÌ¹Á¡½¹•ôð½Àùô(€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€ì¼¨µ…¥°€¨½ô(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆù½ÉÉ•¼•±•ÑËÍ¹¥¼ð½±…‰•°ø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É•±…Ñ¥Ù”™±•à¥Ñ•µÌµ•¹Ñ•Èˆø(€€€€€€€€€€€€€€€€€€ñ5…¥°±…ÍÍ9…µ”ô‰…‰Í½±ÕÑ”±•™Ð´ÌÜ´Ð ´ÐÑ•áÐµÍ±…Ñ”´ÐÀÀÁ½¥¹Ñ•Èµ•Ù•¹ÑÌµ¹½¹”ˆ€¼ø(€€€€€€€€€€€€€€€€€€ñ%¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰•µ…¥°ˆ(€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•Èô‰µ…É¥¼¹Í…¹Ñ½Í•µÁÉ•Í„¹½´ˆ(€€€€€€€€€€€€€€€€€€€Ù…±Õ”õí‘¥É•ÑUÍ•É…Ñ„¹•µ…¥±ô(€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôøÍ•Ñ¥É•ÑUÍ•É…Ñ„¡ì€¸¸¹‘¥É•ÑUÍ•É…Ñ„°•µ…¥°è”¹Ñ…É•Ð¹Ù…±Õ”ô¥ô(€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õíÁ°´ä¸Ô€‘íÉ•…Ñ•ÉÉ½ÉÌ¹•µ…¥°€ü€‰‰½É‘•ÈµÉ•´ÔÀÀˆ€è€ˆ‰õô(€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€€íÉ•…Ñ•ÉÉ½ÉÌ¹•µ…¥°€˜˜€ñÀ±…ÍÍ9…µ”ô‰Ñ•áÐµáÌÑ•áÐµÉ•´ØÀÀµÐ´À¸ÔˆùíÉ•…Ñ•ÉÉ½ÉÌ¹•µ…¥±ôð½Àùô(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€ì¼¨I½±”€¨½ô(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Äˆø(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆùI½°%¹¥¥…°ð½±…‰•°ø(€€€€€€€€€€€€€€€€ñÍ•±•Ð(€€€€€€€€€€€€€€€€€Ù…±Õ”õí‘¥É•ÑUÍ•É…Ñ„¹É½±•½‘•ô(€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø¡…¹‘±•¥É•ÑI½±•¡…¹”¡”¹Ñ…É•Ð¹Ù…±Õ”¥ô(€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µ±œÀ´È¸ÔÑ•áÐµáÌ™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´äÀÀ™½ÕÌéÉ¥¹œ´È™½ÕÌéÉ¥¹œµ¥¹‘¥¼´ÔÀÀ¼ÈÀ™½ÕÌé‰½É‘•Èµ¥¹‘¥¼´ØÀÀ½ÕÑ±¥¹”µ¹½¹”ˆ(€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€íMeMQ5}I=1L¹µ…À ¡È¤€ôø€ (€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸­•äõíÈ¹½‘•ôÙ…±Õ”õíÈ¹½‘•ôø(€€€€€€€€€€€€€€€€€€€€€íÈ¹¹…µ•ôƒŠPíÈ¹‘•ÍÉ¥ÁÑ¥½¹ô(€€€€€€€€€€€€€€€€€€€€ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€€€€€ð½Í•±•Ðø(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€ì¼¨5½‘Õ±”¡•­±¥ÍÐ€¨½ô(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´ÈÁÐ´Ä‰½É‘•ÈµÐ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆø(€€€€€€€€€€€€€€€€€7Í‘Õ±½Ì!…‰¥±¥Ñ…‘½ÌÁ…É„•ÍÑ”UÍÕ…É¥¼è(€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É¥É¥µ½±Ì´È…À´Èµ…àµ ´ÐÀ½Ù•É™±½Üµäµ…ÕÑ¼À´Äˆø(€€€€€€€€€€€€€€€€€íMeMQ5}5=U1L¹µ…À ¡µ½¤€ôøì(€€€€€€€€€€€€€€€€€€€½¹ÍÐ¥Í¡•­•€ô‘¥É•ÑUÍ•É5½‘Õ±•Ì¹¥¹±Õ‘•Ì¡µ½¹­•ä¤ì((€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸€ (€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°(€€€€€€€€€€€€€€€€€€€€€€€­•äõíµ½¹­•åô(€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õí™±•à¥Ñ•µÌµ•¹Ñ•È…À´ÈÀ´ÈÉ½Õ¹‘•µ±œ‰½É‘•ÈÑ•áÐµáÌÕÉÍ½ÈµÁ½¥¹Ñ•ÈÑÉ…¹Í¥Ñ¥½¸µ…±°€‘ì(€€€€€€€€€€€€€€€€€€€€€€€€€¥Í¡•­•(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü€‰‰œµ¥¹‘¥¼´ÔÀ¼ØÀ‰½É‘•Èµ¥¹‘¥¼´ÈÀÀ™½¹ÐµÍ•µ¥‰½±Ñ•áÐµ¥¹‘¥¼´äÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€è€‰‰œµÝ¡¥Ñ”‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÑ•áÐµÍ±…Ñ”´ØÀÀ¡½Ù•Èé‰œµÍ±…Ñ”´ÔÀˆ(€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰¡•­‰½àˆ(€€€€€€€€€€€€€€€€€€€€€€€€€¡•­•õí¥Í¡•­•‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì ¤€ôø¡…¹‘±•Q½±•¥É•Ñ5½‘Õ±”¡µ½¹­•ä¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰É½Õ¹‘•Ñ•áÐµ¥¹‘¥¼´ØÀÀ™½ÕÌéÉ¥¹œµ¥¹‘¥¼´ÔÀÀ…•¹Ðµ¥¹‘¥¼´ØÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ùíµ½¹±…‰•±ôð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€ô¥ô(€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹…À´ÈÁÐ´Ì‰½É‘•ÈµÐ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€€€ñ	ÕÑÑ½¸(€€€€€€€€€€€€€€€€€ÑåÁ”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€€€€€Ù…É¥…¹Ðô‰½ÕÑ±¥¹”ˆ(€€€€€€€€€€€€€€€€€Í¥é”ô‰Í´ˆ(€€€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÍ•ÑM¡½ÝÉ•…Ñ•5½‘…°¡™…±Í”¥ô(€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€…¹•±…È(€€€€€€€€€€€€€€€€ð½	ÕÑÑ½¸ø(€€€€€€€€€€€€€€€€ñ	ÕÑÑ½¸(€€€€€€€€€€€€€€€€€ÑåÁ”ô‰ÍÕ‰µ¥Ðˆ(€€€€€€€€€€€€€€€€€Ù…É¥…¹Ðô‰‘•™…Õ±Ðˆ(€€€€€€€€€€€€€€€€€Í¥é”ô‰Í´ˆ(€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰‰œµ¥¹‘¥¼´ØÀÀ¡½Ù•Èé‰œµ¥¹‘¥¼´ÜÀÀˆ(€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€É•…ÈäÑ¥Ù…ÈUÍÕ…É¥¼(€€€€€€€€€€€€€€€€ð½	ÕÑÑ½¸ø(€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€ð½™½É´ø(€€€€€€€€€€ð½‘¥Øø(€€€€€€€€ð½‘¥Øø(€€€€€€¥ô((€€€€€ì¼¨5=0=9%UI	10AI=	HM=1%%QU€¨½ô(€€€€€íÍ•±•Ñ•‘I•Ä€˜˜€ (€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™¥á•¥¹Í•Ð´Àè´ÔÀ‰œµÍ±…Ñ”´äÀÀ¼ØÀ‰…­‘É½Àµ‰±ÕÈµáÌ™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹Ñ•ÈÀ´Ð…¹¥µ…Ñ”µ™…‘”µ¥¸ˆø(€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•´Éá°µ…àµÜµ±œÜµ™Õ±°À´ØÍ¡…‘½Ü´Éá°ÍÁ…”µä´Ôµ…àµ µläÁÙ¡t½Ù•É™±½Üµäµ…ÕÑ¼ˆø(€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ‰•ÑÝ••¸Áˆ´Ì‰½É‘•Èµˆ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€ñ Ì±…ÍÍ9…µ”ô‰Ñ•áÐµ‰…Í”™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´äÀÀ™±•à¥Ñ•µÌµ•¹Ñ•È…À´Èˆø(€€€€€€€€€€€€€€€€ñUÍ•É¡•¬Í¥é”õìÈÁô±…ÍÍ9…µ”ô‰Ñ•áÐµ¥¹‘¥¼´ØÀÀˆ€¼ø(€€€€€€€€€€€€€€€€ñÍÁ…¸ù½¹™¥ÕÉ…ÈA•Éµ¥Í½Ì‘”íÍ•±•Ñ•‘I•Ä¹¹…µ•ôð½ÍÁ…¸ø(€€€€€€€€€€€€€€ð½ Ìø(€€€€€€€€€€€€€€ñ‰ÕÑÑ½¸(€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÍ•ÑM•±•Ñ•‘I•Ä¡¹Õ±°¥ô(€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÐÀÀ¡½Ù•ÈéÑ•áÐµÍ±…Ñ”´ØÀÀÀ´Äˆ(€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€ña¥É±”Í¥é”õìÄáô€¼ø(€€€€€€€€€€€€€€ð½‰ÕÑÑ½¸ø(€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´ÐÑ•áÐµáÌˆø(€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰À´Ì‰œµÍ±…Ñ”´ÔÀÉ½Õ¹‘•µá°‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÄÀÀÍÁ…”µä´Äˆø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´äÀÀÑ•áÐµÍ´ˆùíÍ•±•Ñ•‘I•Ä¹¹…µ•ôð½‘¥Øø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áÐµ¥¹‘¥¼´ØÀÀ™½¹ÐµÍ•µ¥‰½±™½¹Ðµµ½¹¼ˆùíÍ•±•Ñ•‘I•Ä¹ÕÍ•É¹…µ•ôð½‘¥Øø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰Ñ•áÐµÍ±…Ñ”´ÔÀÀˆùíÍ•±•Ñ•‘I•Ä¹•µ…¥±ôƒŠˆíÍ•±•Ñ•‘I•Ä¹Á¡½¹•ôð½‘¥Øø(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´Ä¸Ôˆø(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆø(€€€€€€€€€€€€€€€€€€Ä¸Í¥¹…ÈI½°	…Í”è(€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€ñÍ•±•Ð(€€€€€€€€€€€€€€€€€Ù…±Õ”õíÍ•±•Ñ•‘I½±•ô(€€€€€€€€€€€€€€€€€½¹¡…¹”õì¡”¤€ôø¡…¹‘±•I½±•¡…¹•½É9•ÝUÍ•È¡”¹Ñ…É•Ð¹Ù…±Õ”¥ô(€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰Üµ™Õ±°‰œµÝ¡¥Ñ”‰½É‘•È‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÉ½Õ¹‘•µ±œÀ´È¸ÔÑ•áÐµáÌ™½¹ÐµÍ•µ¥‰½±Ñ•áÐµÍ±…Ñ”´äÀÀ™½ÕÌéÉ¥¹œ´È™½ÕÌéÉ¥¹œµ¥¹‘¥¼´ÔÀÀ¼ÈÀ™½ÕÌé‰½É‘•Èµ¥¹‘¥¼´ØÀÀ½ÕÑ±¥¹”µ¹½¹”ˆ(€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€íMeMQ5}I=1L¹µ…À ¡È¤€ôø€ (€€€€€€€€€€€€€€€€€€€€ñ½ÁÑ¥½¸­•äõíÈ¹½‘•ôÙ…±Õ”õíÈ¹½‘•ôø(€€€€€€€€€€€€€€€€€€€€€íÈ¹¹…µ•ôƒŠPíÈ¹‘•ÍÉ¥ÁÑ¥½¹ô(€€€€€€€€€€€€€€€€€€€€ð½½ÁÑ¥½¸ø(€€€€€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€€€€€ð½Í•±•Ðø(€€€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰ÍÁ…”µä´ÈÁÐ´Ä‰½É‘•ÈµÐ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€€€ñ±…‰•°±…ÍÍ9…µ”ô‰™½¹Ðµ‰½±Ñ•áÐµÍ±…Ñ”´ÜÀÀ‰±½¬ˆø(€€€€€€€€€€€€€€€€€€È¸Ñ¥Ù…È€¼•Í…Ñ¥Ù…È7Í‘Õ±½ÌÍÁ•µ™¥½ÌÁ…É„•ÍÑ”UÍÕ…É¥¼è(€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰É¥É¥µ½±Ì´È…À´Èµ…àµ ´Ðà½Ù•É™±½Üµäµ…ÕÑ¼À´Äˆø(€€€€€€€€€€€€€€€€€íMeMQ5}5=U1L¹µ…À ¡µ½¤€ôøì(€€€€€€€€€€€€€€€€€€€½¹ÍÐ¥Í¡•­•€ôÍ•±•Ñ•‘5½‘Õ±•Í½É9•ÝUÍ•È¹¥¹±Õ‘•Ì¡µ½¹­•ä¤ì((€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸€ (€€€€€€€€€€€€€€€€€€€€€€ñ±…‰•°(€€€€€€€€€€€€€€€€€€€€€€€­•äõíµ½¹­•åô(€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”õí™±•à¥Ñ•µÌµ•¹Ñ•È…À´ÈÀ´ÈÉ½Õ¹‘•µ±œ‰½É‘•ÈÑ•áÐµáÌÕÉÍ½ÈµÁ½¥¹Ñ•ÈÑÉ…¹Í¥Ñ¥½¸µ…±°€‘ì(€€€€€€€€€€€€€€€€€€€€€€€€€¥Í¡•­•(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü€‰‰œµ¥¹‘¥¼´ÔÀ¼ØÀ‰½É‘•Èµ¥¹‘¥¼´ÈÀÀ™½¹ÐµÍ•µ¥‰½±Ñ•áÐµ¥¹‘¥¼´äÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€è€‰‰œµÝ¡¥Ñ”‰½É‘•ÈµÍ±…Ñ”´ÈÀÀÑ•áÐµÍ±…Ñ”´ØÀÀ¡½Ù•Èé‰œµÍ±…Ñ”´ÔÀˆ(€€€€€€€€€€€€€€€€€€€€€€€õô(€€€€€€€€€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€€€€€€€€€€ñ¥¹ÁÕÐ(€€€€€€€€€€€€€€€€€€€€€€€€€ÑåÁ”ô‰¡•­‰½àˆ(€€€€€€€€€€€€€€€€€€€€€€€€€¡•­•õí¥Í¡•­•‘ô(€€€€€€€€€€€€€€€€€€€€€€€€€½¹¡…¹”õì ¤€ôø¡…¹‘±•Q½±•5½‘Õ±•½É9•ÝUÍ•È¡µ½¹­•ä¥ô(€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰É½Õ¹‘•Ñ•áÐµ¥¹‘¥¼´ØÀÀ™½ÕÌéÉ¥¹œµ¥¹‘¥¼´ÔÀÀ…•¹Ðµ¥¹‘¥¼´ØÀÀˆ(€€€€€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€€€€€€€ñÍÁ…¸ùíµ½¹±…‰•±ôð½ÍÁ…¸ø(€€€€€€€€€€€€€€€€€€€€€€ð½±…‰•°ø(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€ô¥ô(€€€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€€€ð½‘¥Øø((€€€€€€€€€€€€ñ‘¥Ø±…ÍÍ9…µ”ô‰™±•à¥Ñ•µÌµ•¹Ñ•È©ÕÍÑ¥™äµ•¹…À´ÈÁÐ´Ì‰½É‘•ÈµÐ‰½É‘•ÈµÍ±…Ñ”´ÄÀÀˆø(€€€€€€€€€€€€€€ñ	ÕÑÑ½¸(€€€€€€€€€€€€€€€Ù…É¥…¹Ðô‰½ÕÑ±¥¹”ˆ(€€€€€€€€€€€€€€€Í¥é”ô‰Í´ˆ(€€€€€€€€€€€€€€€½¹±¥¬õì ¤€ôøÍ•ÑM•±•Ñ•‘I•Ä¡¹Õ±°¥ô(€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€…¹•±…È(€€€€€€€€€€€€€€ð½	ÕÑÑ½¸ø(€€€€€€€€€€€€€€ñ	ÕÑÑ½¸(€€€€€€€€€€€€€€€Ù…É¥…¹Ðô‰‘•™…Õ±Ðˆ(€€€€€€€€€€€€€€€Í¥é”ô‰Í´ˆ(€€€€€€€€€€€€€€€±…ÍÍ9…µ”ô‰‰œµ¥¹‘¥¼´ØÀÀ¡½Ù•Èé‰œµ¥¹‘¥¼´ÜÀÀˆ(€€€€€€€€€€€€€€€½¹±¥¬õí¡…¹‘±•ÁÁÉ½Ù•ô(€€€€€€€€€€€€€€ø(€€€€€€€€€€€€€€€½¹™¥Éµ…Èä•ÁÑ…ÈÕ•¹Ñ„(€€€€€€€€€€€€€€ð½	ÕÑÑ½¸ø(€€€€€€€€€€€€ð½‘¥Øø(€€€€€€€€€€ð½‘¥Øø(€€€€€€€€ð½‘¥Øø(€€€€€€¥ô(€€€€ð½‘¥Øø(€€¤ì)ô
+                                  : "bg-slate-100/70 border-slate-200 text-slate-400 opacity-60 hover:opacity-100"
+                              } ${u.roleCode === "ADMIN" ? "cursor-not-allowed" : "cursor-pointer"}`}
+                            >
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-xs block">{mod.label}</span>
+                                <span className="text-[10px] text-slate-400 block line-clamp-1">
+                                  {mod.description}
+                                </span>
+                              </div>
+
+                              <div>
+                                {isEnabled ? (
+                                  <ToggleRight size={20} className="text-indigo-600 shrink-0" />
+                                ) : (
+                                  <ToggleLeft size={20} className="text-slate-300 shrink-0" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: SOLICITUDES PENDIENTES */}
+      {activeTab === "requests" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Solicitudes Pendientes</h2>
+              <p className="text-xs text-slate-500">
+                Usuarios que han completado la solicitud en /solicitar-acceso.
+              </p>
+            </div>
+          </div>
+
+          {pendingRequests.length === 0 ? (
+            <Card className="p-8 text-center border-dashed border-slate-200">
+              <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 size={24} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900">No hay solicitudes pendientes</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Todas las solicitudes han sido procesadas.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingRequests.map((req) => (
+                <Card key={req.id} className="border-slate-200/80 hover:border-indigo-200 transition-all shadow-xs">
+                  <CardHeader className="p-5 pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-0.5">
+                        <CardTitle className="text-base font-bold text-slate-900">{req.name}</CardTitle>
+                        <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
+                          <AtSign size={13} className="shrink-0" />
+                          <span>{req.username}</span>
+                        </div>
+                      </div>
+                      <Badge variant="warning" className="text-[10px]">
+                        Pendiente
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Correo</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <Mail size={13} className="text-slate-400 shrink-0" />
+                          {req.email}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">TelÃ©fono</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <Phone size={13} className="text-slate-400 shrink-0" />
+                          {req.phone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(req.createdAt).toLocaleDateString("es-DO")}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 text-xs px-2.5"
+                          onClick={() => handleReject(req.id)}
+                        >
+                          <XCircle size={14} />
+                          <span>Rechazar</span>
+                        </Button>
+
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700"
+                          onClick={() => {
+                            setSelectedReq(req);
+                            setSelectedRole("VENTAS");
+                            setSelectedModulesForNewUser([...DEFAULT_ROLE_MODULES["VENTAS"]]);
+                          }}
+                        >
+                          <UserCheck size={14} />
+                          <span>Configurar & Aceptar</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Historial */}
+          {historyRequests.length > 0 && (
+            <div className="pt-6 border-t border-slate-200 space-y-3">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Historial de Solicitudes</h3>
+              <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">Nombre</th>
+                      <th className="p-3">Usuario</th>
+                      <th className="p-3">Email</th>
+                      <th className="p-3">TelÃ©fono</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3">Rol Asignado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {historyRequests.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-900">{r.name}</td>
+                        <td className="p-3 font-mono font-semibold text-indigo-600">@{r.username}</td>
+                        <td className="p-3">{r.email}</td>
+                        <td className="p-3">{r.phone}</td>
+                        <td className="p-3">
+                          {r.status === "APPROVED" ? (
+                            <Badge variant="success">Aprobado</Badge>
+                          ) : (
+                            <Badge variant="destructive">Rechazado</Badge>
+                          )}
+                        </td>
+                        <td className="p-3 font-mono font-semibold text-slate-700">{r.assignedRole ?? "â€”"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL CREAR USUARIO DIRECTO */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus size={20} className="text-indigo-600" />
+                <span>Crear Usuario Directamente</span>
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDirectUserSubmit} className="space-y-4 text-xs">
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 block">Nombre completo</label>
+                <div className="relative flex items-center">
+                  <User className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input
+                    type="text"
+                    placeholder="Ej. Mario Santos"
+                    value={directUserData.name}
+                    onChange={(e) => setDirectUserData({ ...directUserData, name: e.target.value })}
+                    className={`pl-9.5 ${createErrors.name ? "border-red-500" : ""}`}
+                  />
+                </div>
+                {createErrors.name && <p className="text-xs text-red-600 mt-0.5">{createErrors.name}</p>}
+              </div>
+
+              {/* Username & Phone grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Usuario</label>
+                  <div className="relative flex items-center">
+                    <AtSign className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="msantos"
+                      value={directUserData.username}
+                      onChange={(e) => setDirectUserData({ ...directUserData, username: e.target.value })}
+                      className={`pl-9.5 ${createErrors.username ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.username && <p className="text-xs text-red-600 mt-0.5">{createErrors.username}</p>}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">TelÃ©fono</label>
+                  <div className="relative flex items-center">
+                    <Phone className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="tel"
+                      placeholder="809-555-0199"
+                      value={directUserData.phone}
+                      onChange={(e) => setDirectUserData({ ...directUserData, phone: e.target.value })}
+                      className={`pl-9.5 ${createErrors.phone ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.phone && <p className="text-xs text-red-600 mt-0.5">{createErrors.phone}</p>}
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 block">Correo electrÃ³nico</label>
+                <div className="relative flex items-center">
+                  <Mail className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input
+                    type="email"
+                    placeholder="mario.santos@empresa.com"
+                    value={directUserData.email}
+                    onChange={(e) => setDirectUserData({ ...directUserData, email: e.target.value })}
+                    className={`pl-9.5 ${createErrors.email ? "border-red-500" : ""}`}
+                  />
+                </div>
+                {createErrors.email && <p className="text-xs text-red-600 mt-0.5">{createErrors.email}</p>}
+              </div>
+
+              {/* Role */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 block">Rol Inicial</label>
+                <select
+                  value={directUserData.roleCode}
+                  onChange={(e) => handleDirectRoleChange(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none"
+                >
+                  {SYSTEM_ROLES.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.name} â€” {r.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Module Checklist */}
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <label className="font-bold text-slate-700 block">
+                  MÃ³dulos Habilitados para este Usuario:
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const isChecked = directUserModules.includes(mod.key);
+
+                    return (
+                      <label
+                        key={mod.key}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isChecked
+                            ? "bg-indigo-50/60 border-indigo-200 font-semibold text-indigo-900"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleDirectModule(mod.key)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                        />
+                        <span>{mod.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="default"
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Crear y Activar Usuario
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIGURABLE AL APROBAR SOLICITUD */}
+      {selectedReq && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserCheck size={20} className="text-indigo-600" />
+                <span>Configurar Permisos de {selectedReq.name}</span>
+              </h3>
+              <button
+                onClick={() => setSelectedReq(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                <div className="font-bold text-slate-900 text-sm">{selectedReq.name}</div>
+                <div className="text-indigo-600 font-semibold font-mono">@{selectedReq.username}</div>
+                <div className="text-slate-500">{selectedReq.email} â€¢ {selectedReq.phone}</div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 block">
+                  1. Asignar Rol Base:
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => handleRoleChangeForNewUser(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none"
+                >
+                  {SYSTEM_ROLES.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.name} â€” {r.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <label className="font-bold text-slate-700 block">
+                  2. Activar / Desactivar MÃ³dulos EspecÃ­ficos para este Usuario:
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const isChecked = selectedModulesForNewUser.includes(mod.key);
+
+                    return (
+                      <label
+                        key={mod.key}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isChecked
+                            ? "bg-indigo-50/60 border-indigo-200 font-semibold text-indigo-900"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleModuleForNewUser(mod.key)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                        />
+                        <span>{mod.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedReq(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleApprove}
+              >
+                Confirmar y Aceptar Cuenta
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
