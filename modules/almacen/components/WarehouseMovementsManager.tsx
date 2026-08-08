@@ -94,6 +94,8 @@ export function WarehouseMovementsManager({ roleCode = "ADMIN" }: { roleCode?: s
         productId,
         type,
         unitsCount: Number(unitsCount) || 1,
+        measure: "UNITS",
+        quantity: Number(unitsCount) || 1,
         reason: reason.trim(),
       };
 
