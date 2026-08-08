@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { StockCountsList } from "@/modules/almacen/components/StockCountsList";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Conteos de Stock | SDigitalCore",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function ConteosPage() {
-  return <StockCountsList />;
+  redirect("/almacen");
 }

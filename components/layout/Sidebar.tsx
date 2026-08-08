@@ -37,7 +37,6 @@ const navItems: NavItem[] = [
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
     { label: "Movimientos", href: "/almacen/movimientos" },
     { label: "Transferencias", href: "/almacen/transferencias" },
-    { label: "Conteos de stock", href: "/almacen/conteos" },
   ] },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },
