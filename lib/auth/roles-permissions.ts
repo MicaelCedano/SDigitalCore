@@ -258,6 +258,14 @@ export function toggleUserStatus(userId: string): boolean {
   return true;
 }
 
+export function deleteUser(userId: string): boolean {
+  if (userId === "user-dev-admin") return false;
+  const exists = usersStore.some((user) => user.id === userId);
+  if (!exists) return false;
+  usersStore = usersStore.filter((user) => user.id !== userId);
+  return true;
+}
+
 export function isModuleAllowedForUser(userEmail: string, moduleKey: string): boolean {
   const user = usersStore.find((u) => u.email === userEmail);
   if (!user) return true;

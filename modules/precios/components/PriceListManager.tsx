@@ -20,6 +20,7 @@ type Workspace = { inventory: Item[]; activeList: Item[]; brands: Brand[]; logo:
 const ACTIVE_KEY = "sdigitalcore.price-list.active";
 const INVENTORY_KEY = "sdigitalcore.price-list.inventory";
 const LOGO_KEY = "sdigitalcore.price-list.logo";
+const PREVIEW_WIDTH = 1080;
 
 const money = (value: unknown) => `RD$${Number(value || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`;
 const syncActive = (active: Item[], inventory: Item[]) => {
@@ -107,6 +108,45 @@ export function PriceListManager() {
     );
   }, [activeList, orderedBrands]);
 
+  useEffect(() => {
+    const preview = previewRef.current;
+    const viewport = preview?.parentElement;
+    if (!viewport || !preview) return;
+
+    const updatePreviewSize = () => {
+      const availableWidth = Math.max(viewport.clientWidth - 32, 320);
+      const nextScale = Math.min(1, availableWidth / PREVIEW_WIDTH);
+      preview.style.zoom = String(nextScale);
+    };
+
+    updatePreviewSize();
+    const observer = new ResizeObserver(updatePreviewSize);
+    observer.observe(viewport);
+    observer.observe(preview);
+    return () => observer.disconnect();
+  }, [grouped, logo]);
+
+  useEffect(() => {
+    if (!showBrandModal) return;
+    const modal = document.querySelector<HTMLElement>("div.fixed.inset-0.z-50");
+    const panel = modal?.firstElementChild as HTMLElement | null;
+    const header = panel?.firstElementChild as HTMLElement | null;
+    if (!modal || !panel) return;
+
+    modal.style.alignItems = "flex-start";
+    panel.style.maxHeight = "calc(100vh - 2rem)";
+    panel.style.overflowY = "auto";
+    panel.style.marginTop = "1rem";
+    panel.style.marginBottom = "1rem";
+    if (header) {
+      header.style.position = "sticky";
+      header.style.top = "-1.5rem";
+      header.style.zIndex = "1";
+      header.style.paddingTop = "1.5rem";
+      header.style.backgroundColor = "white";
+    }
+  }, [showBrandModal]);
+
   const openCreate = () => {
     setEditing(null); setForm({ brand: orderedBrands[0]?.name || "", model: "", specs: "", price: "", cost: "0", wholesale: "0" }); setMessage(""); setShowItemModal(true);
   };
@@ -158,8 +198,15 @@ export function PriceListManager() {
   };
   const exportImage = async () => {
     if (!previewRef.current) return; setExporting(true);
-    try { const canvas = await html2canvas(previewRef.current, { scale: 1, backgroundColor: "#fff", useCORS: true, windowWidth: 1080 }); const link = document.createElement("a"); link.download = `lista-precios-${new Date().toISOString().slice(0, 10)}.png`; link.href = canvas.toDataURL("image/png"); link.click(); }
-    catch { setMessage("No se pudo generar la imagen."); } finally { setExporting(false); }
+    const previousZoom = previewRef.current.style.zoom;
+    try {
+      previewRef.current.style.zoom = "1";
+      const canvas = await html2canvas(previewRef.current, { scale: 1, backgroundColor: "#fff", useCORS: true, windowWidth: PREVIEW_WIDTH });
+      const link = document.createElement("a"); link.download = `lista-precios-${new Date().toISOString().slice(0, 10)}.png`; link.href = canvas.toDataURL("image/png"); link.click();
+    } catch { setMessage("No se pudo generar la imagen."); } finally {
+      previewRef.current.style.zoom = previousZoom;
+      setExporting(false);
+    }
   };
 
   return <div className="mx-auto max-w-[1500px] space-y-5 pb-10">

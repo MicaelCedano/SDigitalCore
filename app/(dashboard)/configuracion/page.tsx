@@ -13,6 +13,7 @@ import {
   updateUserRole,
   toggleUserModulePermission,
   toggleUserStatus,
+  deleteUser,
   type AccessRequest,
   type SystemUser,
 } from "@/lib/auth/roles-permissions";
@@ -34,6 +35,7 @@ import {
   Phone,
   AtSign,
   User,
+  LockKeyhole,
   AlertCircle,
   SlidersHorizontal,
   ChevronDown,
@@ -61,6 +63,8 @@ export default function ConfiguracionPage() {
     username: "",
     email: "",
     phone: "",
+    password: "",
+    confirmPassword: "",
     roleCode: "VENTAS",
   });
   const [directUserModules, setDirectUserModules] = useState<string[]>([
@@ -139,6 +143,9 @@ export default function ConfiguracionPage() {
     if (!directUserData.email.trim()) errs.email = "El correo es requerido";
     if (!directUserData.phone.trim()) errs.phone = "El teléfono es requerido";
 
+    if (directUserData.password.length < 6) errs.password = "La contraseÃ±a debe tener al menos 6 caracteres";
+    if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃ±as no coinciden";
+
     if (Object.keys(errs).length > 0) {
       setCreateErrors(errs);
       return;
@@ -151,7 +158,7 @@ export default function ConfiguracionPage() {
 
     setUsers([...getUsers()]);
     setShowCreateModal(false);
-    setDirectUserData({ name: "", username: "", email: "", phone: "", roleCode: "VENTAS" });
+    setDirectUserData({ name: "", username: "", email: "", phone: "", password: "", confirmPassword: "", roleCode: "VENTAS" });
     setDirectUserModules([...DEFAULT_ROLE_MODULES["VENTAS"]]);
     setActionNotice(`¡Usuario @${created.username} (${created.name}) creado con éxito!`);
     setTimeout(() => setActionNotice(null), 4000);
@@ -174,6 +181,21 @@ export default function ConfiguracionPage() {
   function handleStatusToggle(userId: string) {
     toggleUserStatus(userId);
     setUsers([...getUsers()]);
+  }
+
+  function handleDeleteUser(user: SystemUser) {
+    if (user.id === "user-dev-admin") {
+      setActionNotice("La cuenta administradora local no se puede eliminar.");
+      setTimeout(() => setActionNotice(null), 3000);
+      return;
+    }
+    if (!window.confirm(`Â¿Eliminar al usuario @${user.username}? Esta acciÃ³n no se puede deshacer.`)) return;
+    if (deleteUser(user.id)) {
+      setUsers([...getUsers()]);
+      setExpandedUserId((current) => current === user.id ? null : current);
+      setActionNotice(`Usuario @${user.username} eliminado.`);
+      setTimeout(() => setActionNotice(null), 3000);
+    }
   }
 
   return (
@@ -326,6 +348,17 @@ export default function ConfiguracionPage() {
                         onClick={() => handleStatusToggle(u.id)}
                       >
                         {u.status === "ACTIVE" ? "Bloquear" : "Activar"}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleDeleteUser(u)}
+                        disabled={u.id === "user-dev-admin"}
+                        title={u.id === "user-dev-admin" ? "La cuenta administradora local está protegida" : "Eliminar usuario"}
+                      >
+                        Eliminar
                       </Button>
                     </div>
                   </div>
@@ -587,6 +620,40 @@ export default function ConfiguracionPage() {
                     />
                   </div>
                   {createErrors.phone && <p className="text-xs text-red-600 mt-0.5">{createErrors.phone}</p>}
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">ContraseÃ±a inicial</label>
+                  <div className="relative flex items-center">
+                    <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="password"
+                      placeholder="MÃ­nimo 6 caracteres"
+                      value={directUserData.password}
+                      onChange={(e) => setDirectUserData({ ...directUserData, password: e.target.value })}
+                      autoComplete="new-password"
+                      className={`pl-9.5 ${createErrors.password ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.password && <p className="text-xs text-red-600 mt-0.5">{createErrors.password}</p>}
+                </div>
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Confirmar contraseÃ±a</label>
+                  <div className="relative flex items-center">
+                    <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="password"
+                      placeholder="Repite la contraseÃ±a"
+                      value={directUserData.confirmPassword}
+                      onChange={(e) => setDirectUserData({ ...directUserData, confirmPassword: e.target.value })}
+                      autoComplete="new-password"
+                      className={`pl-9.5 ${createErrors.confirmPassword ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.confirmPassword && <p className="text-xs text-red-600 mt-0.5">{createErrors.confirmPassword}</p>}
                 </div>
               </div>
 
