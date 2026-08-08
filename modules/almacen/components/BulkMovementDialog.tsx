@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, CheckCircle2, Download, Plus, Search, Trash2, X } from "lucide-react";
-import { createWarehouseMovementsBulkAction } from "../actions/warehouse";
+import { createWarehouseMovementsBulkAction, createWarehouseRequestAction } from "../actions/warehouse";
 
 type Product = {
   id: string;
@@ -14,11 +14,12 @@ type Product = {
   boxes: number;
   totalUnits: number;
   looseUnits?: number;
+  unitsPerBox?: number;
 };
 
 type MovementType = "ENTRY" | "EXIT";
 
-export function BulkMovementDialog({ products, type, onComplete }: { products: Product[]; type: MovementType; onComplete: () => void }) {
+export function BulkMovementDialog({ products, type, onComplete, mode = "DIRECT", branch = "Principal" }: { products: Product[]; type: MovementType; onComplete: () => void; mode?: "DIRECT" | "REQUEST"; branch?: string }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Array<{ product: Product; units: number }>>([]);
@@ -44,10 +45,12 @@ export function BulkMovementDialog({ products, type, onComplete }: { products: P
     if (selected.length === 0) { setError("Agregue al menos un modelo."); return; }
     if (!reason.trim()) { setError("Indique el motivo del movimiento."); return; }
     setSaving(true); setError(null);
-    const result = await createWarehouseMovementsBulkAction({ type, reason, items: selected.map((item) => ({ productId: item.product.id, unitsCount: item.units })) });
+    const result = mode === "REQUEST"
+      ? await createWarehouseRequestAction({ title: reason.trim(), branch, type, details: reason.trim(), items: selected.map((item) => ({ productId: item.product.id, unitsCount: item.units })), status: "PENDING" })
+      : await createWarehouseMovementsBulkAction({ type, reason, items: selected.map((item) => ({ productId: item.product.id, unitsCount: item.units })) });
     setSaving(false);
     if (!result.success) { setError(result.error); return; }
-    setVoucher({ ...result.data, items: selected.map((item) => ({ ...item.product, unitsCount: item.units })) });
+    if (mode === "DIRECT") setVoucher({ ...result.data, items: selected.map((item) => ({ ...item.product, unitsCount: item.units })) });
     close();
     onComplete();
   };
@@ -57,12 +60,12 @@ export function BulkMovementDialog({ products, type, onComplete }: { products: P
     <>
       <button type="button" onClick={() => setOpen(true)} className={`px-4 py-2.5 ${type === "ENTRY" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"} text-white rounded-xl text-xs font-bold flex items-center gap-1.5`}>
         {type === "ENTRY" ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-        Registrar {type === "ENTRY" ? "Entrada" : "Salida"} por unidades
+        {mode === "REQUEST" ? "Solicitar" : "Registrar"} {type === "ENTRY" ? "Entrada" : "Salida"} por unidades
       </button>
 
       {open && <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h2 className="font-bold text-slate-800">Nueva {type === "ENTRY" ? "entrada" : "salida"} de mercancía</h2><button onClick={close} className="text-slate-400"><X /></button></div>
+          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between"><h2 className="font-bold text-slate-800">{mode === "REQUEST" ? "Solicitar" : "Nueva"} {type === "ENTRY" ? "entrada" : "salida"} de mercancía</h2><button onClick={close} className="text-slate-400"><X /></button></div>
           <form onSubmit={submit} className="p-6 space-y-4">
             {error && <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">{error}</div>}
             <div className="relative"><Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar código, producto o marca..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
@@ -70,7 +73,7 @@ export function BulkMovementDialog({ products, type, onComplete }: { products: P
             </div>
             <div className="space-y-2 max-h-56 overflow-y-auto">{selected.map((item) => <div key={item.product.id} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl"><div className="flex-1 min-w-0"><p className="text-xs font-bold text-slate-800 truncate">{item.product.name}</p><p className="text-[11px] text-slate-500">Disponible: {item.product.totalUnits} uds · Sueltas: {item.product.looseUnits || 0}</p></div><input type="number" min={1} value={item.units} onChange={(e) => updateUnits(item.product.id, Number(e.target.value))} className="w-24 px-2 py-2 text-xs font-bold border border-slate-200 rounded-lg" /><button type="button" onClick={() => setSelected((items) => items.filter((entry) => entry.product.id !== item.product.id))} className="text-red-500"><Trash2 className="w-4 h-4" /></button></div>)}{selected.length === 0 && <p className="p-5 text-center text-xs text-slate-400">Busque y agregue los modelos que forman parte del movimiento.</p>}</div>
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo del despacho o entrada" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={close} className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-semibold">Cancelar</button><button type="submit" disabled={saving} className={`px-4 py-2 text-white rounded-xl text-xs font-bold ${type === "ENTRY" ? "bg-emerald-600" : "bg-rose-600"}`}>{saving ? "Guardando..." : "Confirmar movimiento"}</button></div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={close} className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-semibold">Cancelar</button><button type="submit" disabled={saving} className={`px-4 py-2 text-white rounded-xl text-xs font-bold ${type === "ENTRY" ? "bg-emerald-600" : "bg-rose-600"}`}>{saving ? "Guardando..." : mode === "REQUEST" ? "Enviar solicitud" : "Confirmar movimiento"}</button></div>
           </form>
         </div>
       </div>}
