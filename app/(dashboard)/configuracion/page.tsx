@@ -186,7 +186,7 @@ export default function ConfiguracionPage() {
     if (!directUserData.name.trim()) errs.name = "El nombre completo es requerido";
     if (!directUserData.username.trim()) errs.username = "El nombre de usuario es requerido";
     if (!directUserData.email.trim()) errs.email = "El correo es requerido";
-    if (!directUserData.phone.trim()) errs.phone = "El teléfono es requerido";
+    if (directUserData.phone.trim().length < 7) errs.phone = "El teléfono debe tener al menos 7 caracteres";
 
     if (directUserData.password.length < 8) errs.password = "La contraseña debe tener al menos 8 caracteres";
     if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃ±as no coinciden";
@@ -203,6 +203,7 @@ export default function ConfiguracionPage() {
     });
 
     if (!result.success) {
+      setCreateErrors({ form: result.error });
       setActionNotice(result.error);
       setIsSaving(false);
       return;
@@ -665,6 +666,12 @@ export default function ConfiguracionPage() {
             </div>
 
             <form onSubmit={handleCreateDirectUserSubmit} className="space-y-4 text-xs">
+              {createErrors.form && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg font-semibold">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{createErrors.form}</span>
+                </div>
+              )}
               {/* Name */}
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700 block">Nombre completo</label>
