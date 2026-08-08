@@ -51,7 +51,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseProductSchema.parse(input);
     const boxes = Number(validated.boxes) || 0;
-    const unitsPerBox = Number(validated.unitsPerBox) || 1;
+    const unitsPerBox = Number(validated.unitsPerBox);
     const looseUnits = Number(validated.looseUnits) || 0;
     const totalUnits = boxes * unitsPerBox + looseUnits;
 
