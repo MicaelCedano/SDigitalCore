@@ -77,6 +77,7 @@ export default function ConfiguracionPage() {
 
   // Notification Toast
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<SystemUser | null>(null);
 
   const pendingRequests = requests.filter((r) => r.status === "PENDING");
   const historyRequests = requests.filter((r) => r.status !== "PENDING");
@@ -181,6 +182,26 @@ export default function ConfiguracionPage() {
   function handleStatusToggle(userId: string) {
     toggleUserStatus(userId);
     setUsers([...getUsers()]);
+  }
+
+  function requestDeleteUser(user: SystemUser) {
+    if (user.id === "user-dev-admin") {
+      setActionNotice("La cuenta administradora local no se puede eliminar.");
+      setTimeout(() => setActionNotice(null), 3000);
+      return;
+    }
+    setPendingDeleteUser(user);
+  }
+
+  function confirmDeleteUser() {
+    if (!pendingDeleteUser) return;
+    if (deleteUser(pendingDeleteUser.id)) {
+      setUsers([...getUsers()]);
+      setExpandedUserId((current) => current === pendingDeleteUser.id ? null : current);
+      setActionNotice(`Usuario @${pendingDeleteUser.username} eliminado.`);
+      setTimeout(() => setActionNotice(null), 3000);
+    }
+    setPendingDeleteUser(null);
   }
 
   function handleDeleteUser(user: SystemUser) {
@@ -354,7 +375,7 @@ export default function ConfiguracionPage() {
                         variant="ghost"
                         size="sm"
                         className="h-8 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
-                        onClick={() => handleDeleteUser(u)}
+                        onClick={() => requestDeleteUser(u)}
                         disabled={u.id === "user-dev-admin"}
                         title={u.id === "user-dev-admin" ? "La cuenta administradora local está protegida" : "Eliminar usuario"}
                       >
@@ -831,6 +852,38 @@ export default function ConfiguracionPage() {
               >
                 Confirmar y Aceptar Cuenta
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm animate-fade-in">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="flex items-start gap-4 border-b border-slate-100 p-6">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                <AlertCircle size={23} />
+              </div>
+              <div>
+                <h2 id="delete-user-title" className="text-lg font-black text-slate-900">Eliminar usuario</h2>
+                <p className="mt-1 text-sm leading-5 text-slate-500">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-bold text-slate-900">{pendingDeleteUser.name}</p>
+                <p className="mt-1 text-xs font-semibold text-indigo-600">@{pendingDeleteUser.username}</p>
+              </div>
+              <p className="mt-4 text-sm text-slate-600">¿Quieres eliminar este usuario del sistema?</p>
+              <div className="mt-6 flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setPendingDeleteUser(null)}>Cancelar</Button>
+                <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDeleteUser}>Eliminar usuario</Button>
+              </div>
             </div>
           </div>
         </div>
