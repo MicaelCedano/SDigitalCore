@@ -9,9 +9,12 @@ export const warehouseProductSchema = z.object({
   capacity: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   boxes: z.number().int().min(0, "Cajas debe ser mayor o igual a 0").default(0),
-  unitsPerBox: z.number().int().min(1, "Debe tener al menos 1 unidad por caja").default(1),
+  unitsPerBox: z.number().int().min(0, "Unidades por caja debe ser mayor o igual a 0").default(1),
   looseUnits: z.number().int().min(0, "Equipos sin caja debe ser mayor o igual a 0").default(0),
-});
+}).refine(
+  (data) => data.boxes === 0 || data.unitsPerBox >= 1,
+  "Indica al menos 1 unidad por caja cuando registres cajas."
+);
 
 export const warehouseMovementSchema = z.object({
   productId: z.string().min(1, "Seleccione un producto"),
