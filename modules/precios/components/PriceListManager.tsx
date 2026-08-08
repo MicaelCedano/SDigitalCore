@@ -89,9 +89,10 @@ export function PriceListManager() {
     const groups = new Map<string, Item[]>();
     for (const item of activeList) groups.set(item.brand || "SIN MARCA", [...(groups.get(item.brand || "SIN MARCA") || []), item]);
     for (const list of groups.values()) list.sort((a, b) => Number(a.retailPrice) - Number(b.retailPrice));
-    return orderedBrands.map((brand) => ({ brand, items: groups.get(brand.name) || [] })).filter((group) => group.items.length).concat(
+    const result = orderedBrands.map((brand) => ({ brand, items: groups.get(brand.name) || [] })).filter((group) => group.items.length).concat(
       [...groups.entries()].filter(([name]) => !orderedBrands.some((brand) => brand.name === name)).map(([name, items]) => ({ brand: { id: name, name, color: "#111827", orderIndex: 999 }, items }))
     );
+    return result.sort((a, b) => b.items.length - a.items.length || a.brand.orderIndex - b.brand.orderIndex);
   }, [activeList, orderedBrands]);
   const groupedByCategory = useMemo(() => {
     const groups = new Map<string, typeof grouped>();
