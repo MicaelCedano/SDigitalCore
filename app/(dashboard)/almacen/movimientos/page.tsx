@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/helpers";
 import { WarehouseMovementsManager } from "@/modules/almacen/components/WarehouseMovementsManager";
 
 export const metadata: Metadata = {
   title: "Movimientos de Almacén | SDigitalCore",
-  description: "Registro de Entradas y Salidas de cajas y unidades de almacén",
+  description: "Registro de entradas y salidas de unidades de almacén",
 };
 
-export default function MovimientosPage() {
-  return <WarehouseMovementsManager />;
+export default async function MovimientosPage() {
+  const user = await getCurrentUser();
+  return <WarehouseMovementsManager roleCode={user?.roleCode ?? "ADMIN"} />;
 }
