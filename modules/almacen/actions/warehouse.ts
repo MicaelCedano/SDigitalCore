@@ -7,14 +7,16 @@ import { revalidatePath } from "next/cache";
 import {
   warehouseProductSchema,
   warehouseMovementSchema,
+  warehouseBulkMovementSchema,
   warehouseRequestSchema,
   WarehouseProductInput,
   WarehouseMovementInput,
+  WarehouseBulkMovementInput,
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
 
 /**
- * Obtiene la lista de productos de almacén con sus cajas y unidades totales
+ * Obtiene la lista de productos de almacÃ©n con sus cajas y unidades totales
  */
 export async function getWarehouseProductsAction(query?: string) {
   try {
@@ -38,17 +40,17 @@ export async function getWarehouseProductsAction(query?: string) {
 
     return { success: true, data: products };
   } catch (error: any) {
-    return { success: false, error: "Error al cargar productos de almacén", data: [] };
+    return { success: false, error: "Error al cargar productos de almacÃ©n", data: [] };
   }
 }
 
 /**
- * Crea o actualiza un producto en almacén
+ * Crea o actualiza un producto en almacÃ©n
  */
 export async function createWarehouseProductAction(input: WarehouseProductInput) {
   try {
     const actor = await requirePermission("warehouse.write");
-    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseProductSchema.parse(input);
     const boxes = Number(validated.boxes) || 0;
     const unitsPerBox = Number(validated.unitsPerBox);
@@ -71,19 +73,19 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
           totalUnits,
         },
       });
-      await logAudit({ userId: actor.id, action: "warehouse_product.update", module: "almacen", entityType: "warehouse_product", entityId: updated.id, afterData: { code: updated.code, name: updated.name, boxes: updated.boxes } });
+      await logAudit({ userId: actor.id, action: "warehouse_product.update", module: "almacen", entityType: "warehouse_product", entityId: updated.id, afterData: { code: updated.code, name: updated.name, boxes: updated.boxes, looseUnits: updated.looseUnits, totalUnits: updated.totalUnits } });
 
       revalidatePath("/almacen");
       return { success: true, data: updated, message: "Producto actualizado exitosamente" };
     }
 
-    // Verificar código duplicado
+    // Verificar cÃ³digo duplicado
     const existing = await prisma.warehouseProduct.findUnique({
       where: { code: validated.code.toUpperCase().trim() },
     });
 
     if (existing) {
-      return { success: false, error: "El código de producto ya existe en almacén" };
+      return { success: false, error: "El cÃ³digo de producto ya existe en almacÃ©n" };
     }
 
     const created = await prisma.warehouseProduct.create({
@@ -100,22 +102,22 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
         totalUnits,
       },
     });
-    await logAudit({ userId: actor.id, action: "warehouse_product.create", module: "almacen", entityType: "warehouse_product", entityId: created.id, afterData: { code: created.code, name: created.name, boxes: created.boxes } });
+    await logAudit({ userId: actor.id, action: "warehouse_product.create", module: "almacen", entityType: "warehouse_product", entityId: created.id, afterData: { code: created.code, name: created.name, boxes: created.boxes, looseUnits: created.looseUnits, totalUnits: created.totalUnits } });
 
     revalidatePath("/almacen");
-    return { success: true, data: created, message: "Producto de almacén registrado exitosamente" };
+    return { success: true, data: created, message: "Producto de almacÃ©n registrado exitosamente" };
   } catch (error: any) {
     return { success: false, error: error.message || "Error al registrar producto" };
   }
 }
 
 /**
- * Elimina un producto de almacén
+ * Elimina un producto de almacÃ©n
  */
 export async function deleteWarehouseProductAction(id: string) {
   try {
     const actor = await requirePermission("warehouse.write");
-    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const deleted = await prisma.warehouseProduct.delete({
       where: { id },
     });
@@ -129,12 +131,12 @@ export async function deleteWarehouseProductAction(id: string) {
 }
 
 /**
- * Registra un movimiento de Entradas / Salidas de Almacén y recalcula cajas/unidades
+ * Registra un movimiento de Entradas / Salidas de AlmacÃ©n y recalcula cajas/unidades
  */
 export async function createWarehouseMovementAction(input: WarehouseMovementInput) {
   try {
     const user = await requirePermission("warehouse.write");
-    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseMovementSchema.parse(input);
     const unitsCount = Number(validated.unitsCount) || 1;
 
@@ -147,10 +149,10 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
     }
 
     if (validated.type === "EXIT" && product.totalUnits < unitsCount) {
-      return {
-        success: false,
-        error: `Stock insuficiente de unidades. Disponibles: ${product.totalUnits}, solicitadas: ${unitsCount}`,
-      };
+        return {
+          success: false,
+          error: `Stock insuficiente de unidades. Disponibles: ${product.totalUnits}, solicitadas: ${unitsCount}`,
+        };
     }
 
     const newTotalUnits = product.totalUnits + (validated.type === "ENTRY" ? unitsCount : -unitsCount);
@@ -168,7 +170,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
         },
       });
 
-      // 2. Registrar movimiento en la bitácora
+      // 2. Registrar movimiento en la bitÃ¡cora
       return tx.warehouseMovement.create({
         data: {
           productId: product.id,
@@ -197,8 +199,63 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
   }
 }
 
+/** Registra una entrada o salida con varios modelos en una sola operaciÃ³n. */
+export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMovementInput) {
+  try {
+    const user = await requirePermission("warehouse.write");
+    if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    const validated = warehouseBulkMovementSchema.parse(input);
+    const ids = validated.items.map((item) => item.productId);
+    if (new Set(ids).size !== ids.length) return { success: false, error: "No repita el mismo producto en el movimiento." };
+
+    const batch = await prisma.$transaction(async (tx) => {
+      const products = await tx.warehouseProduct.findMany({ where: { id: { in: ids } } });
+      if (products.length !== ids.length) throw new Error("Uno de los productos no existe.");
+      const byId = new Map(products.map((product) => [product.id, product]));
+      const items = [];
+      const movements = [];
+
+      for (const item of validated.items) {
+        const product = byId.get(item.productId)!;
+        if (validated.type === "EXIT" && product.totalUnits < item.unitsCount) {
+          throw new Error(`Stock insuficiente para ${product.name}. Disponible: ${product.totalUnits} uds.`);
+        }
+        const newTotalUnits = product.totalUnits + (validated.type === "ENTRY" ? item.unitsCount : -item.unitsCount);
+        const newLooseUnits = validated.type === "EXIT"
+          ? Math.max(0, product.looseUnits - item.unitsCount)
+          : product.looseUnits + item.unitsCount;
+        await tx.warehouseProduct.update({
+          where: { id: product.id },
+          data: { looseUnits: newLooseUnits, totalUnits: newTotalUnits },
+        });
+        const movement = await tx.warehouseMovement.create({
+          data: {
+            productId: product.id,
+            type: validated.type,
+            boxesCount: 0,
+            totalUnits: item.unitsCount,
+            reason: validated.reason,
+            createdBy: user.name || user.email || user.id,
+          },
+          include: { product: true },
+        });
+        movements.push(movement);
+        items.push({ product: movement.product, unitsCount: item.unitsCount });
+      }
+      return { id: movements[0]?.id, createdAt: movements[0]?.createdAt, type: validated.type, reason: validated.reason, items };
+    });
+
+    await logAudit({ userId: user.id, action: "warehouse_movement.bulk_create", module: "almacen", entityType: "warehouse_movement_batch", entityId: batch.id, afterData: { type: batch.type, itemCount: batch.items.length, totalUnits: batch.items.reduce((sum, item) => sum + item.unitsCount, 0) } });
+    revalidatePath("/almacen");
+    revalidatePath("/almacen/movimientos");
+    return { success: true, data: batch, message: "Movimiento registrado correctamente" };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al registrar el movimiento" };
+  }
+}
+
 /**
- * Obtiene el historial de movimientos de almacén
+ * Obtiene el historial de movimientos de almacÃ©n
  */
 export async function getWarehouseMovementsAction(query?: string) {
   try {
@@ -231,12 +288,12 @@ export async function getWarehouseMovementsAction(query?: string) {
 
     return { success: true, data: movements };
   } catch (error: any) {
-    return { success: false, error: "Error al cargar movimientos de almacén", data: [] };
+    return { success: false, error: "Error al cargar movimientos de almacÃ©n", data: [] };
   }
 }
 
 /**
- * Genera un código correlativo para solicitudes (Ej. SOL-20260807-001)
+ * Genera un cÃ³digo correlativo para solicitudes (Ej. SOL-20260807-001)
  */
 async function generateRequestCode(): Promise<string> {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -255,15 +312,15 @@ async function generateRequestCode(): Promise<string> {
 }
 
 /**
- * Crea una solicitud de almacén / transferencias
+ * Crea una solicitud de almacÃ©n / transferencias
  */
 export async function createWarehouseRequestAction(input: WarehouseRequestInput) {
   try {
     const user = await requirePermission("warehouse.write");
-    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseRequestSchema.parse(input);
     const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
-    if (!branchExists) return { success: false, error: "La sucursal seleccionada no existe o está inactiva." };
+    if (!branchExists) return { success: false, error: "La sucursal seleccionada no existe o estÃ¡ inactiva." };
     const requestCode = await generateRequestCode();
 
     const created = await prisma.warehouseRequest.create({
@@ -286,7 +343,7 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
 }
 
 /**
- * Obtiene las solicitudes de almacén
+ * Obtiene las solicitudes de almacÃ©n
  */
 export async function getWarehouseRequestsAction(query?: string, status?: string) {
   try {
@@ -317,12 +374,12 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
 }
 
 /**
- * Actualiza el estado de una solicitud de almacén (Aprobar / Rechazar)
+ * Actualiza el estado de una solicitud de almacÃ©n (Aprobar / Rechazar)
  */
 export async function updateWarehouseRequestStatusAction(id: string, status: "APPROVED" | "REJECTED") {
   try {
     const actor = await requirePermission("warehouse.write");
-    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const updated = await prisma.warehouseRequest.update({
       where: { id },
       data: { status },
