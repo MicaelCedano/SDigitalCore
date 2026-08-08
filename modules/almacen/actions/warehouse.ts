@@ -136,7 +136,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
     const user = await requirePermission("warehouse.write");
     if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseMovementSchema.parse(input);
-    const boxesCount = Number(validated.boxesCount) || 1;
+    const unitsCount = Number(validated.unitsCount) || 1;
 
     const product = await prisma.warehouseProduct.findUnique({
       where: { id: validated.productId },
@@ -146,28 +146,24 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
       return { success: false, error: "Producto no encontrado" };
     }
 
-    let newBoxes = product.boxes;
-
-    if (validated.type === "EXIT") {
-      if (product.boxes < boxesCount) {
-        return {
-          success: false,
-          error: `Stock insuficiente de cajas. Cajas actuales: ${product.boxes}, solicitadas: ${boxesCount}`,
-        };
-      }
-      newBoxes = product.boxes - boxesCount;
-    } else {
-      newBoxes = product.boxes + boxesCount;
+    if (validated.type === "EXIT" && product.totalUnits < unitsCount) {
+      return {
+        success: false,
+        error: `Stock insuficiente de unidades. Disponibles: ${product.totalUnits}, solicitadas: ${unitsCount}`,
+      };
     }
 
-    const newTotalUnits = newBoxes * product.unitsPerBox + product.looseUnits;
+    const newTotalUnits = product.totalUnits + (validated.type === "ENTRY" ? unitsCount : -unitsCount);
+    const newLooseUnits = validated.type === "EXIT"
+      ? Math.max(0, product.looseUnits - unitsCount)
+      : product.looseUnits + unitsCount;
 
     const movement = await prisma.$transaction(async (tx) => {
       // 1. Actualizar stock del producto
       await tx.warehouseProduct.update({
         where: { id: product.id },
         data: {
-          boxes: newBoxes,
+          looseUnits: newLooseUnits,
           totalUnits: newTotalUnits,
         },
       });
@@ -177,8 +173,8 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
         data: {
           productId: product.id,
           type: validated.type,
-          boxesCount,
-          totalUnits: boxesCount * product.unitsPerBox,
+          boxesCount: 0,
+          totalUnits: unitsCount,
           reason: validated.reason.trim(),
           createdBy: user.name || user.email || user.id,
         },
@@ -187,7 +183,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
         },
       });
     });
-    await logAudit({ userId: user.id, action: "warehouse_movement.create", module: "almacen", entityType: "warehouse_movement", entityId: movement.id, afterData: { type: movement.type, boxesCount: movement.boxesCount, productId: movement.productId } });
+    await logAudit({ userId: user.id, action: "warehouse_movement.create", module: "almacen", entityType: "warehouse_movement", entityId: movement.id, afterData: { type: movement.type, unitsCount, productId: movement.productId } });
 
     revalidatePath("/almacen");
     revalidatePath("/almacen/movimientos");
