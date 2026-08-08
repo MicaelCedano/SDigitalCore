@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/helpers";
+import { prisma } from "@/lib/db/prisma";
 import { WarehouseMovementsManager } from "@/modules/almacen/components/WarehouseMovementsManager";
 
 export const metadata: Metadata = {
@@ -9,5 +10,12 @@ export const metadata: Metadata = {
 
 export default async function MovimientosPage() {
   const user = await getCurrentUser();
-  return <WarehouseMovementsManager roleCode={(user as { roleCode?: string } | null)?.roleCode ?? "ADMIN"} />;
+  const persistedUser = user
+    ? await prisma.user.findFirst({
+        where: user.id ? { id: user.id } : { email: user.email ?? "" },
+        select: { roleCode: true },
+      })
+    : null;
+
+  return <WarehouseMovementsManager roleCode={persistedUser?.roleCode ?? "VENTAS"} />;
 }
