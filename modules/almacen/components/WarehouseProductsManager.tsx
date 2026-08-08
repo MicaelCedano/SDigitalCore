@@ -26,7 +26,7 @@ import {
   EyeOff,
 } from "lucide-react";
 
-export function WarehouseProductsManager() {
+export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: string }) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -169,12 +169,12 @@ export function WarehouseProductsManager() {
           </div>
         </div>
 
-        <button
+        {roleCode === "ADMIN" && <button
           onClick={handleOpenCreate}
           className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
         >
           <Plus className="w-4 h-4" /> Registrar Producto
-        </button>
+        </button>}
       </div>
 
       {/* Metrics Bar */}
@@ -333,6 +333,7 @@ export function WarehouseProductsManager() {
                     </td>
                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+{roleCode === "ADMIN" && <>
                         <button
                           onClick={() => handleOpenEdit(p)}
                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
@@ -347,6 +348,7 @@ export function WarehouseProductsManager() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                      </>}
                       </div>
                     </td>
                   </tr>
