@@ -53,8 +53,16 @@ export function WarehouseRequestsManager() {
       const unitsCount = choice.measure === "BOXES" ? choice.quantity * (product?.unitsPerBox || 1) : choice.quantity;
       return { productId, unitsCount, measure: choice.measure, quantity: choice.quantity };
     });
-    if (!branch || !reason.trim() || items.length === 0) {
-      setError("Indica sucursal, motivo y al menos un producto.");
+    if (!branch) {
+      setError("Selecciona una sucursal.");
+      return;
+    }
+    if (!reason.trim()) {
+      setError("Indica el motivo o referencia de la solicitud.");
+      return;
+    }
+    if (items.length === 0) {
+      setError("Añade al menos un producto y define su cantidad.");
       return;
     }
     setSaving(true);
