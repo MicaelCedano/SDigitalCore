@@ -10,6 +10,7 @@ export const warehouseProductSchema = z.object({
   description: z.string().optional().nullable(),
   boxes: z.number().int().min(0, "Cajas debe ser mayor o igual a 0").default(0),
   unitsPerBox: z.number().int().min(1, "Debe tener al menos 1 unidad por caja").default(1),
+  looseUnits: z.number().int().min(0, "Equipos sin caja debe ser mayor o igual a 0").default(0),
 });
 
 export const warehouseMovementSchema = z.object({

@@ -52,7 +52,8 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
     const validated = warehouseProductSchema.parse(input);
     const boxes = Number(validated.boxes) || 0;
     const unitsPerBox = Number(validated.unitsPerBox) || 1;
-    const totalUnits = boxes * unitsPerBox;
+    const looseUnits = Number(validated.looseUnits) || 0;
+    const totalUnits = boxes * unitsPerBox + looseUnits;
 
     if (validated.id) {
       const updated = await prisma.warehouseProduct.update({
@@ -66,6 +67,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
           description: validated.description?.trim() || null,
           boxes,
           unitsPerBox,
+          looseUnits,
           totalUnits,
         },
       });
@@ -94,6 +96,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
         description: validated.description?.trim() || null,
         boxes,
         unitsPerBox,
+        looseUnits,
         totalUnits,
       },
     });
@@ -157,7 +160,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
       newBoxes = product.boxes + boxesCount;
     }
 
-    const newTotalUnits = newBoxes * product.unitsPerBox;
+    const newTotalUnits = newBoxes * product.unitsPerBox + product.looseUnits;
 
     const movement = await prisma.$transaction(async (tx) => {
       // 1. Actualizar stock del producto

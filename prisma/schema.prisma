@@ -261,6 +261,7 @@ model WarehouseProduct {
   description String?  @map("descripcion") @db.Text
   boxes       Int      @default(0) @map("cajas")
   unitsPerBox Int      @default(1) @map("unidades_por_caja")
+  looseUnits  Int      @default(0) @map("unidades_sueltas")
   totalUnits  Int      @default(0) @map("cantidad")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
