@@ -22,12 +22,15 @@ import {
   Tag,
   Cpu,
   Palette,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export function WarehouseProductsManager() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showOutOfStock, setShowOutOfStock] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
@@ -140,6 +143,9 @@ export function WarehouseProductsManager() {
 
   const totalBoxes = products.reduce((acc, p) => acc + (p.boxes || 0), 0);
   const totalUnits = products.reduce((acc, p) => acc + (p.totalUnits || 0), 0);
+  const visibleProducts = showOutOfStock
+    ? products
+    : products.filter((p) => (p.boxes || 0) > 0 || (p.totalUnits || 0) > 0);
 
   return (
     <div className="space-y-6">
@@ -219,13 +225,26 @@ export function WarehouseProductsManager() {
           />
         </div>
 
-        <button
-          onClick={fetchProducts}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowOutOfStock((current) => !current)}
+            className={showOutOfStock ? "px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-2 border bg-[#5750f1]/10 text-[#5750f1] border-[#5750f1]/20" : "px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-2 border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"}
+            aria-pressed={showOutOfStock}
+            title={showOutOfStock ? "Ocultar productos sin stock" : "Mostrar productos sin stock"}
+          >
+            {showOutOfStock ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            <span className="hidden sm:inline">{showOutOfStock ? "Ocultar agotados" : "Ver agotados"}</span>
+          </button>
+
+          <button
+            onClick={fetchProducts}
           className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
           title="Recargar inventario"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Products Table */}
@@ -235,7 +254,7 @@ export function WarehouseProductsManager() {
             <RefreshCw className="w-7 h-7 animate-spin mx-auto text-[#5750f1]" />
             <p className="text-xs font-semibold">Cargando productos de almacén...</p>
           </div>
-        ) : products.length === 0 ? (
+        ) : visibleProducts.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <Boxes className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-sm font-bold text-slate-700">No hay productos en almacén</p>
@@ -258,7 +277,7 @@ export function WarehouseProductsManager() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {products.map((p) => (
+                {visibleProducts.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-4 py-3.5 font-mono font-bold text-[#5750f1]">
                       {p.code}
