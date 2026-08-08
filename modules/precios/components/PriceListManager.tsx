@@ -197,14 +197,44 @@ export function PriceListManager() {
     const reader = new FileReader(); reader.onload = () => setLogo(String(reader.result)); reader.readAsDataURL(file);
   };
   const exportImage = async () => {
-    if (!previewRef.current) return; setExporting(true);
-    const previousZoom = previewRef.current.style.zoom;
+    const preview = previewRef.current;
+    if (!preview) return;
+    setExporting(true);
+    const previousZoom = preview.style.zoom;
+    preview.dataset.exportPreview = "true";
     try {
-      previewRef.current.style.zoom = "1";
-      const canvas = await html2canvas(previewRef.current, { scale: 1, backgroundColor: "#fff", useCORS: true, windowWidth: PREVIEW_WIDTH });
+      preview.style.zoom = "1";
+      const canvas = await html2canvas(preview, {
+        scale: 1,
+        backgroundColor: "#fff",
+        useCORS: true,
+        imageTimeout: 15000,
+        windowWidth: PREVIEW_WIDTH,
+        onclone: (clonedDocument) => {
+          const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
+          if (!clonedPreview) return;
+          const elements = [clonedPreview, ...Array.from(clonedPreview.querySelectorAll<HTMLElement>("*"))];
+          for (const element of elements) {
+            const styles = clonedDocument.defaultView?.getComputedStyle(element);
+            if (!styles) continue;
+            for (let index = 0; index < styles.length; index += 1) {
+              const property = styles.item(index);
+              if (property.startsWith("--")) continue;
+              const value = styles.getPropertyValue(property);
+              if (/(?:lab|lch|oklab|oklch)\(/i.test(value)) continue;
+              element.style.setProperty(property, value);
+            }
+          }
+          clonedDocument.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => node.remove());
+        },
+      });
       const link = document.createElement("a"); link.download = `lista-precios-${new Date().toISOString().slice(0, 10)}.png`; link.href = canvas.toDataURL("image/png"); link.click();
-    } catch { setMessage("No se pudo generar la imagen."); } finally {
-      previewRef.current.style.zoom = previousZoom;
+    } catch (error) {
+      console.error("[price-list] Error al exportar PNG", error);
+      setMessage("No se pudo generar la imagen. Intenta nuevamente.");
+    } finally {
+      preview.style.zoom = previousZoom;
+      delete preview.dataset.exportPreview;
       setExporting(false);
     }
   };
