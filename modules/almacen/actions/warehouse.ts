@@ -326,8 +326,6 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
     const user = await requirePermission("warehouse.write");
     if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseRequestSchema.parse(input);
-    const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
-    if (!branchExists) return { success: false, error: "La sucursal seleccionada no existe o estÃ¡ inactiva." };
     const requestCode = await generateRequestCode();
 
     const created = await prisma.warehouseRequest.create({
