@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/helpers";
+import { prisma } from "@/lib/db/prisma";
 import {
   ArrowRight,
   FileText,
@@ -12,16 +13,16 @@ import {
 export const metadata: Metadata = { title: "Resumen general" };
 
 const operations = [
-  { label: "Almacén", href: "/almacen", icon: Warehouse },
+  { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse },
 ];
 
 const commercial = [
-  { label: "Lista de precios", href: "/precios", icon: Tag },
-  { label: "Facturas", href: "/facturas", icon: FileText },
+  { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag },
+  { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText },
 ];
 
 const administration = [
-  { label: "Configuración", href: "/configuracion", icon: Settings },
+  { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings },
 ];
 
 const groups = [
@@ -47,6 +48,24 @@ const groups = [
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  const persistedUser = user
+    ? await prisma.user.findFirst({
+        where: user.id ? { id: user.id } : { email: user.email ?? "" },
+        select: { roleCode: true, allowedModules: true },
+      })
+    : null;
+  const allowedModuleSet =
+    persistedUser?.roleCode === "ADMIN"
+      ? null
+      : new Set(persistedUser?.allowedModules ?? []);
+  const visibleGroups = groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => allowedModuleSet === null || allowedModuleSet.has(item.moduleKey),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
   const hour = Number(
     new Date().toLocaleString("es-DO", {
       timeZone: "America/Santo_Domingo",
@@ -71,7 +90,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="divide-y divide-[#e4e7ec]">
-          {groups.map((group) => {
+          {visibleGroups.map((group) => {
             const GroupIcon = group.icon;
             return (
               <div key={group.title} className="grid lg:grid-cols-[270px_1fr]">
