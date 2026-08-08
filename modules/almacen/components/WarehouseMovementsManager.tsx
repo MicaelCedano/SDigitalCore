@@ -22,12 +22,14 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { BulkMovementDialog } from "./BulkMovementDialog";
+import { getBranchesAction } from "@/modules/configuracion/actions/branch";
 
-export function WarehouseMovementsManager() {
+export function WarehouseMovementsManager({ roleCode = "ADMIN" }: { roleCode?: string }) {
   const [movements, setMovements] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [branch, setBranch] = useState("Principal");
 
   const [showModal, setShowModal] = useState(false);
   const [productId, setProductId] = useState("");
@@ -40,9 +42,10 @@ export function WarehouseMovementsManager() {
 
   const fetchMovementsAndProducts = async () => {
     setLoading(true);
-    const [resMovs, resProds] = await Promise.all([
+    const [resMovs, resProds, resBranches] = await Promise.all([
       getWarehouseMovementsAction(search),
       getWarehouseProductsAction(""),
+      getBranchesAction(true),
     ]);
 
     if (resMovs.success && resMovs.data) {
@@ -51,6 +54,7 @@ export function WarehouseMovementsManager() {
     if (resProds.success && resProds.data) {
       setProducts(resProds.data);
     }
+    if (resBranches.success && resBranches.data?.[0]) setBranch(resBranches.data[0].name);
     setLoading(false);
   };
 
@@ -128,8 +132,13 @@ export function WarehouseMovementsManager() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <BulkMovementDialog products={products} type="ENTRY" onComplete={fetchMovementsAndProducts} />
-          <BulkMovementDialog products={products} type="EXIT" onComplete={fetchMovementsAndProducts} />
+          {roleCode === "ADMIN" ? <>
+            <BulkMovementDialog products={products} type="ENTRY" onComplete={fetchMovementsAndProducts} />
+            <BulkMovementDialog products={products} type="EXIT" onComplete={fetchMovementsAndProducts} />
+          </> : <>
+            <BulkMovementDialog products={products} type="ENTRY" mode="REQUEST" branch={branch} onComplete={fetchMovementsAndProducts} />
+            <BulkMovementDialog products={products} type="EXIT" mode="REQUEST" branch={branch} onComplete={fetchMovementsAndProducts} />
+          </>}
         </div>
       </div>
 
