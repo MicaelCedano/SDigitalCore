@@ -127,7 +127,7 @@ export default function ConfiguracionPage() {
     if (result.success) {
       await loadData();
       setActionNotice(
-        `Â¡Cuenta activada! Usuario @${selectedReq.username} (${selectedReq.name}) registrado con ${selectedModulesForNewUser.length} mÃ³dulos.`
+        `¡Cuenta activada! Usuario @${selectedReq.username} (${selectedReq.name}) registrado con ${selectedModulesForNewUser.length} módulos.`
       );
       setSelectedReq(null);
       setTimeout(() => setActionNotice(null), 4000);
@@ -151,7 +151,7 @@ export default function ConfiguracionPage() {
   }
 
   async function handleDeleteRequest(request: AccessRequest) {
-    if (!window.confirm(`Â¿Eliminar definitivamente la solicitud de ${request.name}?`)) return;
+    if (!window.confirm(`¿Eliminar definitivamente la solicitud de ${request.name}?`)) return;
     setIsSaving(true);
     const result = await deleteAccessRequestAction(request.id);
     if (result.success) {
@@ -186,10 +186,10 @@ export default function ConfiguracionPage() {
     if (!directUserData.name.trim()) errs.name = "El nombre completo es requerido";
     if (!directUserData.username.trim()) errs.username = "El nombre de usuario es requerido";
     if (!directUserData.email.trim()) errs.email = "El correo es requerido";
-    if (directUserData.phone.trim().length < 7) errs.phone = "El telÃ©fono debe tener al menos 7 caracteres";
+    if (directUserData.phone.trim().length < 7) errs.phone = "El teléfono debe tener al menos 7 caracteres";
 
-    if (directUserData.password.length < 8) errs.password = "La contraseÃ±a debe tener al menos 8 caracteres";
-    if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃƒÂ±as no coinciden";
+    if (directUserData.password.length < 8) errs.password = "La contraseña debe tener al menos 8 caracteres";
+    if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃ±as no coinciden";
 
     if (Object.keys(errs).length > 0) {
       setCreateErrors(errs);
@@ -213,7 +213,7 @@ export default function ConfiguracionPage() {
     setShowCreateModal(false);
     setDirectUserData({ name: "", username: "", email: "", phone: "", password: "", confirmPassword: "", roleCode: "VENTAS" });
     setDirectUserModules([...DEFAULT_ROLE_MODULES["VENTAS"]]);
-    setActionNotice(`Â¡Usuario @${result.data.username} (${result.data.name}) creado con Ã©xito!`);
+    setActionNotice(`¡Usuario @${result.data.username} (${result.data.name}) creado con éxito!`);
     setTimeout(() => setActionNotice(null), 4000);
     setIsSaving(false);
   }
@@ -223,7 +223,7 @@ export default function ConfiguracionPage() {
     const result = await updateUserRoleAction(userId, newRoleCode);
     if (result.success) {
       setUsers((current) => current.map((user) => user.id === userId ? result.data : user));
-      setActionNotice("Rol y mÃ³dulos actualizados para el usuario.");
+      setActionNotice("Rol y módulos actualizados para el usuario.");
     } else setActionNotice(result.error);
     setTimeout(() => setActionNotice(null), 3000);
     setIsSaving(false);
@@ -234,7 +234,7 @@ export default function ConfiguracionPage() {
     const result = await toggleUserModuleAction(userId, moduleKey);
     if (result.success) {
       setUsers((current) => current.map((user) => user.id === userId ? result.data : user));
-      setActionNotice(`Acceso al mÃ³dulo "${moduleKey}" modificado.`);
+      setActionNotice(`Acceso al módulo "${moduleKey}" modificado.`);
     } else setActionNotice(result.error);
     setTimeout(() => setActionNotice(null), 2500);
     setIsSaving(false);
@@ -272,10 +272,10 @@ export default function ConfiguracionPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <span>GestiÃ³n Individual de Usuarios & MÃ³dulos</span>
+            <span>Gestión Individual de Usuarios & Módulos</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Crea usuarios directamente, aprueba solicitudes y activa/desactiva mÃ³dulos por usuario.
+            Crea usuarios directamente, aprueba solicitudes y activa/desactiva módulos por usuario.
           </p>
         </div>
 
@@ -336,7 +336,7 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
-      {/* TAB 1: CONTROL POR USUARIO ESPECÃFICO */}
+      {/* TAB 1: CONTROL POR USUARIO ESPECÍFICO */}
       {activeTab === "users" && (
         <div className="space-y-4 animate-fade-in">
           <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-start gap-3 text-xs text-indigo-900">
@@ -344,7 +344,7 @@ export default function ConfiguracionPage() {
             <div>
               <strong className="font-bold">Permisos Individuales por Usuario:</strong>
               <p className="mt-0.5 text-indigo-800">
-                Haz clic en <strong>"Gestionar MÃ³dulos"</strong> en cualquier usuario para activar o desactivar individualmente los mÃ³dulos a los que tendrÃ¡ acceso. O pulsa <strong>"+ Crear Usuario Directo"</strong> para registrar uno de forma inmediata.
+                Haz clic en <strong>"Gestionar Módulos"</strong> en cualquier usuario para activar o desactivar individualmente los módulos a los que tendrá acceso. O pulsa <strong>"+ Crear Usuario Directo"</strong> para registrar uno de forma inmediata.
               </p>
             </div>
           </div>
@@ -376,7 +376,7 @@ export default function ConfiguracionPage() {
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                           <span>{u.email}</span>
-                          <span>â€¢</span>
+                          <span>•</span>
                           <span>{u.phone}</span>
                         </div>
                       </div>
@@ -385,11 +385,9 @@ export default function ConfiguracionPage() {
                     <div className="flex items-center gap-3">
                       <div className="text-right hidden sm:block">
                         <span className="text-xs font-bold text-slate-800 block">
-                          {u.roleCode === "ADMIN" ? "Acceso Total (Admin)" : `${moduleCount} / 12 MÃ³dulos`}
+                          {u.roleCode === "ADMIN" ? "Acceso Total (Admin)" : `${moduleCount} / 12 Módulos`}
                         </span>
-                        <span className={`text-[10px] font-bold ${u.roleCode === "ADMIN" ? "text-indigo-600" : u.roleCode === "ALMACEN" ? "text-blue-600" : "text-slate-400"}`}>
-                          {u.roleCode === "ADMIN" ? "ADMINISTRADOR Â· Aprueba movimientos" : u.roleCode === "ALMACEN" ? "ALMACENISTA Â· Solicita movimientos" : `Rol: ${u.roleCode}`}
-                        </span>
+                        <span className={`text-[10px] font-bold ${u.roleCode === "ADMIN" ? "text-indigo-600" : u.roleCode === "ALMACEN" ? "text-blue-600" : "text-slate-400"}`}>{u.roleCode === "ADMIN" ? "ADMINISTRADOR · Aprueba movimientos" : u.roleCode === "ALMACEN" ? "ALMACENISTA · Solicita movimientos" : `Rol: ${u.roleCode}`}</span>
                       </div>
 
                       <select
@@ -412,7 +410,7 @@ export default function ConfiguracionPage() {
                         onClick={() => setExpandedUserId(isExpanded ? null : u.id)}
                       >
                         <SlidersHorizontal size={14} className="text-indigo-600" />
-                        <span>Gestionar MÃ³dulos</span>
+                        <span>Gestionar Módulos</span>
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </Button>
 
@@ -444,11 +442,11 @@ export default function ConfiguracionPage() {
                     <div className="p-5 bg-slate-50 border-t border-slate-200 space-y-3 animate-fade-in">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                          MÃ³dulos Activos para {u.name} (@{u.username})
+                          Módulos Activos para {u.name} (@{u.username})
                         </h4>
                         {u.roleCode === "ADMIN" && (
                           <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                            El rol Administrador tiene todos los mÃ³dulos habilitados por defecto
+                            El rol Administrador tiene todos los módulos habilitados por defecto
                           </span>
                         )}
                       </div>
@@ -467,7 +465,116 @@ export default function ConfiguracionPage() {
                                   ? "bg-white border-indigo-200 shadow-2xs text-slate-900"
                                   : "bg-slate-100/70 border-slate-200 text-slate-400 opacity-60 hover:opacity-100"
                               } ${u.roleCode === "ADMIN" ? "cursor-not-allowed" : "cursor-pointer"}`}
-            …1357 tokens truncated…r:bg-indigo-700"
+                            >
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-xs block">{mod.label}</span>
+                                <span className="text-[10px] text-slate-400 block line-clamp-1">
+                                  {mod.description}
+                                </span>
+                              </div>
+
+                              <div>
+                                {isEnabled ? (
+                                  <ToggleRight size={20} className="text-indigo-600 shrink-0" />
+                                ) : (
+                                  <ToggleLeft size={20} className="text-slate-300 shrink-0" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: SOLICITUDES PENDIENTES */}
+      {activeTab === "requests" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Solicitudes Pendientes</h2>
+              <p className="text-xs text-slate-500">
+                Usuarios que han completado la solicitud en /solicitar-acceso.
+              </p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <Card className="p-8 text-center text-sm text-slate-500">Cargando solicitudes...</Card>
+          ) : pendingRequests.length === 0 ? (
+            <Card className="p-8 text-center border-dashed border-slate-200">
+              <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 size={24} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900">No hay solicitudes pendientes</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Todas las solicitudes han sido procesadas.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingRequests.map((req) => (
+                <Card key={req.id} className="border-slate-200/80 hover:border-indigo-200 transition-all shadow-xs">
+                  <CardHeader className="p-5 pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-0.5">
+                        <CardTitle className="text-base font-bold text-slate-900">{req.name}</CardTitle>
+                        <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
+                          <AtSign size={13} className="shrink-0" />
+                          <span>{req.username}</span>
+                        </div>
+                      </div>
+                      <Badge variant="warning" className="text-[10px]">
+                        Pendiente
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Correo</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <Mail size={13} className="text-slate-400 shrink-0" />
+                          {req.email}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Teléfono</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <Phone size={13} className="text-slate-400 shrink-0" />
+                          {req.phone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(req.createdAt).toLocaleDateString("es-DO")}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 text-xs px-2.5"
+                          onClick={() => handleReject(req.id)}
+                          disabled={isSaving}
+                        >
+                          <XCircle size={14} />
+                          <span>Rechazar</span>
+                        </Button>
+
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700"
                           onClick={() => {
                             setSelectedReq(req);
                             setSelectedRole("VENTAS");
@@ -497,7 +604,7 @@ export default function ConfiguracionPage() {
                       <th className="p-3">Nombre</th>
                       <th className="p-3">Usuario</th>
                       <th className="p-3">Email</th>
-                      <th className="p-3">TelÃ©fono</th>
+                      <th className="p-3">Teléfono</th>
                       <th className="p-3">Estado</th>
                       <th className="p-3">Rol Asignado</th>
                       <th className="p-3 text-right">Acciones</th>
@@ -517,7 +624,7 @@ export default function ConfiguracionPage() {
                             <Badge variant="destructive">Rechazado</Badge>
                           )}
                         </td>
-                        <td className="p-3 font-mono font-semibold text-slate-700">{r.assignedRole ?? "â€”"}</td>
+                        <td className="p-3 font-mono font-semibold text-slate-700">{r.assignedRole ?? "—"}</td>
                         <td className="p-3 text-right">
                           <Button
                             type="button"
@@ -599,7 +706,7 @@ export default function ConfiguracionPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">TelÃ©fono</label>
+                  <label className="font-semibold text-slate-700 block">Teléfono</label>
                   <div className="relative flex items-center">
                     <Phone className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
                     <Input
@@ -617,12 +724,12 @@ export default function ConfiguracionPage() {
               {/* Password */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">ContraseÃƒÂ±a inicial</label>
+                  <label className="font-semibold text-slate-700 block">ContraseÃ±a inicial</label>
                   <div className="relative flex items-center">
                     <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
                     <Input
                       type="password"
-                      placeholder="MÃƒÂ­nimo 6 caracteres"
+                      placeholder="MÃ­nimo 6 caracteres"
                       value={directUserData.password}
                       onChange={(e) => setDirectUserData({ ...directUserData, password: e.target.value })}
                       autoComplete="new-password"
@@ -632,12 +739,12 @@ export default function ConfiguracionPage() {
                   {createErrors.password && <p className="text-xs text-red-600 mt-0.5">{createErrors.password}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">Confirmar contraseÃƒÂ±a</label>
+                  <label className="font-semibold text-slate-700 block">Confirmar contraseÃ±a</label>
                   <div className="relative flex items-center">
                     <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
                     <Input
                       type="password"
-                      placeholder="Repite la contraseÃƒÂ±a"
+                      placeholder="Repite la contraseÃ±a"
                       value={directUserData.confirmPassword}
                       onChange={(e) => setDirectUserData({ ...directUserData, confirmPassword: e.target.value })}
                       autoComplete="new-password"
@@ -650,7 +757,7 @@ export default function ConfiguracionPage() {
 
               {/* Email */}
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700 block">Correo electrÃ³nico</label>
+                <label className="font-semibold text-slate-700 block">Correo electrónico</label>
                 <div className="relative flex items-center">
                   <Mail className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
                   <Input
@@ -666,8 +773,7 @@ export default function ConfiguracionPage() {
 
               {/* Role */}
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Rol Inicial</label>
-                <p className="text-[11px] text-slate-500">Administrador: acceso total y aprobaciÃ³n de entradas/salidas. Almacenista: crea solicitudes; no modifica existencias hasta aprobaciÃ³n.</p>
+                <label className="font-bold text-slate-700 block">Rol Inicial</label><p className="text-[11px] text-slate-500">Administrador: acceso total y aprobación de entradas/salidas. Almacenista: crea solicitudes; no modifica existencias hasta aprobación.</p>
                 <select
                   value={directUserData.roleCode}
                   onChange={(e) => handleDirectRoleChange(e.target.value)}
@@ -675,7 +781,7 @@ export default function ConfiguracionPage() {
                 >
                   {SYSTEM_ROLES.map((r) => (
                     <option key={r.code} value={r.code}>
-                      {r.name} â€” {r.description}
+                      {r.name} — {r.description}
                     </option>
                   ))}
                 </select>
@@ -684,7 +790,7 @@ export default function ConfiguracionPage() {
               {/* Module Checklist */}
               <div className="space-y-2 pt-1 border-t border-slate-100">
                 <label className="font-bold text-slate-700 block">
-                  MÃ³dulos Habilitados para este Usuario:
+                  Módulos Habilitados para este Usuario:
                 </label>
                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
                   {SYSTEM_MODULES.map((mod) => {
@@ -758,7 +864,7 @@ export default function ConfiguracionPage() {
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                 <div className="font-bold text-slate-900 text-sm">{selectedReq.name}</div>
                 <div className="text-indigo-600 font-semibold font-mono">@{selectedReq.username}</div>
-                <div className="text-slate-500">{selectedReq.email} â€¢ {selectedReq.phone}</div>
+                <div className="text-slate-500">{selectedReq.email} • {selectedReq.phone}</div>
               </div>
 
               <div className="space-y-1.5">
@@ -772,7 +878,7 @@ export default function ConfiguracionPage() {
                 >
                   {SYSTEM_ROLES.map((r) => (
                     <option key={r.code} value={r.code}>
-                      {r.name} â€” {r.description}
+                      {r.name} — {r.description}
                     </option>
                   ))}
                 </select>
@@ -780,7 +886,7 @@ export default function ConfiguracionPage() {
 
               <div className="space-y-2 pt-1 border-t border-slate-100">
                 <label className="font-bold text-slate-700 block">
-                  2. Activar / Desactivar MÃ³dulos EspecÃ­ficos para este Usuario:
+                  2. Activar / Desactivar Módulos Específicos para este Usuario:
                 </label>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
                   {SYSTEM_MODULES.map((mod) => {
@@ -845,7 +951,7 @@ export default function ConfiguracionPage() {
               </div>
               <div>
                 <h2 id="delete-user-title" className="text-lg font-black text-slate-900">Eliminar usuario</h2>
-                <p className="mt-1 text-sm leading-5 text-slate-500">Esta acciÃ³n no se puede deshacer.</p>
+                <p className="mt-1 text-sm leading-5 text-slate-500">Esta acción no se puede deshacer.</p>
               </div>
             </div>
             <div className="p-6">
@@ -853,7 +959,7 @@ export default function ConfiguracionPage() {
                 <p className="text-sm font-bold text-slate-900">{pendingDeleteUser.name}</p>
                 <p className="mt-1 text-xs font-semibold text-indigo-600">@{pendingDeleteUser.username}</p>
               </div>
-              <p className="mt-4 text-sm text-slate-600">Â¿Quieres eliminar este usuario del sistema?</p>
+              <p className="mt-4 text-sm text-slate-600">¿Quieres eliminar este usuario del sistema?</p>
               <div className="mt-6 flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setPendingDeleteUser(null)} disabled={isSaving}>Cancelar</Button>
                 <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDeleteUser} disabled={isSaving}>Eliminar usuario</Button>
@@ -865,4 +971,3 @@ export default function ConfiguracionPage() {
     </div>
   );
 }
-
