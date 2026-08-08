@@ -21,6 +21,7 @@ import {
   AlertCircle,
   FileSpreadsheet,
 } from "lucide-react";
+import { BulkMovementDialog } from "./BulkMovementDialog";
 
 export function WarehouseMovementsManager() {
   const [movements, setMovements] = useState<any[]>([]);
@@ -64,7 +65,7 @@ export function WarehouseMovementsManager() {
     setType(initialType);
     setProductId(products.length > 0 ? products[0].id : "");
     setUnitsCount(1);
-    setReason(initialType === "ENTRY" ? "Recepción de mercancía" : "Traslado / Salida de inventario");
+    setReason(initialType === "ENTRY" ? "RecepciÃ³n de mercancÃ­a" : "Traslado / Salida de inventario");
     setErrorMsg(null);
     setShowModal(true);
   };
@@ -118,7 +119,7 @@ export function WarehouseMovementsManager() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-              Movimientos de Almacén (Entradas & Salidas)
+              Movimientos de AlmacÃ©n (Entradas & Salidas)
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Registro de ingresos, salidas de cajas, ajustes de stock y trazabilidad en tiempo real
@@ -127,18 +128,8 @@ export function WarehouseMovementsManager() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => handleOpenCreate("ENTRY")}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-          >
-            <ArrowDownRight className="w-4 h-4" /> Registrar Entrada (+Cajas)
-          </button>
-          <button
-            onClick={() => handleOpenCreate("EXIT")}
-            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-          >
-            <ArrowUpRight className="w-4 h-4" /> Registrar Salida (-Cajas)
-          </button>
+          <BulkMovementDialog products={products} type="ENTRY" onComplete={fetchMovementsAndProducts} />
+          <BulkMovementDialog products={products} type="EXIT" onComplete={fetchMovementsAndProducts} />
         </div>
       </div>
 
@@ -169,14 +160,14 @@ export function WarehouseMovementsManager() {
         {loading ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <RefreshCw className="w-7 h-7 animate-spin mx-auto text-[#5750f1]" />
-            <p className="text-xs font-semibold">Cargando movimientos de almacén...</p>
+            <p className="text-xs font-semibold">Cargando movimientos de almacÃ©n...</p>
           </div>
         ) : movements.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <Boxes className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-sm font-bold text-slate-700">No hay movimientos registrados</p>
             <p className="text-xs text-slate-500">
-              Registra una Entrada o Salida para llevar la bitácora del inventario.
+              Registra una Entrada o Salida para llevar la bitÃ¡cora del inventario.
             </p>
           </div>
         ) : (
@@ -186,9 +177,9 @@ export function WarehouseMovementsManager() {
                 <tr>
                   <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Fecha & Hora</th>
-                  <th className="px-4 py-3">Producto / Código</th>
+                  <th className="px-4 py-3">Producto / CÃ³digo</th>
                   <th className="px-4 py-3 text-center">Impacto Unidades</th>
-                  <th className="px-4 py-3">Motivo / Razón</th>
+                  <th className="px-4 py-3">Motivo / RazÃ³n</th>
                   <th className="px-4 py-3">Registrado Por</th>
                 </tr>
               </thead>
@@ -269,11 +260,11 @@ export function WarehouseMovementsManager() {
               <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                 {type === "ENTRY" ? (
                   <span className="text-emerald-600 flex items-center gap-1">
-                    <ArrowDownRight className="w-5 h-5" /> Nueva Entrada de Almacén
+                    <ArrowDownRight className="w-5 h-5" /> Nueva Entrada de AlmacÃ©n
                   </span>
                 ) : (
                   <span className="text-rose-600 flex items-center gap-1">
-                    <ArrowUpRight className="w-5 h-5" /> Nueva Salida de Almacén
+                    <ArrowUpRight className="w-5 h-5" /> Nueva Salida de AlmacÃ©n
                   </span>
                 )}
               </h2>
@@ -304,7 +295,7 @@ export function WarehouseMovementsManager() {
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.code} — {p.name} (Stock: {p.boxes} cajas)
+                      {p.code} â€” {p.name} (Stock: {p.boxes} cajas)
                     </option>
                   ))}
                 </select>
@@ -342,13 +333,13 @@ export function WarehouseMovementsManager() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Motivo / Razón <span className="text-red-500">*</span>
+                  Motivo / RazÃ³n <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Ej. Recepción de proveedor, Venta mayorista, Traslado..."
+                  placeholder="Ej. RecepciÃ³n de proveedor, Venta mayorista, Traslado..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
                 />
               </div>
