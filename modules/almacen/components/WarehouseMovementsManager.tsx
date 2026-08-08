@@ -31,7 +31,7 @@ export function WarehouseMovementsManager() {
   const [showModal, setShowModal] = useState(false);
   const [productId, setProductId] = useState("");
   const [type, setType] = useState<"ENTRY" | "EXIT">("ENTRY");
-  const [boxesCount, setBoxesCount] = useState<number>(1);
+  const [unitsCount, setUnitsCount] = useState<number>(1);
   const [reason, setReason] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -63,7 +63,7 @@ export function WarehouseMovementsManager() {
   const handleOpenCreate = (initialType: "ENTRY" | "EXIT" = "ENTRY") => {
     setType(initialType);
     setProductId(products.length > 0 ? products[0].id : "");
-    setBoxesCount(1);
+    setUnitsCount(1);
     setReason(initialType === "ENTRY" ? "Recepción de mercancía" : "Traslado / Salida de inventario");
     setErrorMsg(null);
     setShowModal(true);
@@ -88,7 +88,7 @@ export function WarehouseMovementsManager() {
       const payload: WarehouseMovementInput = {
         productId,
         type,
-        boxesCount: Number(boxesCount) || 1,
+        unitsCount: Number(unitsCount) || 1,
         reason: reason.trim(),
       };
 
@@ -187,7 +187,6 @@ export function WarehouseMovementsManager() {
                   <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Fecha & Hora</th>
                   <th className="px-4 py-3">Producto / Código</th>
-                  <th className="px-4 py-3 text-center">Cajas</th>
                   <th className="px-4 py-3 text-center">Impacto Unidades</th>
                   <th className="px-4 py-3">Motivo / Razón</th>
                   <th className="px-4 py-3">Registrado Por</th>
@@ -233,11 +232,6 @@ export function WarehouseMovementsManager() {
                         </span>
                         <span className="text-[11px] font-mono text-slate-500">
                           {m.product?.code || "-"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        <span className="font-bold text-slate-800">
-                          {m.type === "ENTRY" ? `+${m.boxesCount}` : `-${m.boxesCount}`} cajas
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
@@ -318,14 +312,14 @@ export function WarehouseMovementsManager() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Cantidad de Cajas {type === "ENTRY" ? "(a Ingresar)" : "(a Retirar)"}{" "}
+                  Cantidad de Unidades {type === "ENTRY" ? "(a Ingresar)" : "(a Retirar)"}{" "}
                   <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
                   min={1}
-                  value={boxesCount}
-                  onChange={(e) => setBoxesCount(Number(e.target.value))}
+                  value={unitsCount}
+                  onChange={(e) => setUnitsCount(Number(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-slate-800 focus:outline-none focus:border-[#5750f1]"
                 />
               </div>
@@ -333,14 +327,14 @@ export function WarehouseMovementsManager() {
               {selectedProductObj && (
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
                   <div className="text-slate-500">
-                    Cajas actuales: <strong>{selectedProductObj.boxes}</strong> | Unidades/caja:{" "}
-                    <strong>{selectedProductObj.unitsPerBox}</strong>
+                    Unidades disponibles: <strong>{selectedProductObj.totalUnits}</strong> | Sueltas:{" "}
+                    <strong>{selectedProductObj.looseUnits || 0}</strong>
                   </div>
                   <div className="font-bold text-slate-800">
                     Impacto en Unidades Totales:{" "}
                     <strong className={type === "ENTRY" ? "text-emerald-600" : "text-rose-600"}>
                       {type === "ENTRY" ? "+" : "-"}
-                      {(Number(boxesCount) || 1) * selectedProductObj.unitsPerBox} uds
+                      {Number(unitsCount) || 1} uds
                     </strong>
                   </div>
                 </div>
