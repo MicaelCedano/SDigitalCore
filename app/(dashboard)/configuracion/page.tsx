@@ -1,0 +1,840 @@
+"use client";
+
+import { useState } from "react";
+import {
+  SYSTEM_ROLES,
+  SYSTEM_MODULES,
+  DEFAULT_ROLE_MODULES,
+  getAccessRequests,
+  approveAccessRequest,
+  rejectAccessRequest,
+  createDirectUser,
+  getUsers,
+  updateUserRole,
+  toggleUserModulePermission,
+  toggleUserStatus,
+  deleteUser,
+  type AccessRequest,
+  type SystemUser,
+} from "@/lib/auth/roles-permissions";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  UserCheck,
+  Users,
+  UserPlus,
+  ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  ToggleLeft,
+  ToggleRight,
+  Clock,
+  Mail,
+  Phone,
+  AtSign,
+  User,
+  LockKeyhole,
+  AlertCircle,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+
+export default function ConfiguracionPage() {
+  const [activeTab, setActiveTab] = useState<"requests" | "users">("users");
+
+  // Reactive states
+  const [requests, setRequests] = useState<AccessRequest[]>(getAccessRequests());
+  const [users, setUsers] = useState<SystemUser[]>(getUsers());
+
+  // Modal state for approving request
+  const [selectedReq, setSelectedReq] = useState<AccessRequest | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("VENTAS");
+  const [selectedModulesForNewUser, setSelectedModulesForNewUser] = useState<string[]>([
+    ...DEFAULT_ROLE_MODULES["VENTAS"],
+  ]);
+
+  // Modal state for Direct User Creation
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [directUserData, setDirectUserData] = useState({
+    name: "",
+    username: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    roleCode: "VENTAS",
+  });
+  const [directUserModules, setDirectUserModules] = useState<string[]>([
+    ...DEFAULT_ROLE_MODULES["VENTAS"],
+  ]);
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
+
+  // Expanded user state for custom module toggling
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+
+  // Notification Toast
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  const pendingRequests = requests.filter((r) => r.status === "PENDING");
+  const historyRequests = requests.filter((r) => r.status !== "PENDING");
+
+  function handleRoleChangeForNewUser(roleCode: string) {
+    setSelectedRole(roleCode);
+    setSelectedModulesForNewUser([...(DEFAULT_ROLE_MODULES[roleCode] ?? ["inventario"])]);
+  }
+
+  function handleToggleModuleForNewUser(moduleKey: string) {
+    if (selectedModulesForNewUser.includes(moduleKey)) {
+      setSelectedModulesForNewUser(selectedModulesForNewUser.filter((m) => m !== moduleKey));
+    } else {
+      setSelectedModulesForNewUser([...selectedModulesForNewUser, moduleKey]);
+    }
+  }
+
+  function handleApprove() {
+    if (!selectedReq) return;
+    const newUser = approveAccessRequest(
+      selectedReq.id,
+      selectedRole,
+      selectedModulesForNewUser
+    );
+    if (newUser) {
+      setRequests([...getAccessRequests()]);
+      setUsers([...getUsers()]);
+      setActionNotice(
+        `¡Cuenta activada! Usuario @${selectedReq.username} (${selectedReq.name}) registrado con ${selectedModulesForNewUser.length} módulos.`
+      );
+      setSelectedReq(null);
+      setTimeout(() => setActionNotice(null), 4000);
+    }
+  }
+
+  function handleReject(reqId: string) {
+    rejectAccessRequest(reqId);
+    setRequests([...getAccessRequests()]);
+    setActionNotice("Solicitud de acceso rechazada.");
+    setTimeout(() => setActionNotice(null), 3000);
+  }
+
+  // Direct User Creation Handler
+  function handleDirectRoleChange(roleCode: string) {
+    setDirectUserData({ ...directUserData, roleCode });
+    setDirectUserModules([...(DEFAULT_ROLE_MODULES[roleCode] ?? ["inventario"])]);
+  }
+
+  function handleToggleDirectModule(moduleKey: string) {
+    if (directUserModules.includes(moduleKey)) {
+      setDirectUserModules(directUserModules.filter((m) => m !== moduleKey));
+    } else {
+      setDirectUserModules([...directUserModules, moduleKey]);
+    }
+  }
+
+  function handleCreateDirectUserSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateErrors({});
+
+    const errs: Record<string, string> = {};
+    if (!directUserData.name.trim()) errs.name = "El nombre completo es requerido";
+    if (!directUserData.username.trim()) errs.username = "El nombre de usuario es requerido";
+    if (!directUserData.email.trim()) errs.email = "El correo es requerido";
+    if (!directUserData.phone.trim()) errs.phone = "El teléfono es requerido";
+
+    if (directUserData.password.length < 6) errs.password = "La contraseÃ±a debe tener al menos 6 caracteres";
+    if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃ±as no coinciden";
+
+    if (Object.keys(errs).length > 0) {
+      setCreateErrors(errs);
+      return;
+    }
+
+    const created = createDirectUser({
+      ...directUserData,
+      allowedModules: directUserModules,
+    });
+
+    setUsers([...getUsers()]);
+    setShowCreateModal(false);
+    setDirectUserData({ name: "", username: "", email: "", phone: "", password: "", confirmPassword: "", roleCode: "VENTAS" });
+    setDirectUserModules([...DEFAULT_ROLE_MODULES["VENTAS"]]);
+    setActionNotice(`¡Usuario @${created.username} (${created.name}) creado con éxito!`);
+    setTimeout(() => setActionNotice(null), 4000);
+  }
+
+  function handleUserRoleChange(userId: string, newRoleCode: string) {
+    updateUserRole(userId, newRoleCode);
+    setUsers([...getUsers()]);
+    setActionNotice(`Rol y módulos actualizados para el usuario.`);
+    setTimeout(() => setActionNotice(null), 3000);
+  }
+
+  function handleToggleUserModule(userId: string, moduleKey: string) {
+    toggleUserModulePermission(userId, moduleKey);
+    setUsers([...getUsers()]);
+    setActionNotice(`Acceso al módulo "${moduleKey}" modificado.`);
+    setTimeout(() => setActionNotice(null), 2500);
+  }
+
+  function handleStatusToggle(userId: string) {
+    toggleUserStatus(userId);
+    setUsers([...getUsers()]);
+  }
+
+  function handleDeleteUser(user: SystemUser) {
+    if (user.id === "user-dev-admin") {
+      setActionNotice("La cuenta administradora local no se puede eliminar.");
+      setTimeout(() => setActionNotice(null), 3000);
+      return;
+    }
+    if (!window.confirm(`Â¿Eliminar al usuario @${user.username}? Esta acciÃ³n no se puede deshacer.`)) return;
+    if (deleteUser(user.id)) {
+      setUsers([...getUsers()]);
+      setExpandedUserId((current) => current === user.id ? null : current);
+      setActionNotice(`Usuario @${user.username} eliminado.`);
+      setTimeout(() => setActionNotice(null), 3000);
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-7xl">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <span>Gestión Individual de Usuarios & Módulos</span>
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Crea usuarios directamente, aprueba solicitudes y activa/desactiva módulos por usuario.
+          </p>
+        </div>
+
+        {/* Action notification toast */}
+        {actionNotice && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold animate-fade-in shadow-xs">
+            <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+            <span>{actionNotice}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs & Main Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-px">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition-all border-b-2 ${
+              activeTab === "users"
+                ? "border-indigo-600 text-indigo-600 bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Users size={16} />
+            <span>Usuarios Registrados ({users.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("requests")}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition-all border-b-2 ${
+              activeTab === "requests"
+                ? "border-indigo-600 text-indigo-600 bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <UserCheck size={16} />
+            <span>Solicitudes Pendientes</span>
+            {pendingRequests.length > 0 && (
+              <Badge variant="default" className="ml-1 bg-indigo-600 text-white px-1.5 py-0 text-[10px]">
+                {pendingRequests.length}
+              </Badge>
+            )}
+          </button>
+        </div>
+
+        {/* CREATE DIRECT USER BUTTON */}
+        <div className="pb-2 sm:pb-0">
+          <Button
+            variant="default"
+            size="sm"
+            className="bg-indigo-600 hover:bg-indigo-700 font-semibold gap-1.5 text-xs shadow-xs"
+            onClick={() => setShowCreateModal(true)}
+          >
+            <UserPlus size={15} />
+            <span>+ Crear Usuario Directo</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* TAB 1: CONTROL POR USUARIO ESPECÍFICO */}
+      {activeTab === "users" && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-start gap-3 text-xs text-indigo-900">
+            <AlertCircle size={18} className="text-indigo-600 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-bold">Permisos Individuales por Usuario:</strong>
+              <p className="mt-0.5 text-indigo-800">
+                Haz clic en <strong>"Gestionar Módulos"</strong> en cualquier usuario para activar o desactivar individualmente los módulos a los que tendrá acceso. O pulsa <strong>"+ Crear Usuario Directo"</strong> para registrar uno de forma inmediata.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {users.map((u) => {
+              const isExpanded = expandedUserId === u.id;
+              const moduleCount = u.allowedModules.length;
+
+              return (
+                <Card key={u.id} className="border-slate-200/80 bg-white overflow-hidden shadow-2xs">
+                  <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {u.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-slate-900">{u.name}</h3>
+                          <span className="text-xs font-semibold font-mono text-indigo-600">@{u.username}</span>
+                          {u.status === "ACTIVE" ? (
+                            <Badge variant="success" className="text-[10px]">Activo</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px]">Bloqueado</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                          <span>{u.email}</span>
+                          <span>•</span>
+                          <span>{u.phone}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-right hidden sm:block">
+                        <span className="text-xs font-bold text-slate-800 block">
+                          {u.roleCode === "ADMIN" ? "Acceso Total (Admin)" : `${moduleCount} / 12 Módulos`}
+                        </span>
+                        <span className="text-[10px] text-slate-400">Rol: {u.roleCode}</span>
+                      </div>
+
+                      <select
+                        value={u.roleCode}
+                        onChange={(e) => handleUserRoleChange(u.id, e.target.value)}
+                        className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                      >
+                        {SYSTEM_ROLES.map((r) => (
+                          <option key={r.code} value={r.code}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs gap-1.5 border-slate-200"
+                        onClick={() => setExpandedUserId(isExpanded ? null : u.id)}
+                      >
+                        <SlidersHorizontal size={14} className="text-indigo-600" />
+                        <span>Gestionar Módulos</span>
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-slate-500 hover:text-red-600"
+                        onClick={() => handleStatusToggle(u.id)}
+                      >
+                        {u.status === "ACTIVE" ? "Bloquear" : "Activar"}
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => handleDeleteUser(u)}
+                        disabled={u.id === "user-dev-admin"}
+                        title={u.id === "user-dev-admin" ? "La cuenta administradora local está protegida" : "Eliminar usuario"}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* EXPANDABLE MODULE TOGGLES */}
+                  {isExpanded && (
+                    <div className="p-5 bg-slate-50 border-t border-slate-200 space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                          Módulos Activos para {u.name} (@{u.username})
+                        </h4>
+                        {u.roleCode === "ADMIN" && (
+                          <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            El rol Administrador tiene todos los módulos habilitados por defecto
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                        {SYSTEM_MODULES.map((mod) => {
+                          const isEnabled = u.roleCode === "ADMIN" || u.allowedModules.includes(mod.key);
+
+                          return (
+                            <button
+                              key={mod.key}
+                              disabled={u.roleCode === "ADMIN"}
+                              onClick={() => handleToggleUserModule(u.id, mod.key)}
+                              className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                                isEnabled
+                                  ? "bg-white border-indigo-200 shadow-2xs text-slate-900"
+                                  : "bg-slate-100/70 border-slate-200 text-slate-400 opacity-60 hover:opacity-100"
+                              } ${u.roleCode === "ADMIN" ? "cursor-not-allowed" : "cursor-pointer"}`}
+                            >
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-xs block">{mod.label}</span>
+                                <span className="text-[10px] text-slate-400 block line-clamp-1">
+                                  {mod.description}
+                                </span>
+                              </div>
+
+                              <div>
+                                {isEnabled ? (
+                                  <ToggleRight size={20} className="text-indigo-600 shrink-0" />
+                                ) : (
+                                  <ToggleLeft size={20} className="text-slate-300 shrink-0" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: SOLICITUDES PENDIENTES */}
+      {activeTab === "requests" && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Solicitudes Pendientes</h2>
+              <p className="text-xs text-slate-500">
+                Usuarios que han completado la solicitud en /solicitar-acceso.
+              </p>
+            </div>
+          </div>
+
+          {pendingRequests.length === 0 ? (
+            <Card className="p-8 text-center border-dashed border-slate-200">
+              <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 size={24} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900">No hay solicitudes pendientes</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Todas las solicitudes han sido procesadas.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingRequests.map((req) => (
+                <Card key={req.id} className="border-slate-200/80 hover:border-indigo-200 transition-all shadow-xs">
+                  <CardHeader className="p-5 pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-0.5">
+                        <CardTitle className="text-base font-bold text-slate-900">{req.name}</CardTitle>
+                        <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
+                          <AtSign size={13} className="shrink-0" />
+                          <span>{req.username}</span>
+                        </div>
+                      </div>
+                      <Badge variant="warning" className="text-[10px]">
+                        Pendiente
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Correo</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <Mail size={13} className="text-slate-400 shrink-0" />
+                          {req.email}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Teléfono</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                          <Phone size={13} className="text-slate-400 shrink-0" />
+                          {req.phone}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(req.createdAt).toLocaleDateString("es-DO")}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 text-xs px-2.5"
+                          onClick={() => handleReject(req.id)}
+                        >
+                          <XCircle size={14} />
+                          <span>Rechazar</span>
+                        </Button>
+
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700"
+                          onClick={() => {
+                            setSelectedReq(req);
+                            setSelectedRole("VENTAS");
+                            setSelectedModulesForNewUser([...DEFAULT_ROLE_MODULES["VENTAS"]]);
+                          }}
+                        >
+                          <UserCheck size={14} />
+                          <span>Configurar & Aceptar</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Historial */}
+          {historyRequests.length > 0 && (
+            <div className="pt-6 border-t border-slate-200 space-y-3">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Historial de Solicitudes</h3>
+              <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs text-slate-600">
+                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">Nombre</th>
+                      <th className="p-3">Usuario</th>
+                      <th className="p-3">Email</th>
+                      <th className="p-3">Teléfono</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3">Rol Asignado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {historyRequests.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-900">{r.name}</td>
+                        <td className="p-3 font-mono font-semibold text-indigo-600">@{r.username}</td>
+                        <td className="p-3">{r.email}</td>
+                        <td className="p-3">{r.phone}</td>
+                        <td className="p-3">
+                          {r.status === "APPROVED" ? (
+                            <Badge variant="success">Aprobado</Badge>
+                          ) : (
+                            <Badge variant="destructive">Rechazado</Badge>
+                          )}
+                        </td>
+                        <td className="p-3 font-mono font-semibold text-slate-700">{r.assignedRole ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL CREAR USUARIO DIRECTO */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus size={20} className="text-indigo-600" />
+                <span>Crear Usuario Directamente</span>
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDirectUserSubmit} className="space-y-4 text-xs">
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 block">Nombre completo</label>
+                <div className="relative flex items-center">
+                  <User className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input
+                    type="text"
+                    placeholder="Ej. Mario Santos"
+                    value={directUserData.name}
+                    onChange={(e) => setDirectUserData({ ...directUserData, name: e.target.value })}
+                    className={`pl-9.5 ${createErrors.name ? "border-red-500" : ""}`}
+                  />
+                </div>
+                {createErrors.name && <p className="text-xs text-red-600 mt-0.5">{createErrors.name}</p>}
+              </div>
+
+              {/* Username & Phone grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Usuario</label>
+                  <div className="relative flex items-center">
+                    <AtSign className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="msantos"
+                      value={directUserData.username}
+                      onChange={(e) => setDirectUserData({ ...directUserData, username: e.target.value })}
+                      className={`pl-9.5 ${createErrors.username ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.username && <p className="text-xs text-red-600 mt-0.5">{createErrors.username}</p>}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Teléfono</label>
+                  <div className="relative flex items-center">
+                    <Phone className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="tel"
+                      placeholder="809-555-0199"
+                      value={directUserData.phone}
+                      onChange={(e) => setDirectUserData({ ...directUserData, phone: e.target.value })}
+                      className={`pl-9.5 ${createErrors.phone ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.phone && <p className="text-xs text-red-600 mt-0.5">{createErrors.phone}</p>}
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">ContraseÃ±a inicial</label>
+                  <div className="relative flex items-center">
+                    <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="password"
+                      placeholder="MÃ­nimo 6 caracteres"
+                      value={directUserData.password}
+                      onChange={(e) => setDirectUserData({ ...directUserData, password: e.target.value })}
+                      autoComplete="new-password"
+                      className={`pl-9.5 ${createErrors.password ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.password && <p className="text-xs text-red-600 mt-0.5">{createErrors.password}</p>}
+                </div>
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 block">Confirmar contraseÃ±a</label>
+                  <div className="relative flex items-center">
+                    <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <Input
+                      type="password"
+                      placeholder="Repite la contraseÃ±a"
+                      value={directUserData.confirmPassword}
+                      onChange={(e) => setDirectUserData({ ...directUserData, confirmPassword: e.target.value })}
+                      autoComplete="new-password"
+                      className={`pl-9.5 ${createErrors.confirmPassword ? "border-red-500" : ""}`}
+                    />
+                  </div>
+                  {createErrors.confirmPassword && <p className="text-xs text-red-600 mt-0.5">{createErrors.confirmPassword}</p>}
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700 block">Correo electrónico</label>
+                <div className="relative flex items-center">
+                  <Mail className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input
+                    type="email"
+                    placeholder="mario.santos@empresa.com"
+                    value={directUserData.email}
+                    onChange={(e) => setDirectUserData({ ...directUserData, email: e.target.value })}
+                    className={`pl-9.5 ${createErrors.email ? "border-red-500" : ""}`}
+                  />
+                </div>
+                {createErrors.email && <p className="text-xs text-red-600 mt-0.5">{createErrors.email}</p>}
+              </div>
+
+              {/* Role */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 block">Rol Inicial</label>
+                <select
+                  value={directUserData.roleCode}
+                  onChange={(e) => handleDirectRoleChange(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none"
+                >
+                  {SYSTEM_ROLES.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.name} — {r.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Module Checklist */}
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <label className="font-bold text-slate-700 block">
+                  Módulos Habilitados para este Usuario:
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const isChecked = directUserModules.includes(mod.key);
+
+                    return (
+                      <label
+                        key={mod.key}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isChecked
+                            ? "bg-indigo-50/60 border-indigo-200 font-semibold text-indigo-900"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleDirectModule(mod.key)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                        />
+                        <span>{mod.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="default"
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Crear y Activar Usuario
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIGURABLE AL APROBAR SOLICITUD */}
+      {selectedReq && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserCheck size={20} className="text-indigo-600" />
+                <span>Configurar Permisos de {selectedReq.name}</span>
+              </h3>
+              <button
+                onClick={() => setSelectedReq(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                <div className="font-bold text-slate-900 text-sm">{selectedReq.name}</div>
+                <div className="text-indigo-600 font-semibold font-mono">@{selectedReq.username}</div>
+                <div className="text-slate-500">{selectedReq.email} • {selectedReq.phone}</div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 block">
+                  1. Asignar Rol Base:
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => handleRoleChangeForNewUser(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none"
+                >
+                  {SYSTEM_ROLES.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.name} — {r.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <label className="font-bold text-slate-700 block">
+                  2. Activar / Desactivar Módulos Específicos para este Usuario:
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const isChecked = selectedModulesForNewUser.includes(mod.key);
+
+                    return (
+                      <label
+                        key={mod.key}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isChecked
+                            ? "bg-indigo-50/60 border-indigo-200 font-semibold text-indigo-900"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleModuleForNewUser(mod.key)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                        />
+                        <span>{mod.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedReq(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleApprove}
+              >
+                Confirmar y Aceptar Cuenta
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

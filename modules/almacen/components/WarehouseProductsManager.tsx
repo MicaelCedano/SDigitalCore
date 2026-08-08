@@ -1,0 +1,490 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  getWarehouseProductsAction,
+  createWarehouseProductAction,
+  deleteWarehouseProductAction,
+} from "../actions/warehouse";
+import { WarehouseProductInput } from "@/lib/validation/warehouse";
+import {
+  Package,
+  Plus,
+  Search,
+  RefreshCw,
+  Boxes,
+  Layers,
+  Pencil,
+  Trash2,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Tag,
+  Cpu,
+  Palette,
+} from "lucide-react";
+
+export function WarehouseProductsManager() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [color, setColor] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [description, setDescription] = useState("");
+  const [boxes, setBoxes] = useState<number>(0);
+  const [unitsPerBox, setUnitsPerBox] = useState<number>(1);
+
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    const res = await getWarehouseProductsAction(search);
+    if (res.success && res.data) {
+      setProducts(res.data);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handleOpenCreate = () => {
+    setSelectedProduct(null);
+    setCode("");
+    setName("");
+    setBrand("");
+    setColor("");
+    setCapacity("");
+    setDescription("");
+    setBoxes(0);
+    setUnitsPerBox(1);
+    setErrorMsg(null);
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (prod: any) => {
+    setSelectedProduct(prod);
+    setCode(prod.code || "");
+    setName(prod.name || "");
+    setBrand(prod.brand || "");
+    setColor(prod.color || "");
+    setCapacity(prod.capacity || "");
+    setDescription(prod.description || "");
+    setBoxes(prod.boxes || 0);
+    setUnitsPerBox(prod.unitsPerBox || 1);
+    setErrorMsg(null);
+    setShowModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!code.trim()) {
+      setErrorMsg("El código de producto es obligatorio.");
+      return;
+    }
+    if (!name.trim()) {
+      setErrorMsg("El nombre del producto es obligatorio.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const payload: WarehouseProductInput = {
+        id: selectedProduct?.id,
+        code: code.trim(),
+        name: name.trim(),
+        brand: brand.trim() || undefined,
+        color: color.trim() || undefined,
+        capacity: capacity.trim() || undefined,
+        description: description.trim() || undefined,
+        boxes: Number(boxes) || 0,
+        unitsPerBox: Number(unitsPerBox) || 1,
+      };
+
+      const res = await createWarehouseProductAction(payload);
+      if (res.success) {
+        setShowModal(false);
+        fetchProducts();
+      } else {
+        setErrorMsg(res.error || "Ocurrió un error al guardar");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al procesar la solicitud");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm("¿Estás seguro de eliminar este producto del almacén?")) {
+      await deleteWarehouseProductAction(id);
+      fetchProducts();
+    }
+  };
+
+  const totalBoxes = products.reduce((acc, p) => acc + (p.boxes || 0), 0);
+  const totalUnits = products.reduce((acc, p) => acc + (p.totalUnits || 0), 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
+            <Boxes className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+              Almacén & Inventario General
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Control de productos por cajas, unidades sueltas, marcas y especificaciones de capacidad
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleOpenCreate}
+          className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" /> Registrar Producto
+        </button>
+      </div>
+
+      {/* Metrics Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-500 font-medium block">Variedad de Productos</span>
+            <span className="text-2xl font-black text-slate-800 mt-1 block">
+              {products.length}
+            </span>
+          </div>
+          <div className="p-3 bg-slate-100 text-slate-600 rounded-xl">
+            <Package className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-xs text-amber-600 font-medium block">Total Cajas en Stock</span>
+            <span className="text-2xl font-black text-amber-600 mt-1 block">
+              {totalBoxes} <span className="text-xs font-semibold text-slate-500">cajas</span>
+            </span>
+          </div>
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+            <Boxes className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-xs text-[#5750f1] font-medium block">Unidades Totales Calculadas</span>
+            <span className="text-2xl font-black text-[#5750f1] mt-1 block">
+              {totalUnits} <span className="text-xs font-semibold text-slate-500">uds</span>
+            </span>
+          </div>
+          <div className="p-3 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
+            <Layers className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs flex items-center justify-between gap-4">
+        <div className="relative w-full sm:w-96">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por código, nombre, marca, color o capacidad..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+          />
+        </div>
+
+        <button
+          onClick={fetchProducts}
+          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
+          title="Recargar inventario"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* Products Table */}
+      <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center text-slate-500 space-y-3">
+            <RefreshCw className="w-7 h-7 animate-spin mx-auto text-[#5750f1]" />
+            <p className="text-xs font-semibold">Cargando productos de almacén...</p>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 space-y-3">
+            <Boxes className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="text-sm font-bold text-slate-700">No hay productos en almacén</p>
+            <p className="text-xs text-slate-500">
+              Registra un nuevo producto para iniciar la gestión de cajas y unidades.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3">Código</th>
+                  <th className="px-4 py-3">Producto / Nombre</th>
+                  <th className="px-4 py-3">Especificaciones</th>
+                  <th className="px-4 py-3 text-center">Cajas en Stock</th>
+                  <th className="px-4 py-3 text-center">Uds por Caja</th>
+                  <th className="px-4 py-3 text-center">Total Unidades</th>
+                  <th className="px-4 py-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {products.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-4 py-3.5 font-mono font-bold text-[#5750f1]">
+                      {p.code}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="font-bold text-slate-800 block text-xs">{p.name}</span>
+                      {p.description && (
+                        <span className="text-[11px] text-slate-500 block truncate max-w-xs mt-0.5">
+                          {p.description}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {p.brand && (
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                            <Tag className="w-3 h-3 text-slate-400" /> {p.brand}
+                          </span>
+                        )}
+                        {p.color && (
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                            <Palette className="w-3 h-3 text-indigo-500" /> {p.color}
+                          </span>
+                        )}
+                        {p.capacity && (
+                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                            <Cpu className="w-3 h-3 text-emerald-600" /> {p.capacity}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <span className="font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                        {p.boxes} cajas
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center font-semibold text-slate-600">
+                      {p.unitsPerBox} uds/caja
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <span className="font-extrabold text-[#5750f1] bg-[#5750f1]/10 px-2.5 py-1 rounded-lg border border-[#5750f1]/20">
+                        {p.totalUnits} uds
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(p)}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                          title="Editar producto"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(p.id, e)}
+                          className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal Form */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h2 className="text-base font-bold text-slate-800">
+                {selectedProduct ? "Editar Producto de Almacén" : "Nuevo Producto de Almacén"}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Código / SKU <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Ej. IP15PM-256-AZ"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Nombre del Producto <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej. iPhone 15 Pro Max"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Marca</label>
+                  <input
+                    type="text"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    placeholder="Ej. Apple"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Color</label>
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    placeholder="Ej. Azul Titania"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Capacidad</label>
+                  <input
+                    type="text"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    placeholder="Ej. 256GB"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Cajas Iniciales
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={boxes}
+                    onChange={(e) => setBoxes(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-amber-700 focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Unidades por Caja
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={unitsPerBox}
+                    onChange={(e) => setUnitsPerBox(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-[#5750f1] focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+
+                <div className="col-span-2 text-right pt-1 border-t border-slate-200 text-xs font-bold text-slate-700">
+                  Total Unidades Calculadas:{" "}
+                  <strong className="text-[#5750f1] text-sm">
+                    {(Number(boxes) || 0) * (Number(unitsPerBox) || 1)} uds
+                  </strong>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Descripción (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Detalles adicionales del producto..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-[#5750f1]/20 disabled:opacity-50"
+                >
+                  {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Guardar Producto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
