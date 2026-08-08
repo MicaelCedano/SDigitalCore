@@ -61,7 +61,7 @@ export function BulkMovementDialog({ products, type, onComplete, mode = "DIRECT"
     <>
       <button type="button" onClick={() => setOpen(true)} className={`px-4 py-2.5 ${type === "ENTRY" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"} text-white rounded-xl text-xs font-bold flex items-center gap-1.5`}>
         {type === "ENTRY" ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-        {mode === "REQUEST" ? "Solicitar" : "Registrar"} {type === "ENTRY" ? "Entrada" : "Salida"} por unidades
+        {mode === "REQUEST" ? "Solicitar" : "Registrar"} {type === "ENTRY" ? "Entrada" : "Salida"} por presentación
       </button>
 
       {open && <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
