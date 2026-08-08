@@ -39,11 +39,14 @@ export const warehouseRequestSchema = z.object({
   title: z.string().min(1, "El tÃ­tulo de la solicitud es requerido"),
   branch: z.string().trim().min(1, "La sucursal es requerida"),
   requestedBy: z.string().optional(),
+  type: z.enum(["ENTRY", "EXIT"]).default("EXIT"),
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).default("PENDING"),
   details: z.string().optional().nullable(),
+  items: z.array(warehouseMovementItemSchema).min(1, "Debe agregar al menos un producto"),
 });
 
 export type WarehouseProductInput = z.infer<typeof warehouseProductSchema>;
 export type WarehouseMovementInput = z.infer<typeof warehouseMovementSchema>;
 export type WarehouseBulkMovementInput = z.infer<typeof warehouseBulkMovementSchema>;
 export type WarehouseRequestInput = z.infer<typeof warehouseRequestSchema>;
+

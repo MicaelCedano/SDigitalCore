@@ -15,6 +15,13 @@ import {
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
 
+async function requireWarehouseAdmin() {
+  const actor = await requirePermission("warehouse.read");
+  const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
+  if (persisted?.roleCode !== "ADMIN") throw new Error("Solo un administrador puede aprobar o rechazar solicitudes.");
+  return actor;
+}
+
 /**
  * Obtiene la lista de productos de almacÃ©n con sus cajas y unidades totales
  */
@@ -329,9 +336,12 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
         title: validated.title.trim(),
         branch: validated.branch,
         requestedBy: user.name || user.email || user.id,
-        status: validated.status || "PENDING",
+        type: validated.type || "EXIT",
+        status: "PENDING",
         details: validated.details?.trim() || null,
+        items: { create: validated.items.map((item) => ({ productId: item.productId, unitsCount: item.unitsCount })) },
       },
+      include: { items: true },
     });
     await logAudit({ userId: user.id, action: "warehouse_request.create", module: "almacen", entityType: "warehouse_request", entityId: created.id, afterData: { requestCode: created.requestCode, status: created.status } });
 
@@ -364,6 +374,7 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
 
     const requests = await prisma.warehouseRequest.findMany({
       where,
+      include: { items: { include: { product: { select: { id: true, code: true, name: true, brand: true } } } } },
       orderBy: { createdAt: "desc" },
     });
 
@@ -378,11 +389,27 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
  */
 export async function updateWarehouseRequestStatusAction(id: string, status: "APPROVED" | "REJECTED") {
   try {
-    const actor = await requirePermission("warehouse.write");
+    const actor = await requireWarehouseAdmin();
     if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
-    const updated = await prisma.warehouseRequest.update({
-      where: { id },
-      data: { status },
+    const updated = await prisma.$transaction(async (tx) => {
+      const request = await tx.warehouseRequest.findUnique({ where: { id }, include: { items: true } });
+      if (!request) throw new Error("Solicitud no encontrada.");
+      if (request.status !== "PENDING") throw new Error("Esta solicitud ya fue procesada.");
+      if (status === "REJECTED") return tx.warehouseRequest.update({ where: { id }, data: { status } });
+      const products = await tx.warehouseProduct.findMany({ where: { id: { in: request.items.map((item) => item.productId) } } });
+      for (const item of request.items) {
+        const product = products.find((candidate) => candidate.id === item.productId);
+        if (!product) throw new Error("Uno de los productos de la solicitud ya no existe.");
+        if (request.type === "EXIT" && product.totalUnits < item.unitsCount) throw new Error(`Stock insuficiente para ${product.name}. Disponible: ${product.totalUnits} unidades.`);
+      }
+      for (const item of request.items) {
+        const product = products.find((candidate) => candidate.id === item.productId)!;
+        const nextTotal = request.type === "ENTRY" ? product.totalUnits + item.unitsCount : product.totalUnits - item.unitsCount;
+        const nextLoose = request.type === "ENTRY" ? product.looseUnits + item.unitsCount : Math.max(0, product.looseUnits - item.unitsCount);
+        await tx.warehouseProduct.update({ where: { id: product.id }, data: { totalUnits: nextTotal, looseUnits: nextLoose } });
+        await tx.warehouseMovement.create({ data: { productId: product.id, type: request.type, boxesCount: 0, totalUnits: item.unitsCount, reason: `Solicitud ${request.requestCode}: ${request.title}`, createdBy: actor.id } });
+      }
+      return tx.warehouseRequest.update({ where: { id }, data: { status } });
     });
     await logAudit({ userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: updated.id, afterData: { status: updated.status } });
 
@@ -396,3 +423,4 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
     return { success: false, error: "Error al actualizar la solicitud" };
   }
 }
+

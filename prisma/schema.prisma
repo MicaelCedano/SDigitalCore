@@ -10,7 +10,7 @@ datasource db {
 }
 
 // ============================================================
-// TABLAS NEXTAUTH — Requeridas por Auth.js / NextAuth v5
+// TABLAS NEXTAUTH â€” Requeridas por Auth.js / NextAuth v5
 // ============================================================
 
 model User {
@@ -142,7 +142,7 @@ enum GoodsReceiptStatus {
 }
 
 // ============================================================
-// MÓDULO ALMACÉN — Recibos de Mercancía
+// MÃ“DULO ALMACÃ‰N â€” Recibos de MercancÃ­a
 // ============================================================
 
 model GoodsReceipt {
@@ -210,13 +210,13 @@ enum StockCountStatus {
 }
 
 // ============================================================
-// CONTEO DE STOCK & AUDITORÍA DE INVENTARIO
+// CONTEO DE STOCK & AUDITORÃA DE INVENTARIO
 // ============================================================
 
 model StockCount {
   id          String           @id @default(cuid())
   countNumber String           @unique @map("count_number")
-  title       String           @default("Conteo Físico de Stock")
+  title       String           @default("Conteo FÃ­sico de Stock")
   branch      String
   performedBy String           @map("performed_by")
   status      StockCountStatus @default(IN_PROGRESS)
@@ -248,7 +248,7 @@ model StockCountItem {
 }
 
 // ============================================================
-// MÓDULO ALMACENCASITA — PRODUCTOS, CAJAS, MOVIMIENTOS Y SOLICITUDES
+// MÃ“DULO ALMACENCASITA â€” PRODUCTOS, CAJAS, MOVIMIENTOS Y SOLICITUDES
 // ============================================================
 
 model WarehouseProduct {
@@ -267,6 +267,7 @@ model WarehouseProduct {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   movements WarehouseMovement[]
+  requestItems WarehouseRequestItem[]
 
   @@map("warehouse_product")
 }
@@ -300,22 +301,44 @@ enum WarehouseRequestStatus {
   @@map("warehouse_request_status")
 }
 
+enum WarehouseRequestType {
+  ENTRY
+  EXIT
+
+  @@map("warehouse_request_type")
+}
+
 model WarehouseRequest {
   id          String                 @id @default(cuid())
   requestCode String                 @unique @map("request_code")
   title       String                 @map("titulo")
   branch      String                 @map("sucursal")
   requestedBy String                 @map("requested_by")
+  type        WarehouseRequestType    @default(EXIT) @map("tipo")
   status      WarehouseRequestStatus @default(PENDING) @map("status")
   details     String?                @map("detalles") @db.Text
   createdAt   DateTime               @default(now()) @map("created_at")
   updatedAt   DateTime               @updatedAt @map("updated_at")
 
+  items       WarehouseRequestItem[]
+
   @@map("warehouse_request")
 }
 
+model WarehouseRequestItem {
+  id        String          @id @default(cuid())
+  requestId String          @map("request_id")
+  request   WarehouseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  productId String          @map("product_id")
+  product   WarehouseProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitsCount Int            @map("unidades")
+
+  @@unique([requestId, productId])
+  @@map("warehouse_request_item")
+}
+
 // ============================================================
-// MÓDULO LISTA DE PRECIOS SDIGITAL
+// MÃ“DULO LISTA DE PRECIOS SDIGITAL
 // ============================================================
 
 model PriceListItem {
@@ -359,7 +382,7 @@ model PriceListSetting {
 }
 
 // ============================================================
-// MÓDULO FACTURA & CONDUCE PDF SDIGITAL
+// MÃ“DULO FACTURA & CONDUCE PDF SDIGITAL
 // ============================================================
 
 enum InvoiceType {
@@ -409,3 +432,4 @@ model InvoiceItem {
 
   @@map("invoice_item")
 }
+
