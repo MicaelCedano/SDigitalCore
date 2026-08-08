@@ -26,6 +26,8 @@ export const warehouseMovementSchema = z.object({
 export const warehouseMovementItemSchema = z.object({
   productId: z.string().min(1, "Seleccione un producto"),
   unitsCount: z.number().int().min(1, "Cantidad de unidades debe ser al menos 1"),
+  measure: z.enum(["BOXES", "UNITS"]).default("UNITS"),
+  quantity: z.number().int().min(1).optional(),
 });
 
 export const warehouseBulkMovementSchema = z.object({
