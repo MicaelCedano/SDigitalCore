@@ -93,7 +93,7 @@ export function WarehouseProductsManager() {
     setErrorMsg(null);
 
     if (!code.trim()) {
-      setErrorMsg("El código de producto es obligatorio.");
+      setErrorMsg("El cÃ³digo de producto es obligatorio.");
       return;
     }
     if (!name.trim()) {
@@ -121,7 +121,7 @@ export function WarehouseProductsManager() {
         setShowModal(false);
         fetchProducts();
       } else {
-        setErrorMsg(res.error || "Ocurrió un error al guardar");
+        setErrorMsg(res.error || "OcurriÃ³ un error al guardar");
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Error al procesar la solicitud");
@@ -132,7 +132,7 @@ export function WarehouseProductsManager() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Estás seguro de eliminar este producto del almacén?")) {
+    if (confirm("Â¿EstÃ¡s seguro de eliminar este producto del almacÃ©n?")) {
       await deleteWarehouseProductAction(id);
       fetchProducts();
     }
@@ -151,7 +151,7 @@ export function WarehouseProductsManager() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-              Almacén & Inventario General
+              AlmacÃ©n & Inventario General
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Control de productos por cajas, unidades sueltas, marcas y especificaciones de capacidad
@@ -214,7 +214,7 @@ export function WarehouseProductsManager() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por código, nombre, marca, color o capacidad..."
+            placeholder="Buscar por cÃ³digo, nombre, marca, color o capacidad..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
           />
         </div>
@@ -233,14 +233,14 @@ export function WarehouseProductsManager() {
         {loading ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <RefreshCw className="w-7 h-7 animate-spin mx-auto text-[#5750f1]" />
-            <p className="text-xs font-semibold">Cargando productos de almacén...</p>
+            <p className="text-xs font-semibold">Cargando productos de almacÃ©n...</p>
           </div>
         ) : products.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <Boxes className="w-10 h-10 text-slate-300 mx-auto" />
-            <p className="text-sm font-bold text-slate-700">No hay productos en almacén</p>
+            <p className="text-sm font-bold text-slate-700">No hay productos en almacÃ©n</p>
             <p className="text-xs text-slate-500">
-              Registra un nuevo producto para iniciar la gestión de cajas y unidades.
+              Registra un nuevo producto para iniciar la gestiÃ³n de cajas y unidades.
             </p>
           </div>
         ) : (
@@ -248,7 +248,7 @@ export function WarehouseProductsManager() {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3">Código</th>
+                  <th className="px-4 py-3">CÃ³digo</th>
                   <th className="px-4 py-3">Producto / Nombre</th>
                   <th className="px-4 py-3">Especificaciones</th>
                   <th className="px-4 py-3 text-center">Cajas en Stock</th>
@@ -265,6 +265,12 @@ export function WarehouseProductsManager() {
                     </td>
                     <td className="px-4 py-3.5">
                       <span className="font-bold text-slate-800 block text-xs">{p.name}</span>
+                      {p.brand && (
+                        <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          <span className="font-semibold">Marca: {p.brand}</span>
+                        </span>
+                      )}
                       {p.description && (
                         <span className="text-[11px] text-slate-500 block truncate max-w-xs mt-0.5">
                           {p.description}
@@ -273,11 +279,6 @@ export function WarehouseProductsManager() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                        {p.brand && (
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
-                            <Tag className="w-3 h-3 text-slate-400" /> {p.brand}
-                          </span>
-                        )}
                         {p.color && (
                           <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
                             <Palette className="w-3 h-3 text-indigo-500" /> {p.color}
@@ -335,7 +336,7 @@ export function WarehouseProductsManager() {
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <h2 className="text-base font-bold text-slate-800">
-                {selectedProduct ? "Editar Producto de Almacén" : "Nuevo Producto de Almacén"}
+                {selectedProduct ? "Editar Producto de AlmacÃ©n" : "Nuevo Producto de AlmacÃ©n"}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
@@ -356,7 +357,7 @@ export function WarehouseProductsManager() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Código / SKU <span className="text-red-500">*</span>
+                    CÃ³digo / SKU <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -453,7 +454,7 @@ export function WarehouseProductsManager() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Descripción (Opcional)
+                  DescripciÃ³n (Opcional)
                 </label>
                 <textarea
                   rows={2}
@@ -488,3 +489,4 @@ export function WarehouseProductsManager() {
     </div>
   );
 }
+
