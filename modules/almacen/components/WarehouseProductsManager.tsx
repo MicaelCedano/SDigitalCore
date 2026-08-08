@@ -265,6 +265,12 @@ export function WarehouseProductsManager() {
                     </td>
                     <td className="px-4 py-3.5">
                       <span className="font-bold text-slate-800 block text-xs">{p.name}</span>
+                      {p.brand && (
+                        <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          <span className="font-semibold">Marca: {p.brand}</span>
+                        </span>
+                      )}
                       {p.description && (
                         <span className="text-[11px] text-slate-500 block truncate max-w-xs mt-0.5">
                           {p.description}
@@ -273,11 +279,6 @@ export function WarehouseProductsManager() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                        {p.brand && (
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
-                            <Tag className="w-3 h-3 text-slate-400" /> {p.brand}
-                          </span>
-                        )}
                         {p.color && (
                           <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
                             <Palette className="w-3 h-3 text-indigo-500" /> {p.color}
