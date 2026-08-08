@@ -43,6 +43,7 @@ export function WarehouseProductsManager() {
   const [description, setDescription] = useState("");
   const [boxes, setBoxes] = useState<number>(0);
   const [unitsPerBox, setUnitsPerBox] = useState<number>(1);
+  const [looseUnits, setLooseUnits] = useState<number>(0);
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -73,6 +74,7 @@ export function WarehouseProductsManager() {
     setDescription("");
     setBoxes(0);
     setUnitsPerBox(1);
+    setLooseUnits(0);
     setErrorMsg(null);
     setShowModal(true);
   };
@@ -87,6 +89,7 @@ export function WarehouseProductsManager() {
     setDescription(prod.description || "");
     setBoxes(prod.boxes || 0);
     setUnitsPerBox(prod.unitsPerBox || 1);
+    setLooseUnits(prod.looseUnits || 0);
     setErrorMsg(null);
     setShowModal(true);
   };
@@ -117,6 +120,7 @@ export function WarehouseProductsManager() {
         description: description.trim() || undefined,
         boxes: Number(boxes) || 0,
         unitsPerBox: Number(unitsPerBox) || 1,
+        looseUnits: Number(looseUnits) || 0,
       };
 
       const res = await createWarehouseProductAction(payload);
@@ -272,6 +276,7 @@ export function WarehouseProductsManager() {
                   <th className="px-4 py-3">Especificaciones</th>
                   <th className="px-4 py-3 text-center">Cajas en Stock</th>
                   <th className="px-4 py-3 text-center">Uds por Caja</th>
+                  <th className="px-4 py-3 text-center">Sin Caja</th>
                   <th className="px-4 py-3 text-center">Total Unidades</th>
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
@@ -317,6 +322,9 @@ export function WarehouseProductsManager() {
                     </td>
                     <td className="px-4 py-3.5 text-center font-semibold text-slate-600">
                       {p.unitsPerBox} uds/caja
+                    </td>
+                    <td className="px-4 py-3.5 text-center font-semibold text-slate-600">
+                      {p.looseUnits || 0} uds
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <span className="font-extrabold text-[#5750f1] bg-[#5750f1]/10 px-2.5 py-1 rounded-lg border border-[#5750f1]/20">
@@ -463,10 +471,21 @@ export function WarehouseProductsManager() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Equipos sin caja</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={looseUnits}
+                    onChange={(e) => setLooseUnits(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-emerald-700 focus:outline-none focus:border-[#5750f1]"
+                  />
+                </div>
+
                 <div className="col-span-2 text-right pt-1 border-t border-slate-200 text-xs font-bold text-slate-700">
                   Total Unidades Calculadas:{" "}
                   <strong className="text-[#5750f1] text-sm">
-                    {(Number(boxes) || 0) * (Number(unitsPerBox) || 1)} uds
+                    {(Number(boxes) || 0) * (Number(unitsPerBox) || 1) + (Number(looseUnits) || 0)} uds
                   </strong>
                 </div>
               </div>
