@@ -142,7 +142,7 @@ export async function deleteWarehouseProductAction(id: string) {
  */
 export async function createWarehouseMovementAction(input: WarehouseMovementInput) {
   try {
-    const user = await requirePermission("warehouse.write");
+    const user = await requireWarehouseAdmin();
     if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseMovementSchema.parse(input);
     const unitsCount = Number(validated.unitsCount) || 1;
@@ -209,7 +209,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
 /** Registra una entrada o salida con varios modelos en una sola operaciÃ³n. */
 export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMovementInput) {
   try {
-    const user = await requirePermission("warehouse.write");
+    const user = await requireWarehouseAdmin();
     if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseBulkMovementSchema.parse(input);
     const ids = validated.items.map((item) => item.productId);
