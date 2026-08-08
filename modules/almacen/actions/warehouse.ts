@@ -326,6 +326,14 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
     const user = await requirePermission("warehouse.write");
     if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const validated = warehouseRequestSchema.parse(input);
+    if (validated.type === "EXIT") {
+      const products = await prisma.warehouseProduct.findMany({ where: { id: { in: validated.items.map((item) => item.productId) } }, select: { id: true, name: true, totalUnits: true } });
+      for (const item of validated.items) {
+        const product = products.find((candidate) => candidate.id === item.productId);
+        if (!product) return { success: false, error: "Uno de los productos seleccionados ya no existe." };
+        if (product.totalUnits < item.unitsCount) return { success: false, error: `No hay suficientes unidades de ${product.name}. Disponible: ${product.totalUnits}.` };
+      }
+    }
     const requestCode = await generateRequestCode();
 
     const created = await prisma.warehouseRequest.create({
