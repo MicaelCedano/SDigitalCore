@@ -30,11 +30,12 @@ export function BulkMovementDialog({ products, type, onComplete, mode = "DIRECT"
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return products.filter((p) => !q || [p.code, p.name, p.brand, p.color, p.capacity].some((value) => value?.toLowerCase().includes(q)));
+    return products.filter((p) => (type === "ENTRY" || p.totalUnits > 0) && (!q || [p.code, p.name, p.brand, p.color, p.capacity].some((value) => value?.toLowerCase().includes(q))));
   }, [products, search]);
 
   const close = () => { setOpen(false); setSelected([]); setSearch(""); setError(null); };
   const add = (product: Product) => {
+    if (type === "EXIT" && product.totalUnits <= 0) return;
     if (selected.some((item) => item.product.id === product.id)) return;
     setSelected((items) => [...items, { product, units: 1, measure: "boxes" }]);
   };
