@@ -1,7 +1,3 @@
-Exit code: 0
-Wall time: 0.3 seconds
-Total output lines: 977
-Output:
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
