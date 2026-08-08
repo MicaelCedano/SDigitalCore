@@ -47,7 +47,7 @@ export function BulkMovementDialog({ products, type, onComplete, mode = "DIRECT"
     if (!reason.trim()) { setError("Indique el motivo del movimiento."); return; }
     setSaving(true); setError(null);
     const result = mode === "REQUEST"
-      ? await createWarehouseRequestAction({ title: reason.trim(), branch, type, details: reason.trim(), items: selected.map((item) => ({ productId: item.product.id, unitsCount: item.measure === "boxes" ? item.units * (item.product.unitsPerBox || 1) : item.units })), status: "PENDING" })
+      ? await createWarehouseRequestAction({ title: reason.trim(), branch, type, details: reason.trim(), items: selected.map((item) => ({ productId: item.product.id, unitsCount: item.measure === "boxes" ? item.units * (item.product.unitsPerBox || 1) : item.units, measure: item.measure === "boxes" ? "BOXES" as const : "UNITS" as const, quantity: item.units })), status: "PENDING" })
       : await createWarehouseMovementsBulkAction({ type, reason, items: selected.map((item) => ({ productId: item.product.id, unitsCount: item.measure === "boxes" ? item.units * (item.product.unitsPerBox || 1) : item.units, measure: item.measure === "boxes" ? "BOXES" : "UNITS", quantity: item.units })) });
     setSaving(false);
     if (!result.success) { setError(result.error); return; }
