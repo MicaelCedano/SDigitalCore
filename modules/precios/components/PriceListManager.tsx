@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import html2canvas from "html2canvas";
 import {
   Award, CalendarDays, Download, GripVertical, Headphones,
   Image as ImageIcon, ListPlus, Loader2, Pencil, Plus, Search, Settings2,
@@ -19,20 +18,93 @@ type Brand = { id: string; name: string; color: string; orderIndex: number };
 type Workspace = { inventory: Item[]; activeList: Item[]; brands: Brand[]; logo: string | null };
 
 const PREVIEW_WIDTH = 1080;
-const EXPORT_STYLE_PROPERTIES = [
-  "box-sizing", "display", "position", "width", "min-width", "max-width", "height", "min-height", "max-height",
-  "flex", "flex-direction", "flex-grow", "flex-shrink", "flex-basis", "flex-wrap", "align-items", "align-content", "align-self", "justify-content", "justify-items", "gap", "column-gap", "row-gap",
-  "grid-template-columns", "grid-template-rows", "grid-column", "grid-row",
-  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "border", "border-top", "border-right", "border-bottom", "border-left", "border-width", "border-style", "border-color", "border-radius",
-  "background", "background-color", "background-image", "color", "opacity",
-  "font-family", "font-size", "font-style", "font-weight", "line-height", "letter-spacing", "text-align", "text-transform", "text-decoration", "white-space", "vertical-align",
-  "overflow", "overflow-x", "overflow-y", "object-fit", "object-position", "text-overflow",
-] as const;
-
-const isUnsupportedCanvasValue = (value: string) => /(?:lab|lch|oklab|oklch)\(/i.test(value);
 
 const money = (value: unknown) => `RD$ ${Number(value || 0).toLocaleString("es-DO", { maximumFractionDigits: 0 })}`;
+const escapeXml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character] || character);
+
+type PriceListGroup = { brand: Brand; items: Item[] };
+
+const buildPriceListSvg = (groups: PriceListGroup[], logo: string | null) => {
+  const width = PREVIEW_WIDTH;
+  const headerHeight = 170;
+  const productBarHeight = 56;
+  const cellWidth = width / 4;
+  const rows: PriceListGroup[][] = [];
+  for (let index = 0; index < groups.length; index += 4) rows.push(groups.slice(index, index + 4));
+  const rowHeights = rows.map((row) => Math.max(190, ...row.map((group) => 70 + group.items.length * 38)));
+  const productsHeight = productBarHeight + rowHeights.reduce((sum, height) => sum + height, 0);
+  const benefitsHeight = 112;
+  const footerHeight = 52;
+  const height = headerHeight + productsHeight + benefitsHeight + footerHeight;
+  const parts: string[] = [];
+
+  parts.push(`<rect width="${width}" height="${height}" fill="#ffffff"/>`);
+  if (logo) {
+    parts.push(`<image href="${escapeXml(logo)}" x="40" y="20" width="160" height="128" preserveAspectRatio="xMidYMid meet"/>`);
+  } else {
+    parts.push(`<rect x="40" y="20" width="160" height="128" rx="12" fill="#fff1f2"/><text x="120" y="82" text-anchor="middle" fill="#b91c1c" font-size="18" font-weight="900">SEÑAL</text><text x="120" y="108" text-anchor="middle" fill="#b91c1c" font-size="18" font-weight="900">DIGITAL</text>`);
+  }
+  parts.push(`<text x="225" y="78" fill="#000000" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="900">LISTA DE <tspan fill="#b91c1c">PRECIOS</tspan></text>`);
+  parts.push(`<text x="225" y="116" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">✓ Los mejores equipos, al <tspan fill="#b91c1c">mejor precio</tspan></text>`);
+  parts.push(`<rect x="875" y="42" width="165" height="86" rx="12" fill="#b91c1c"/><text x="957" y="70" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">ACTUALIZADO:</text><text x="957" y="102" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900">${escapeXml(new Date().toLocaleDateString("es-DO"))}</text>`);
+  parts.push(`<rect y="${headerHeight}" width="${width}" height="${productBarHeight}" fill="#b91c1c"/><text x="${width / 2}" y="${headerHeight + 37}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="900">PRODUCTOS</text>`);
+
+  let rowY = headerHeight + productBarHeight;
+  rows.forEach((row, rowIndex) => {
+    const rowHeight = rowHeights[rowIndex];
+    row.forEach((group, columnIndex) => {
+      const x = columnIndex * cellWidth;
+      const color = /^#[0-9a-f]{6}$/i.test(group.brand.color) ? group.brand.color : "#111827";
+      parts.push(`<rect x="${x}" y="${rowY}" width="${cellWidth}" height="${rowHeight}" fill="#ffffff" stroke="#e2e8f0"/>`);
+      parts.push(`<text x="${x + 14}" y="${rowY + 35}" fill="${color}" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="900">${escapeXml(group.brand.name).slice(0, 21)}</text><rect x="${x + 14}" y="${rowY + 47}" width="${cellWidth - 28}" height="2" fill="${color}"/>`);
+      group.items.forEach((item, itemIndex) => {
+        const itemY = rowY + 82 + itemIndex * 38;
+        parts.push(`<text x="${x + 14}" y="${itemY}" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="900">${escapeXml(`${item.model} ${item.capacity || ""}`).slice(0, 25)}</text>`);
+        parts.push(`<text x="${x + cellWidth - 14}" y="${itemY}" text-anchor="end" fill="${color}" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900">${escapeXml(money(item.retailPrice))}</text>`);
+        parts.push(`<line x1="${x + 14}" y1="${itemY + 10}" x2="${x + cellWidth - 14}" y2="${itemY + 10}" stroke="#f1f5f9"/>`);
+      });
+    });
+    rowY += rowHeight;
+  });
+
+  const benefitsY = headerHeight + productsHeight;
+  const benefits = [["GARANTÍA", "En todos nuestros productos"], ["PRODUCTOS 100% ORIGINALES", "Calidad garantizada"], ["SOPORTE Y ASESORÍA", "Estamos para ayudarte"]];
+  benefits.forEach(([title, subtitle], index) => {
+    const x = index * (width / 3) + 12;
+    parts.push(`<rect x="${x}" y="${benefitsY + 12}" width="${width / 3 - 24}" height="88" rx="8" fill="#ffffff" stroke="#e2e8f0"/><circle cx="${x + 30}" cy="${benefitsY + 56}" r="16" fill="#b91c1c"/><text x="${x + 58}" y="${benefitsY + 52}" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="900">${escapeXml(title)}</text><text x="${x + 58}" y="${benefitsY + 75}" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">${escapeXml(subtitle)}</text>`);
+  });
+  parts.push(`<rect y="${height - footerHeight}" width="${width}" height="${footerHeight}" fill="#b91c1c"/><text x="32" y="${height - 20}" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Contáctanos por WhatsApp</text><text x="${width / 2}" y="${height - 20}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Precios sujetos a disponibilidad</text><text x="${width - 32}" y="${height - 20}" text-anchor="end" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Gracias por elegir Señal Digital ♥</text>`);
+
+  return { width, height, markup: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${parts.join("")}</svg>` };
+};
+
+const downloadSvgAsPng = (svgMarkup: string, width: number, height: number, filename: string) => new Promise<void>((resolve, reject) => {
+  const svgUrl = URL.createObjectURL(new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" }));
+  const image = new Image();
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) { URL.revokeObjectURL(svgUrl); reject(new Error("No se pudo crear el canvas")); return; }
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    URL.revokeObjectURL(svgUrl);
+    canvas.toBlob((blob) => {
+      if (!blob) { reject(new Error("No se pudo convertir el SVG a PNG")); return; }
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = downloadUrl;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      resolve();
+    }, "image/png");
+  };
+  image.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error("No se pudo cargar la imagen SVG")); };
+  image.src = svgUrl;
+});
 const syncActive = (active: Item[], inventory: Item[]) => {
   const byId = new Map(inventory.map((item) => [item.id, item]));
   return active.map((item) => byId.get(item.id) || item).filter((item) => item.status !== "INACTIVE");
@@ -57,7 +129,6 @@ export function PriceListManager() {
   const [brandForm, setBrandForm] = useState({ name: "", color: "#111827" });
   const previewRef = useRef<HTMLDivElement>(null);
   const workspaceHydrated = useRef(false);
-  const exportingRef = useRef(false);
 
   const loadWorkspace = async () => {
     setLoading(true);
@@ -113,7 +184,6 @@ export function PriceListManager() {
     if (!viewport || !preview) return;
 
     const updatePreviewSize = () => {
-      if (exportingRef.current) return;
       const availableWidth = Math.max(viewport.clientWidth - 32, 320);
       const nextScale = Math.min(1, availableWidth / PREVIEW_WIDTH);
       preview.style.zoom = String(nextScale);
@@ -197,71 +267,15 @@ export function PriceListManager() {
     const reader = new FileReader(); reader.onload = () => setLogo(String(reader.result)); reader.readAsDataURL(file);
   };
   const exportImage = async () => {
-    const preview = previewRef.current;
-    if (!preview) return;
+    if (!activeList.length) return;
     setExporting(true);
-    exportingRef.current = true;
-    const previousZoom = preview.style.zoom;
-    preview.dataset.exportPreview = "true";
     try {
-      preview.style.zoom = "1";
-      const baseOptions = {
-        scale: 1,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        imageTimeout: 15000,
-        windowWidth: PREVIEW_WIDTH,
-        width: PREVIEW_WIDTH,
-      } as const;
-      let canvas: HTMLCanvasElement;
-      try {
-        canvas = await html2canvas(preview, {
-          ...baseOptions,
-          foreignObjectRendering: true,
-          onclone: (clonedDocument) => {
-            const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
-            if (!clonedPreview) return;
-            clonedPreview.style.width = `${PREVIEW_WIDTH}px`;
-            clonedPreview.style.zoom = "1";
-            clonedPreview.style.transform = "none";
-            clonedPreview.style.backgroundColor = "#ffffff";
-            clonedPreview.style.backgroundImage = "none";
-          },
-        });
-      } catch (nativeError) {
-        console.warn("[price-list] Renderizado nativo no disponible; usando respaldo CSS", nativeError);
-        canvas = await html2canvas(preview, {
-          ...baseOptions,
-          onclone: (clonedDocument) => {
-            const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
-            if (!clonedPreview) return;
-            clonedPreview.style.width = `${PREVIEW_WIDTH}px`;
-            clonedPreview.style.zoom = "1";
-            clonedPreview.style.transform = "none";
-            clonedPreview.style.backgroundColor = "#ffffff";
-            clonedPreview.style.backgroundImage = "none";
-            const elements = [clonedPreview, ...Array.from(clonedPreview.querySelectorAll<HTMLElement>("*"))];
-            for (const element of elements) {
-              const styles = clonedDocument.defaultView?.getComputedStyle(element);
-              if (!styles) continue;
-              for (const property of EXPORT_STYLE_PROPERTIES) {
-                const value = styles.getPropertyValue(property);
-                if (!value || isUnsupportedCanvasValue(value)) continue;
-                element.style.setProperty(property, value);
-              }
-            }
-            clonedDocument.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => node.remove());
-          },
-        });
-      }
-      const link = document.createElement("a"); link.download = `lista-precios-${new Date().toISOString().slice(0, 10)}.png`; link.href = canvas.toDataURL("image/png"); link.click();
+      const svg = buildPriceListSvg(grouped, logo);
+      await downloadSvgAsPng(svg.markup, svg.width, svg.height, `lista-precios-${new Date().toISOString().slice(0, 10)}.png`);
     } catch (error) {
       console.error("[price-list] Error al exportar PNG", error);
       setMessage("No se pudo generar la imagen. Intenta nuevamente.");
     } finally {
-      preview.style.zoom = previousZoom;
-      delete preview.dataset.exportPreview;
-      exportingRef.current = false;
       setExporting(false);
     }
   };
