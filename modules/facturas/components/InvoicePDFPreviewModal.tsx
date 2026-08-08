@@ -3,6 +3,10 @@
 import { useRef } from "react";
 import { Printer, Download, X, Building2, Phone, Calendar, User, FileText, CheckCircle2, ShieldCheck } from "lucide-react";
 
+const COMPANY_ADDRESS = "Calle Duarte esquina Dr. Teofilo Ferry #54, La Romana, Dominican Republic 22000";
+const COMPANY_WHATSAPP = "(829) 266-0404";
+const COMPANY_LABEL = "Se\u00f1al Digital";
+
 interface InvoicePDFPreviewModalProps {
   invoice: any;
   onClose: () => void;
@@ -24,6 +28,8 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
   });
 
   const isConduce = invoice.type === "CONDUCE";
+  const displayBranch = isConduce ? COMPANY_LABEL : invoice.branch;
+  if (isConduce) invoice.branch = displayBranch;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:static">
@@ -65,14 +71,14 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                     S
                   </div>
                   <div>
-                    <h1 className="text-xl font-black text-slate-900 tracking-tight">SDIGITAL / LA CASITA</h1>
+                    <h1 className="text-xl font-black text-slate-900 tracking-tight">{COMPANY_LABEL}</h1>
                     <span className="text-[11px] text-slate-500 font-bold block">EQUIPOS Y TECNOLOGÍA MÓVIL</span>
                   </div>
                 </div>
                 <div className="text-xs text-slate-600 space-y-0.5 pt-2">
                   <p className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-slate-400" /> {invoice.branch}, República Dominicana</p>
-                  <p className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" /> Tel: (809) 555-0100 | WhatsApp: (809) 555-0100</p>
-                  <p className="font-mono text-[11px] text-slate-500">RNC: 1-30-99999-9</p>
+                  <p className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" /> WhatsApp: {COMPANY_WHATSAPP}</p>
+                  <p className="font-mono text-[11px] text-slate-500">{COMPANY_ADDRESS}</p>
                 </div>
               </div>
 
@@ -101,6 +107,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
 
               <div className="space-y-1 text-right sm:text-left">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DETALLES DE DESPACHO</span>
+                {invoice.notes && <p className="text-slate-700 whitespace-pre-line"><strong>Nota:</strong> {invoice.notes}</p>}
                 {invoice.clientAddress && <p className="text-slate-700">Dirección: {invoice.clientAddress}</p>}
                 <p className="text-slate-600">Almacén Origen: <strong>{invoice.branch}</strong></p>
                 <p className="text-slate-600">Método de Pago: <strong>{invoice.paymentMethod || "Efectivo"}</strong></p>
