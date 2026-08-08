@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 
 export default async function AlmacenPage() {
   const user = await getCurrentUser();
-  return <WarehouseProductsManager roleCode={user?.roleCode ?? "ADMIN"} />;
+  return <WarehouseProductsManager roleCode={(user as { roleCode?: string } | null)?.roleCode ?? "ADMIN"} />;
 }
