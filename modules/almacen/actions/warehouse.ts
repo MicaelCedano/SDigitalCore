@@ -56,8 +56,8 @@ export async function getWarehouseProductsAction(query?: string) {
  */
 export async function createWarehouseProductAction(input: WarehouseProductInput) {
   try {
-    const actor = await requirePermission("warehouse.write");
-    if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    const actor = await requireWarehouseAdmin();
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseProductSchema.parse(input);
     const boxes = Number(validated.boxes) || 0;
     const unitsPerBox = Number(validated.unitsPerBox);
@@ -123,7 +123,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
  */
 export async function deleteWarehouseProductAction(id: string) {
   try {
-    const actor = await requirePermission("warehouse.write");
+    const actor = await requireWarehouseAdmin();
     if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
     const deleted = await prisma.warehouseProduct.delete({
       where: { id },
