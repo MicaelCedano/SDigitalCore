@@ -179,7 +179,7 @@ export function WarehouseProductsManager() {
           <div>
             <span className="text-xs text-slate-500 font-medium block">Variedad de Productos</span>
             <span className="text-2xl font-black text-slate-800 mt-1 block">
-              {products.length}
+              {visibleProducts.length}
             </span>
           </div>
           <div className="p-3 bg-slate-100 text-slate-600 rounded-xl">
