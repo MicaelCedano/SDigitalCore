@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:validate": "prisma validate",
+    "import:prepare:almacen-products": "node scripts/prepare-almacen-casita-products-import.mjs",
     "bootstrap:admin": "node --env-file=.env.local scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
@@ -47,3 +48,4 @@
     "typescript": "^5"
   }
 }
+
