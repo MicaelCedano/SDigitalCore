@@ -19,6 +19,18 @@ type Brand = { id: string; name: string; color: string; orderIndex: number };
 type Workspace = { inventory: Item[]; activeList: Item[]; brands: Brand[]; logo: string | null };
 
 const PREVIEW_WIDTH = 1080;
+const EXPORT_STYLE_PROPERTIES = [
+  "box-sizing", "display", "position", "width", "min-width", "max-width", "height", "min-height", "max-height",
+  "flex", "flex-direction", "flex-grow", "flex-shrink", "flex-basis", "flex-wrap", "align-items", "align-content", "align-self", "justify-content", "justify-items", "gap", "column-gap", "row-gap",
+  "grid-template-columns", "grid-template-rows", "grid-column", "grid-row",
+  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+  "border", "border-top", "border-right", "border-bottom", "border-left", "border-width", "border-style", "border-color", "border-radius",
+  "background", "background-color", "background-image", "color", "opacity",
+  "font-family", "font-size", "font-style", "font-weight", "line-height", "letter-spacing", "text-align", "text-transform", "text-decoration", "white-space", "vertical-align",
+  "overflow", "overflow-x", "overflow-y", "object-fit", "object-position", "text-overflow",
+] as const;
+
+const isUnsupportedCanvasValue = (value: string) => /(?:lab|lch|oklab|oklch)\(/i.test(value);
 
 const money = (value: unknown) => `RD$ ${Number(value || 0).toLocaleString("es-DO", { maximumFractionDigits: 0 })}`;
 const syncActive = (active: Item[], inventory: Item[]) => {
@@ -199,15 +211,15 @@ export function PriceListManager() {
         onclone: (clonedDocument) => {
           const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
           if (!clonedPreview) return;
+          clonedPreview.style.backgroundColor = "#ffffff";
+          clonedPreview.style.backgroundImage = "none";
           const elements = [clonedPreview, ...Array.from(clonedPreview.querySelectorAll<HTMLElement>("*"))];
           for (const element of elements) {
             const styles = clonedDocument.defaultView?.getComputedStyle(element);
             if (!styles) continue;
-            for (let index = 0; index < styles.length; index += 1) {
-              const property = styles.item(index);
-              if (property.startsWith("--")) continue;
+            for (const property of EXPORT_STYLE_PROPERTIES) {
               const value = styles.getPropertyValue(property);
-              if (/(?:lab|lch|oklab|oklch)\(/i.test(value)) continue;
+              if (!value || isUnsupportedCanvasValue(value)) continue;
               element.style.setProperty(property, value);
             }
           }
