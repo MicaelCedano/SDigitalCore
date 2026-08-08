@@ -1,6 +1,7 @@
 "use server";
 
 import { createRequire } from "node:module";
+import { requirePermission } from "@/lib/auth/helpers";
 
 const require = createRequire(import.meta.url);
 const pdfModule = require("pdf-parse/lib/pdf-parse.js");
@@ -163,6 +164,7 @@ function extractItems(text: string): ExtractedInvoiceItem[] {
 
 export async function extractInvoiceFromPDF(formData: FormData): Promise<ExtractionResult> {
   try {
+    await requirePermission("facturas.emitir");
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) return { success: false, error: "Selecciona un PDF válido." };
     if (file.type && file.type !== "application/pdf") return { success: false, error: "El archivo debe ser PDF." };

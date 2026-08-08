@@ -1,7 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/db/prisma";
-import { getCurrentUser } from "@/lib/auth/helpers";
+import { requirePermission } from "@/lib/auth/helpers";
+import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { stockCountSchema, StockCountInput } from "@/lib/validation/stock-count";
 
@@ -29,10 +30,12 @@ async function generateCountNumber(): Promise<string> {
  */
 export async function saveStockCountAction(input: StockCountInput) {
   try {
-    const user = await getCurrentUser();
+    const user = await requirePermission("warehouse.write");
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = stockCountSchema.parse(input);
-
-    const performedBy = validated.performedBy || user?.name || user?.email || "Usuario del Sistema";
+    const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
+    if (!branchExists) return { success: false, error: "La sucursal seleccionada no existe o está inactiva." };
+    const performedBy = user.name || user.email || user.id;
 
     // Si ya tiene ID, actualizamos
     if (validated.id) {
@@ -78,6 +81,7 @@ export async function saveStockCountAction(input: StockCountInput) {
             },
           });
         });
+        await logAudit({ userId: user.id, action: "stock_count.update", module: "almacen", entityType: "stock_count", entityId: updated.id, afterData: { countNumber: updated.countNumber, status: updated.status, itemCount: updated.items.length } });
 
         revalidatePath("/almacen/conteos");
         return { success: true, data: updated, message: "Conteo de stock actualizado exitosamente" };
@@ -118,6 +122,7 @@ export async function saveStockCountAction(input: StockCountInput) {
         items: true,
       },
     });
+    await logAudit({ userId: user.id, action: "stock_count.create", module: "almacen", entityType: "stock_count", entityId: created.id, afterData: { countNumber: created.countNumber, status: created.status, itemCount: created.items.length } });
 
     revalidatePath("/almacen/conteos");
     return { success: true, data: created, message: `Conteo ${countNumber} registrado exitosamente` };
@@ -135,6 +140,7 @@ export async function saveStockCountAction(input: StockCountInput) {
  */
 export async function getStockCountsAction(query?: string, status?: string) {
   try {
+    await requirePermission("warehouse.read");
     const where: any = {};
 
     if (status && status !== "ALL") {
@@ -184,6 +190,7 @@ export async function getStockCountsAction(query?: string, status?: string) {
  */
 export async function getStockCountByIdAction(id: string) {
   try {
+    await requirePermission("warehouse.read");
     const count = await prisma.stockCount.findUnique({
       where: { id },
       include: {
@@ -206,9 +213,12 @@ export async function getStockCountByIdAction(id: string) {
  */
 export async function deleteStockCountAction(id: string) {
   try {
-    await prisma.stockCount.delete({
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const deleted = await prisma.stockCount.delete({
       where: { id },
     });
+    await logAudit({ userId: actor.id, action: "stock_count.delete", module: "almacen", entityType: "stock_count", entityId: deleted.id, beforeData: { countNumber: deleted.countNumber, status: deleted.status } });
 
     revalidatePath("/almacen/conteos");
     return { success: true, message: "Conteo eliminado" };

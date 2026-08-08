@@ -6,11 +6,12 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Menu, Settings, User } from "lucide-react";
-import { getUsers } from "@/lib/auth/roles-permissions";
 
 interface TopbarProps {
   userName?: string | null;
   userEmail?: string | null;
+  userRole?: string | null;
+  userAvatarUrl?: string | null;
   onMobileToggle?: () => void;
 }
 
@@ -39,11 +40,10 @@ function getInitials(name?: string | null) {
   return name?.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
 }
 
-export function Topbar({ userName, userEmail, onMobileToggle }: TopbarProps) {
+export function Topbar({ userName, userEmail, userRole, userAvatarUrl, onMobileToggle }: TopbarProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const currentUser = getUsers().find((user) => user.email === userEmail || user.name === userName);
 
   useEffect(() => {
     function closeOnOutsideClick(event: MouseEvent) {
@@ -79,11 +79,11 @@ export function Topbar({ userName, userEmail, onMobileToggle }: TopbarProps) {
             aria-haspopup="menu"
           >
             <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eef2ff] text-xs font-bold text-[#4338ca]">
-              {currentUser?.avatarUrl ? <Image src={currentUser.avatarUrl} alt="" fill className="object-cover" /> : getInitials(userName)}
+              {userAvatarUrl ? <Image src={userAvatarUrl} alt="" fill className="object-cover" /> : getInitials(userName)}
             </span>
             <span className="hidden min-w-0 sm:block">
               <span className="block max-w-36 truncate text-[13px] font-semibold text-[#101828]">{userName ?? "Usuario"}</span>
-              <span className="block text-[11px] capitalize text-[#667085]">{currentUser?.roleCode?.toLowerCase() ?? "Administrador"}</span>
+              <span className="block text-[11px] capitalize text-[#667085]">{userRole?.toLowerCase() ?? "Administrador"}</span>
             </span>
             <ChevronDown size={15} className={`hidden text-[#98a2b3] transition-transform sm:block ${dropdownOpen ? "rotate-180" : ""}`} />
           </button>

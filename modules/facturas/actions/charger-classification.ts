@@ -1,6 +1,7 @@
 "use server";
 
 import { extractInvoiceFromPDF } from "./pdf-extraction";
+import { requirePermission } from "@/lib/auth/helpers";
 
 export type ChargerCategory = "USB_LIGHTNING_10W" | "TPC_LIGHTNING_20W" | "TPC_LIGHTNING_33W" | "TPC_TPC_33W";
 
@@ -31,6 +32,7 @@ function classify(description: string): ChargerCategory {
 
 export async function classifyChargersFromPDF(formData: FormData): Promise<ChargerClassificationResult> {
   try {
+    await requirePermission("facturas.emitir");
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) return { success: false, error: "Selecciona una factura PDF." };
     if (file.type && file.type !== "application/pdf") return { success: false, error: "El archivo debe ser PDF." };

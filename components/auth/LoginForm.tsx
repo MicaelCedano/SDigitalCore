@@ -84,9 +84,8 @@ export function LoginForm() {
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-4">
+        <div>
           <label htmlFor="login-password" className="text-sm font-medium text-[#344054]">Contraseña</label>
-          <a href="/recuperar-password" className="focus-ring rounded text-xs font-semibold text-[#4f46e5] hover:text-[#4338ca]">¿Olvidaste tu contraseña?</a>
         </div>
         <div className="relative flex items-center">
           <Lock className="pointer-events-none absolute left-3.5 h-[18px] w-[18px] text-[#667085]" strokeWidth={1.75} />

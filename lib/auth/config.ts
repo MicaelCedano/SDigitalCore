@@ -16,35 +16,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const { username, password } = parsed.data;
 
-        const configuredDevEmail = process.env.DEV_ADMIN_EMAIL || "admin@sdigital.local";
-        const isLocalDevelopment = process.env.NEXTAUTH_URL?.includes("localhost") === true;
-        let persistedDevUser: { email: string; name: string | null; username: string | null } | null = null;
-        if (isLocalDevelopment) {
-          try {
-            const { prisma } = await import("@/lib/db/prisma");
-            persistedDevUser = await prisma.user.findUnique({
-              where: { id: "dev-admin-001" },
-              select: { email: true, name: true, username: true },
-            });
-          } catch {
-            // El login demo sigue funcionando si la base aún no tiene credenciales.
-          }
-        }
-        const devUsernames = ["admin", "admin@sdigital.local", configuredDevEmail, persistedDevUser?.email, "admin local", "micael"].filter(Boolean).map((value) => value!.toLowerCase());
-        const DEV_PASSWORD = "Admin1234!";
-
-        if (
-          isLocalDevelopment &&
-          devUsernames.includes(username.toLowerCase().trim()) &&
-          password === DEV_PASSWORD
-        ) {
-          return {
-            id: "dev-admin-001",
-            email: persistedDevUser?.email || configuredDevEmail,
-            name: persistedDevUser?.name || "Micael Cedano",
-          };
-        }
-
         try {
           const { verifyUserCredentials } = await import(
             "@/lib/auth/credentials"

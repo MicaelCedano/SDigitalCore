@@ -16,6 +16,12 @@ import {
 
 const modulePath = "/precios";
 
+async function requirePriceEditor() {
+  const user = await requirePermission("precios.write");
+  if (!user.id) throw new Error("La sesión no tiene un usuario identificable.");
+  return { ...user, id: user.id };
+}
+
 async function ensureBrands() {
   const brands = await prisma.priceListBrand.findMany({ orderBy: { orderIndex: "asc" } });
   if (brands.length) return brands;
@@ -66,7 +72,7 @@ export async function getPriceListWorkspaceAction(query = "") {
 
 export async function savePriceListItemAction(input: PriceListItemInput) {
   try {
-    const user = await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     const validated = priceListItemSchema.parse(input);
     const data = {
       sku: validated.sku?.trim().toUpperCase() || null,
@@ -94,7 +100,7 @@ export async function savePriceListItemAction(input: PriceListItemInput) {
         create: { name: item.brand, orderIndex: await prisma.priceListBrand.count() },
       });
     }
-    await logAudit({ userId: user.id || "unknown", action: validated.id ? "UPDATE" : "CREATE", module: "PRECIOS", entityType: "PriceListItem", entityId: item.id, afterData: { model: item.model, isActive: item.isActive } });
+    await logAudit({ userId: user.id, action: validated.id ? "UPDATE" : "CREATE", module: "PRECIOS", entityType: "PriceListItem", entityId: item.id, afterData: { model: item.model, isActive: item.isActive } });
     revalidatePath(modulePath);
     return { success: true, data: item };
   } catch (error) {
@@ -104,7 +110,7 @@ export async function savePriceListItemAction(input: PriceListItemInput) {
 
 export async function setActivePriceListAction(itemIds: string[]) {
   try {
-    const user = await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     const { itemIds: ids } = priceListOrderSchema.parse({ itemIds });
     await prisma.$transaction(async (tx) => {
       await tx.priceListItem.updateMany({ where: { status: "ACTIVE" }, data: { isActive: false } });
@@ -115,7 +121,7 @@ export async function setActivePriceListAction(itemIds: string[]) {
         }
       }
     });
-    await logAudit({ userId: user.id || "unknown", action: "UPDATE_ACTIVE_LIST", module: "PRECIOS", afterData: { itemCount: ids.length } });
+    await logAudit({ userId: user.id, action: "UPDATE_ACTIVE_LIST", module: "PRECIOS", afterData: { itemCount: ids.length } });
     revalidatePath(modulePath);
     return { success: true };
   } catch (error) {
@@ -125,10 +131,10 @@ export async function setActivePriceListAction(itemIds: string[]) {
 
 export async function savePriceListBrandAction(input: PriceListBrandInput) {
   try {
-    const user = await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     const validated = priceListBrandSchema.parse(input);
     const brand = await prisma.priceListBrand.create({ data: { name: validated.name.toUpperCase(), color: validated.color, orderIndex: await prisma.priceListBrand.count() } });
-    await logAudit({ userId: user.id || "unknown", action: "CREATE", module: "PRECIOS", entityType: "PriceListBrand", entityId: brand.id, afterData: { name: brand.name } });
+    await logAudit({ userId: user.id, action: "CREATE", module: "PRECIOS", entityType: "PriceListBrand", entityId: brand.id, afterData: { name: brand.name } });
     revalidatePath(modulePath);
     return { success: true, data: brand };
   } catch (error) {
@@ -138,9 +144,10 @@ export async function savePriceListBrandAction(input: PriceListBrandInput) {
 
 export async function reorderPriceListBrandsAction(brandIds: string[]) {
   try {
-    await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     const { brandIds: ids } = priceListBrandOrderSchema.parse({ brandIds });
     await prisma.$transaction(ids.map((id, orderIndex) => prisma.priceListBrand.update({ where: { id }, data: { orderIndex } })));
+    await logAudit({ userId: user.id, action: "REORDER", module: "PRECIOS", entityType: "PriceListBrand", afterData: { brandIds: ids } });
     revalidatePath(modulePath);
     return { success: true };
   } catch (error) {
@@ -150,14 +157,14 @@ export async function reorderPriceListBrandsAction(brandIds: string[]) {
 
 export async function deletePriceListBrandAction(id: string) {
   try {
-    const user = await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     const brand = await prisma.priceListBrand.findUnique({ where: { id } });
     if (!brand) return { success: false, error: "Marca no encontrada" };
     await prisma.$transaction([
       prisma.priceListItem.updateMany({ where: { brand: brand.name }, data: { status: "INACTIVE", isActive: false } }),
       prisma.priceListBrand.delete({ where: { id } }),
     ]);
-    await logAudit({ userId: user.id || "unknown", action: "ARCHIVE", module: "PRECIOS", entityType: "PriceListBrand", entityId: id, beforeData: { name: brand.name } });
+    await logAudit({ userId: user.id, action: "ARCHIVE", module: "PRECIOS", entityType: "PriceListBrand", entityId: id, beforeData: { name: brand.name } });
     revalidatePath(modulePath);
     return { success: true };
   } catch (error) {
@@ -167,11 +174,11 @@ export async function deletePriceListBrandAction(id: string) {
 
 export async function savePriceListLogoAction(logo: string | null) {
   try {
-    const user = await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     if (logo && logo.length > 3_000_000) return { success: false, error: "El logo supera el límite de 2 MB" };
     const value = logo === null ? Prisma.JsonNull : logo;
     await prisma.priceListSetting.upsert({ where: { key: "logo" }, update: { value }, create: { key: "logo", value } });
-    await logAudit({ userId: user.id || "unknown", action: "UPDATE", module: "PRECIOS", entityType: "PriceListSetting", entityId: "logo" });
+    await logAudit({ userId: user.id, action: "UPDATE", module: "PRECIOS", entityType: "PriceListSetting", entityId: "logo" });
     revalidatePath(modulePath);
     return { success: true };
   } catch (error) {
@@ -181,9 +188,9 @@ export async function savePriceListLogoAction(logo: string | null) {
 
 export async function deletePriceListItemAction(id: string) {
   try {
-    const user = await requirePermission("precios.write");
+    const user = await requirePriceEditor();
     const item = await prisma.priceListItem.update({ where: { id }, data: { status: "INACTIVE", isActive: false } });
-    await logAudit({ userId: user.id || "unknown", action: "ARCHIVE", module: "PRECIOS", entityType: "PriceListItem", entityId: id, beforeData: { model: item.model } });
+    await logAudit({ userId: user.id, action: "ARCHIVE", module: "PRECIOS", entityType: "PriceListItem", entityId: id, beforeData: { model: item.model } });
     revalidatePath(modulePath);
     return { success: true };
   } catch (error) {

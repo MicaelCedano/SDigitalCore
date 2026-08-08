@@ -51,7 +51,7 @@ export function StockCountForm({
   const [title, setTitle] = useState(
     initialData?.title || "Conteo Físico de Celulares & Equipos"
   );
-  const [branch, setBranch] = useState(initialData?.branch || "Almacén Casita");
+  const [branch, setBranch] = useState(initialData?.branch || "");
   const [performedBy, setPerformedBy] = useState(initialData?.performedBy || "");
   const [notes, setNotes] = useState(initialData?.notes || "");
   const [items, setItems] = useState<any[]>(
@@ -80,6 +80,7 @@ export function StockCountForm({
       const res = await getBranchesAction(true);
       if (res.success && res.data && res.data.length > 0) {
         setBranchesList(res.data);
+        setBranch((current) => current || res.data[0].name);
       }
     }
     loadBranches();
@@ -182,15 +183,15 @@ export function StockCountForm({
         ...prev,
         {
           code: scannedCode.length < 10 ? scannedCode : "",
-          description: scannedCode.length >= 10 ? `Celular IMEI: ${scannedCode}` : `Producto ${scannedCode}`,
+          description: "",
           expectedQty: 0,
           countedQty: newCountedQty,
           difference: newCountedQty,
           scannedImeis: scannedCode,
-          notes: "Escaneado directamente",
+          notes: "",
         },
       ]);
-      setScanSuccessMsg(`Escaneado: ${scannedCode} (+1)`);
+      setScanSuccessMsg(`Código ${scannedCode} agregado. Completa la descripción real del producto.`);
     }
 
     setScanInput("");
@@ -200,7 +201,7 @@ export function StockCountForm({
   const handleRestoreDraft = () => {
     if (savedDraftData) {
       setTitle(savedDraftData.title || "Conteo Físico de Celulares & Equipos");
-      setBranch(savedDraftData.branch || "Principal");
+      setBranch(savedDraftData.branch || "");
       setPerformedBy(savedDraftData.performedBy || "");
       setNotes(savedDraftData.notes || "");
       if (savedDraftData.items && savedDraftData.items.length > 0) {
@@ -451,21 +452,15 @@ export function StockCountForm({
               <select
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
+                required
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-medium focus:outline-none focus:border-[#5750f1]"
               >
-                {branchesList.length > 0 ? (
-                  branchesList.map((b) => (
+                <option value="">Selecciona una sucursal activa</option>
+                {branchesList.map((b) => (
                     <option key={b.id} value={b.name}>
                       {b.name}
                     </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Sucursal Principal">Sucursal Principal</option>
-                    <option value="Almacén Central">Almacén Central</option>
-                    <option value="Sucursal Bella Vista">Sucursal Bella Vista</option>
-                  </>
-                )}
+                ))}
               </select>
             </div>
 
@@ -473,13 +468,7 @@ export function StockCountForm({
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Auditor / Responsable
               </label>
-              <input
-                type="text"
-                value={performedBy}
-                onChange={(e) => setPerformedBy(e.target.value)}
-                placeholder="Tu nombre o usuario"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
-              />
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-600">Se asignará automáticamente desde la sesión activa.</p>
             </div>
           </div>
 

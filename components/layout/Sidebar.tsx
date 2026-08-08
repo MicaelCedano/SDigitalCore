@@ -4,24 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { isModuleAllowedForUser } from "@/lib/auth/roles-permissions";
 import {
-  BarChart3,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   FileText,
   LayoutDashboard,
-  Package,
   Settings,
-  ShieldCheck,
-  ShoppingCart,
   Tag,
-  Truck,
-  Users,
   Warehouse,
-  Wrench,
   X,
 } from "lucide-react";
 
@@ -41,11 +32,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", moduleKey: "dashboard", icon: LayoutDashboard, section: "Inicio" },
-  { label: "Inventario", href: "/inventario", moduleKey: "inventario", icon: Package, section: "Operaciones", children: [
-    { label: "Equipos", href: "/inventario" },
-    { label: "IMEIs y series", href: "/inventario/imeis" },
-    { label: "Ajustes de stock", href: "/inventario/ajustes" },
-  ] },
   { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse, section: "Operaciones", children: [
     { label: "Productos", href: "/almacen" },
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
@@ -53,38 +39,16 @@ const navItems: NavItem[] = [
     { label: "Transferencias", href: "/almacen/transferencias" },
     { label: "Conteos de stock", href: "/almacen/conteos" },
   ] },
-  { label: "Taller", href: "/taller", moduleKey: "taller", icon: Wrench, section: "Operaciones", children: [
-    { label: "Órdenes de reparación", href: "/taller" },
-    { label: "Diagnósticos", href: "/taller/diagnosticos" },
-    { label: "Entregas", href: "/taller/entregas" },
-  ] },
-  { label: "RMA / Garantías", href: "/rma", moduleKey: "rma", icon: ShieldCheck, section: "Operaciones", children: [
-    { label: "Casos de garantía", href: "/rma" },
-    { label: "Resoluciones", href: "/rma/resoluciones" },
-  ] },
-  { label: "Control QC", href: "/qc", moduleKey: "qc", icon: CheckCircle2, section: "Operaciones", children: [
-    { label: "Inspecciones", href: "/qc" },
-    { label: "Checklists", href: "/qc/checklists" },
-  ] },
-  { label: "Ventas", href: "/ventas", moduleKey: "ventas", icon: ShoppingCart, section: "Comercial", children: [
-    { label: "Cotizaciones", href: "/ventas" },
-    { label: "Órdenes de venta", href: "/ventas/ordenes" },
-    { label: "Cobros y pagos", href: "/ventas/cobros" },
-  ] },
-  { label: "Clientes", href: "/clientes", moduleKey: "clientes", icon: Users, section: "Comercial" },
-  { label: "Proveedores", href: "/proveedores", moduleKey: "proveedores", icon: Truck, section: "Comercial" },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },
-  { label: "Reportes", href: "/reportes", moduleKey: "reportes", icon: BarChart3, section: "Administración" },
   { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings, section: "Administración", children: [
     { label: "Usuarios y permisos", href: "/configuracion" },
     { label: "Sucursales", href: "/configuracion/sucursales" },
-    { label: "Ajustes generales", href: "/configuracion/general" },
   ] },
 ];
 
 interface SidebarProps {
-  userEmail?: string;
+  allowedModules?: string[];
   mobileOpen?: boolean;
   onMobileClose?: () => void;
   collapsed?: boolean;
@@ -92,7 +56,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  userEmail = "admin@sdigital.local",
+  allowedModules,
   mobileOpen = false,
   onMobileClose,
   collapsed = false,
@@ -104,8 +68,9 @@ export function Sidebar({
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
-  const visibleItems = navItems.filter(
-    (item) => item.moduleKey === "dashboard" || isModuleAllowedForUser(userEmail, item.moduleKey),
+  const allowedModuleSet = allowedModules ? new Set(allowedModules) : null;
+  const visibleItems = navItems.filter((item) =>
+    item.moduleKey === "dashboard" || allowedModuleSet === null || allowedModuleSet.has(item.moduleKey),
   );
   const sections = ["Inicio", "Operaciones", "Comercial", "Administración"] as const;
 

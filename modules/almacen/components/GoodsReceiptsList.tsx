@@ -66,7 +66,7 @@ export function GoodsReceiptsList() {
       receipts.map((r) => ({
         receiptNumber: r.receiptNumber,
         supplierName: r.supplierName,
-        branch: r.branch || "Principal",
+        branch: r.branch,
         receivedBy: r.receivedBy || "Usuario",
         status: r.status,
         notes: r.notes,
@@ -272,7 +272,7 @@ export function GoodsReceiptsList() {
                         {receipt.supplierName}
                       </td>
                       <td className="px-4 py-4 text-slate-600">
-                        {receipt.branch || "Principal"}
+                        {receipt.branch}
                       </td>
                       <td className="px-4 py-4 text-center font-bold text-slate-800">
                         {receipt.items?.length || 0} ({qty} uds)

@@ -1,22 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   SYSTEM_ROLES,
   SYSTEM_MODULES,
   DEFAULT_ROLE_MODULES,
-  getAccessRequests,
-  approveAccessRequest,
-  rejectAccessRequest,
-  createDirectUser,
-  getUsers,
-  updateUserRole,
-  toggleUserModulePermission,
-  toggleUserStatus,
-  deleteUser,
   type AccessRequest,
   type SystemUser,
 } from "@/lib/auth/roles-permissions";
+import {
+  approveAccessRequestAction,
+  createDirectUserAction,
+  deleteAccessRequestAction,
+  deleteUserAction,
+  getUserManagementDataAction,
+  rejectAccessRequestAction,
+  toggleUserModuleAction,
+  toggleUserStatusAction,
+  updateUserRoleAction,
+} from "@/app/actions/user-management";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,14 +42,17 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
+  Trash2,
 } from "lucide-react";
 
 export default function ConfiguracionPage() {
   const [activeTab, setActiveTab] = useState<"requests" | "users">("users");
 
   // Reactive states
-  const [requests, setRequests] = useState<AccessRequest[]>(getAccessRequests());
-  const [users, setUsers] = useState<SystemUser[]>(getUsers());
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Modal state for approving request
   const [selectedReq, setSelectedReq] = useState<AccessRequest | null>(null);
@@ -79,12 +84,28 @@ export default function ConfiguracionPage() {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<SystemUser | null>(null);
 
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    const result = await getUserManagementDataAction();
+    if (result.success) {
+      setUsers(result.data.users);
+      setRequests(result.data.requests);
+    } else {
+      setActionNotice(result.error);
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
   const pendingRequests = requests.filter((r) => r.status === "PENDING");
   const historyRequests = requests.filter((r) => r.status !== "PENDING");
 
   function handleRoleChangeForNewUser(roleCode: string) {
     setSelectedRole(roleCode);
-    setSelectedModulesForNewUser([...(DEFAULT_ROLE_MODULES[roleCode] ?? ["inventario"])]);
+    setSelectedModulesForNewUser([...(DEFAULT_ROLE_MODULES[roleCode] ?? [])]);
   }
 
   function handleToggleModuleForNewUser(moduleKey: string) {
@@ -95,35 +116,58 @@ export default function ConfiguracionPage() {
     }
   }
 
-  function handleApprove() {
+  async function handleApprove() {
     if (!selectedReq) return;
-    const newUser = approveAccessRequest(
+    setIsSaving(true);
+    const result = await approveAccessRequestAction(
       selectedReq.id,
       selectedRole,
       selectedModulesForNewUser
     );
-    if (newUser) {
-      setRequests([...getAccessRequests()]);
-      setUsers([...getUsers()]);
+    if (result.success) {
+      await loadData();
       setActionNotice(
         `¡Cuenta activada! Usuario @${selectedReq.username} (${selectedReq.name}) registrado con ${selectedModulesForNewUser.length} módulos.`
       );
       setSelectedReq(null);
       setTimeout(() => setActionNotice(null), 4000);
+    } else {
+      setActionNotice(result.error);
     }
+    setIsSaving(false);
   }
 
-  function handleReject(reqId: string) {
-    rejectAccessRequest(reqId);
-    setRequests([...getAccessRequests()]);
-    setActionNotice("Solicitud de acceso rechazada.");
+  async function handleReject(reqId: string) {
+    setIsSaving(true);
+    const result = await rejectAccessRequestAction(reqId);
+    if (result.success) {
+      setRequests((current) => current.map((request) => request.id === reqId ? result.data : request));
+      setActionNotice("Solicitud de acceso rechazada.");
+    } else {
+      setActionNotice(result.error);
+    }
     setTimeout(() => setActionNotice(null), 3000);
+    setIsSaving(false);
+  }
+
+  async function handleDeleteRequest(request: AccessRequest) {
+    if (!window.confirm(`¿Eliminar definitivamente la solicitud de ${request.name}?`)) return;
+    setIsSaving(true);
+    const result = await deleteAccessRequestAction(request.id);
+    if (result.success) {
+      setRequests((current) => current.filter((item) => item.id !== request.id));
+      setActionNotice("Solicitud eliminada de la base de datos.");
+    } else {
+      setActionNotice(result.error);
+    }
+    setTimeout(() => setActionNotice(null), 3000);
+    setIsSaving(false);
   }
 
   // Direct User Creation Handler
   function handleDirectRoleChange(roleCode: string) {
     setDirectUserData({ ...directUserData, roleCode });
-    setDirectUserModules([...(DEFAULT_ROLE_MODULES[roleCode] ?? ["inventario"])]);
+    setDirectUserModules([...(DEFAULT_ROLE_MODULES[roleCode] ?? [])]);
   }
 
   function handleToggleDirectModule(moduleKey: string) {
@@ -134,7 +178,7 @@ export default function ConfiguracionPage() {
     }
   }
 
-  function handleCreateDirectUserSubmit(e: React.FormEvent) {
+  async function handleCreateDirectUserSubmit(e: React.FormEvent) {
     e.preventDefault();
     setCreateErrors({});
 
@@ -144,7 +188,7 @@ export default function ConfiguracionPage() {
     if (!directUserData.email.trim()) errs.email = "El correo es requerido";
     if (!directUserData.phone.trim()) errs.phone = "El teléfono es requerido";
 
-    if (directUserData.password.length < 6) errs.password = "La contraseÃ±a debe tener al menos 6 caracteres";
+    if (directUserData.password.length < 8) errs.password = "La contraseña debe tener al menos 8 caracteres";
     if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃ±as no coinciden";
 
     if (Object.keys(errs).length > 0) {
@@ -152,71 +196,73 @@ export default function ConfiguracionPage() {
       return;
     }
 
-    const created = createDirectUser({
+    setIsSaving(true);
+    const result = await createDirectUserAction({
       ...directUserData,
       allowedModules: directUserModules,
     });
 
-    setUsers([...getUsers()]);
+    if (!result.success) {
+      setActionNotice(result.error);
+      setIsSaving(false);
+      return;
+    }
+
+    setUsers((current) => [result.data, ...current]);
     setShowCreateModal(false);
     setDirectUserData({ name: "", username: "", email: "", phone: "", password: "", confirmPassword: "", roleCode: "VENTAS" });
     setDirectUserModules([...DEFAULT_ROLE_MODULES["VENTAS"]]);
-    setActionNotice(`¡Usuario @${created.username} (${created.name}) creado con éxito!`);
+    setActionNotice(`¡Usuario @${result.data.username} (${result.data.name}) creado con éxito!`);
     setTimeout(() => setActionNotice(null), 4000);
+    setIsSaving(false);
   }
 
-  function handleUserRoleChange(userId: string, newRoleCode: string) {
-    updateUserRole(userId, newRoleCode);
-    setUsers([...getUsers()]);
-    setActionNotice(`Rol y módulos actualizados para el usuario.`);
+  async function handleUserRoleChange(userId: string, newRoleCode: string) {
+    setIsSaving(true);
+    const result = await updateUserRoleAction(userId, newRoleCode);
+    if (result.success) {
+      setUsers((current) => current.map((user) => user.id === userId ? result.data : user));
+      setActionNotice("Rol y módulos actualizados para el usuario.");
+    } else setActionNotice(result.error);
     setTimeout(() => setActionNotice(null), 3000);
+    setIsSaving(false);
   }
 
-  function handleToggleUserModule(userId: string, moduleKey: string) {
-    toggleUserModulePermission(userId, moduleKey);
-    setUsers([...getUsers()]);
-    setActionNotice(`Acceso al módulo "${moduleKey}" modificado.`);
+  async function handleToggleUserModule(userId: string, moduleKey: string) {
+    setIsSaving(true);
+    const result = await toggleUserModuleAction(userId, moduleKey);
+    if (result.success) {
+      setUsers((current) => current.map((user) => user.id === userId ? result.data : user));
+      setActionNotice(`Acceso al módulo "${moduleKey}" modificado.`);
+    } else setActionNotice(result.error);
     setTimeout(() => setActionNotice(null), 2500);
+    setIsSaving(false);
   }
 
-  function handleStatusToggle(userId: string) {
-    toggleUserStatus(userId);
-    setUsers([...getUsers()]);
+  async function handleStatusToggle(userId: string) {
+    setIsSaving(true);
+    const result = await toggleUserStatusAction(userId);
+    if (result.success) setUsers((current) => current.map((user) => user.id === userId ? result.data : user));
+    else setActionNotice(result.error);
+    setIsSaving(false);
   }
 
   function requestDeleteUser(user: SystemUser) {
-    if (user.id === "user-dev-admin") {
-      setActionNotice("La cuenta administradora local no se puede eliminar.");
-      setTimeout(() => setActionNotice(null), 3000);
-      return;
-    }
     setPendingDeleteUser(user);
   }
 
-  function confirmDeleteUser() {
+  async function confirmDeleteUser() {
     if (!pendingDeleteUser) return;
-    if (deleteUser(pendingDeleteUser.id)) {
-      setUsers([...getUsers()]);
+    setIsSaving(true);
+    const result = await deleteUserAction(pendingDeleteUser.id);
+    if (result.success) {
+      setUsers((current) => current.filter((user) => user.id !== pendingDeleteUser.id));
       setExpandedUserId((current) => current === pendingDeleteUser.id ? null : current);
       setActionNotice(`Usuario @${pendingDeleteUser.username} eliminado.`);
       setTimeout(() => setActionNotice(null), 3000);
-    }
+    } else setActionNotice(result.error);
     setPendingDeleteUser(null);
-  }
-
-  function handleDeleteUser(user: SystemUser) {
-    if (user.id === "user-dev-admin") {
-      setActionNotice("La cuenta administradora local no se puede eliminar.");
-      setTimeout(() => setActionNotice(null), 3000);
-      return;
-    }
-    if (!window.confirm(`Â¿Eliminar al usuario @${user.username}? Esta acciÃ³n no se puede deshacer.`)) return;
-    if (deleteUser(user.id)) {
-      setUsers([...getUsers()]);
-      setExpandedUserId((current) => current === user.id ? null : current);
-      setActionNotice(`Usuario @${user.username} eliminado.`);
-      setTimeout(() => setActionNotice(null), 3000);
-    }
+    setIsSaving(false);
   }
 
   return (
@@ -281,6 +327,7 @@ export default function ConfiguracionPage() {
             size="sm"
             className="bg-indigo-600 hover:bg-indigo-700 font-semibold gap-1.5 text-xs shadow-xs"
             onClick={() => setShowCreateModal(true)}
+            disabled={isLoading || isSaving}
           >
             <UserPlus size={15} />
             <span>+ Crear Usuario Directo</span>
@@ -302,6 +349,9 @@ export default function ConfiguracionPage() {
           </div>
 
           <div className="space-y-3">
+            {isLoading ? (
+              <Card className="p-8 text-center text-sm text-slate-500">Cargando usuarios...</Card>
+            ) : null}
             {users.map((u) => {
               const isExpanded = expandedUserId === u.id;
               const moduleCount = u.allowedModules.length;
@@ -342,6 +392,7 @@ export default function ConfiguracionPage() {
                       <select
                         value={u.roleCode}
                         onChange={(e) => handleUserRoleChange(u.id, e.target.value)}
+                        disabled={isSaving}
                         className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                       >
                         {SYSTEM_ROLES.map((r) => (
@@ -367,6 +418,7 @@ export default function ConfiguracionPage() {
                         size="sm"
                         className="h-8 text-xs text-slate-500 hover:text-red-600"
                         onClick={() => handleStatusToggle(u.id)}
+                        disabled={isSaving}
                       >
                         {u.status === "ACTIVE" ? "Bloquear" : "Activar"}
                       </Button>
@@ -376,8 +428,8 @@ export default function ConfiguracionPage() {
                         size="sm"
                         className="h-8 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
                         onClick={() => requestDeleteUser(u)}
-                        disabled={u.id === "user-dev-admin"}
-                        title={u.id === "user-dev-admin" ? "La cuenta administradora local está protegida" : "Eliminar usuario"}
+                        disabled={isSaving}
+                        title="Eliminar usuario"
                       >
                         Eliminar
                       </Button>
@@ -405,7 +457,7 @@ export default function ConfiguracionPage() {
                           return (
                             <button
                               key={mod.key}
-                              disabled={u.roleCode === "ADMIN"}
+                              disabled={u.roleCode === "ADMIN" || isSaving}
                               onClick={() => handleToggleUserModule(u.id, mod.key)}
                               className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
                                 isEnabled
@@ -452,7 +504,9 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          {pendingRequests.length === 0 ? (
+          {isLoading ? (
+            <Card className="p-8 text-center text-sm text-slate-500">Cargando solicitudes...</Card>
+          ) : pendingRequests.length === 0 ? (
             <Card className="p-8 text-center border-dashed border-slate-200">
               <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 size={24} />
@@ -510,6 +564,7 @@ export default function ConfiguracionPage() {
                           size="sm"
                           className="h-8 text-xs px-2.5"
                           onClick={() => handleReject(req.id)}
+                          disabled={isSaving}
                         >
                           <XCircle size={14} />
                           <span>Rechazar</span>
@@ -524,6 +579,7 @@ export default function ConfiguracionPage() {
                             setSelectedRole("VENTAS");
                             setSelectedModulesForNewUser([...DEFAULT_ROLE_MODULES["VENTAS"]]);
                           }}
+                          disabled={isSaving}
                         >
                           <UserCheck size={14} />
                           <span>Configurar & Aceptar</span>
@@ -550,6 +606,7 @@ export default function ConfiguracionPage() {
                       <th className="p-3">Teléfono</th>
                       <th className="p-3">Estado</th>
                       <th className="p-3">Rol Asignado</th>
+                      <th className="p-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -567,6 +624,19 @@ export default function ConfiguracionPage() {
                           )}
                         </td>
                         <td className="p-3 font-mono font-semibold text-slate-700">{r.assignedRole ?? "—"}</td>
+                        <td className="p-3 text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => void handleDeleteRequest(r)}
+                            disabled={isSaving}
+                          >
+                            <Trash2 size={14} />
+                            Eliminar
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -747,6 +817,7 @@ export default function ConfiguracionPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowCreateModal(false)}
+                  disabled={isSaving}
                 >
                   Cancelar
                 </Button>
@@ -755,6 +826,7 @@ export default function ConfiguracionPage() {
                   variant="default"
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700"
+                  disabled={isSaving}
                 >
                   Crear y Activar Usuario
                 </Button>
@@ -849,6 +921,7 @@ export default function ConfiguracionPage() {
                 size="sm"
                 className="bg-indigo-600 hover:bg-indigo-700"
                 onClick={handleApprove}
+                disabled={isSaving}
               >
                 Confirmar y Aceptar Cuenta
               </Button>
@@ -881,8 +954,8 @@ export default function ConfiguracionPage() {
               </div>
               <p className="mt-4 text-sm text-slate-600">¿Quieres eliminar este usuario del sistema?</p>
               <div className="mt-6 flex justify-end gap-3">
-                <Button variant="outline" onClick={() => setPendingDeleteUser(null)}>Cancelar</Button>
-                <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDeleteUser}>Eliminar usuario</Button>
+                <Button variant="outline" onClick={() => setPendingDeleteUser(null)} disabled={isSaving}>Cancelar</Button>
+                <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDeleteUser} disabled={isSaving}>Eliminar usuario</Button>
               </div>
             </div>
           </div>

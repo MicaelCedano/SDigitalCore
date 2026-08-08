@@ -266,7 +266,7 @@ export function InvoicesList() {
                       <td className="px-4 py-3.5 text-slate-600">
                         <div className="flex items-center gap-1">
                           <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{inv.branch || "Almacén Casita"}</span>
+                          <span>{inv.branch}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 text-sm">

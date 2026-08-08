@@ -65,7 +65,7 @@ export function GoodsReceiptForm({
   const [supplierName, setSupplierName] = useState(
     initialData?.supplierName || ""
   );
-  const [branch, setBranch] = useState(initialData?.branch || "Almacén Casita");
+  const [branch, setBranch] = useState(initialData?.branch || "");
   const [receivedBy, setReceivedBy] = useState(initialData?.receivedBy || "");
   const [notes, setNotes] = useState(initialData?.notes || "");
   const [items, setItems] = useState<any[]>(
@@ -98,6 +98,7 @@ export function GoodsReceiptForm({
       const res = await getBranchesAction(true);
       if (res.success && res.data && res.data.length > 0) {
         setBranchesList(res.data);
+        setBranch((current) => current || res.data[0].name);
       }
     }
     loadBranches();
@@ -169,7 +170,7 @@ export function GoodsReceiptForm({
   const handleRestoreDraft = () => {
     if (savedDraftData) {
       setSupplierName(savedDraftData.supplierName || "");
-      setBranch(savedDraftData.branch || "Principal");
+      setBranch(savedDraftData.branch || "");
       setReceivedBy(savedDraftData.receivedBy || "");
       setNotes(savedDraftData.notes || "");
       if (savedDraftData.items && savedDraftData.items.length > 0) {
@@ -478,23 +479,15 @@ export function GoodsReceiptForm({
               <select
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
+                required
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-[#5750f1] transition-colors"
               >
-                {branchesList.length > 0 ? (
-                  branchesList.map((b) => (
+                <option value="">Selecciona una sucursal activa</option>
+                {branchesList.map((b) => (
                     <option key={b.id} value={b.name}>
                       {b.name}
                     </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Sucursal Principal">Sucursal Principal</option>
-                    <option value="Almacén Central">Almacén Central</option>
-                    <option value="Sucursal Bella Vista">Sucursal Bella Vista</option>
-                    <option value="Sucursal Santiago">Sucursal Santiago</option>
-                    <option value="Sucursal Megacentro">Sucursal Megacentro</option>
-                  </>
-                )}
+                ))}
               </select>
             </div>
 
@@ -502,13 +495,7 @@ export function GoodsReceiptForm({
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Recibido / Registrado Por
               </label>
-              <input
-                type="text"
-                value={receivedBy}
-                onChange={(e) => setReceivedBy(e.target.value)}
-                placeholder="Tu nombre o usuario"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 transition-colors"
-              />
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-600">Se asignará automáticamente desde la sesión activa.</p>
             </div>
           </div>
 

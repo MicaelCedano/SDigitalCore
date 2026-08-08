@@ -39,6 +39,8 @@ export async function createInvoiceAction(input: InvoiceInput) {
     const userId = user.id;
     if (!userId) throw new Error("La sesión no tiene un usuario identificable.");
     const validated = invoiceSchema.parse(input);
+    const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
+    if (!branchExists) throw new Error("La sucursal seleccionada no existe o está inactiva.");
 
     const invoiceNumber = validated.invoiceNumber || (await generateInvoiceNumber(validated.type));
 
@@ -52,7 +54,7 @@ export async function createInvoiceAction(input: InvoiceInput) {
           clientTaxId: validated.clientTaxId?.trim() || null,
           clientPhone: validated.clientPhone?.trim() || null,
           clientAddress: validated.clientAddress?.trim() || null,
-          branch: validated.branch || "Almacén Casita",
+          branch: validated.branch,
           paymentMethod: validated.paymentMethod || "Efectivo",
           subtotal: Number(validated.subtotal) || 0,
           tax: Number(validated.tax) || 0,
@@ -60,7 +62,7 @@ export async function createInvoiceAction(input: InvoiceInput) {
           total: Number(validated.total) || 0,
           notes: validated.notes?.trim() || null,
           status: "EMITIDA",
-          createdBy: user?.name || user?.email || "Usuario del Sistema",
+          createdBy: user.name || user.email || userId,
           items: {
             create: validated.items.map((item) => ({
               description: item.description.trim(),

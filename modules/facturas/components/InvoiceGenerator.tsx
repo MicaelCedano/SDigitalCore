@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { createInvoiceAction } from "../actions/invoice";
 import { extractInvoiceFromPDF } from "../actions/pdf-extraction";
 import { InvoiceInput } from "@/lib/validation/invoice";
@@ -32,18 +32,19 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
   const [clientTaxId, setClientTaxId] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
-  const [ncf, setNcf] = useState("B0100000101");
-  const [branch, setBranch] = useState("Almacén Casita");
+  const [ncf, setNcf] = useState("");
+  const [branch, setBranch] = useState("");
+  const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [paymentMethod, setPaymentMethod] = useState("Efectivo");
   const [discount, setDiscount] = useState<number | string>(0);
   const [notes, setNotes] = useState("");
 
   const [items, setItems] = useState<any[]>([
     {
-      description: "iPhone 15 Pro Max 256GB Azul Titania",
-      sku: "IP15PM-256",
+      description: "",
+      sku: "",
       imeis: "",
-      quantity: 2,
+      quantity: 1,
       unitPrice: 0,
       applyTax: true,
     },
@@ -53,6 +54,17 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
   const [extracting, setExtracting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [extractMsg, setExtractMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getBranchesAction(true).then((result) => {
+      if (!active || !result.success) return;
+      const available = result.data.map(({ id, name }) => ({ id, name }));
+      setBranches(available);
+      setBranch((current) => current || available[0]?.name || "");
+    });
+    return () => { active = false; };
+  }, []);
 
   const handlePDFUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -144,6 +156,11 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
 
     if (!clientName.trim()) {
       setErrorMsg("El nombre del cliente es obligatorio.");
+      return;
+    }
+
+    if (!branch) {
+      setErrorMsg("Debes crear y seleccionar una sucursal activa antes de emitir.");
       return;
     }
 
@@ -267,6 +284,22 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
             <User className="w-4 h-4 text-[#5750f1]" /> Información del Cliente & NCF
           </h3>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Sucursal <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={branch}
+              onChange={(event) => setBranch(event.target.value)}
+              required
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#5750f1]"
+            >
+              <option value="">Selecciona una sucursal activa</option>
+              {branches.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select>
+            {!branches.length ? <p className="mt-1 text-[11px] text-amber-700">No hay sucursales activas configuradas.</p> : null}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">

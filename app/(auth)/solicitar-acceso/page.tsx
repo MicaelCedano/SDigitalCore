@@ -4,20 +4,22 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { accessRequestSchema, type AccessRequestInput } from "@/lib/validation/access-request";
-import { addAccessRequest } from "@/lib/auth/roles-permissions";
+import { submitAccessRequestAction } from "@/app/actions/user-management";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { User, AtSign, Mail, Phone, CheckCircle2, ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
+import { User, AtSign, Mail, Phone, CheckCircle2, ArrowLeft, Loader2, ShieldAlert, LockKeyhole } from "lucide-react";
 
 export default function SolicitarAccesoPage() {
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Partial<AccessRequestInput>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrors({});
+    setSubmitError(null);
 
     const formData = new FormData(e.currentTarget);
     const raw = {
@@ -25,6 +27,8 @@ export default function SolicitarAccesoPage() {
       username: formData.get("username") as string,
       email: formData.get("email") as string,
       phone: formData.get("phone") as string,
+      password: formData.get("password") as string,
+      confirmPassword: formData.get("confirmPassword") as string,
     };
 
     const parsed = accessRequestSchema.safeParse(raw);
@@ -38,9 +42,10 @@ export default function SolicitarAccesoPage() {
       return;
     }
 
-    startTransition(() => {
-      addAccessRequest(parsed.data);
-      setIsSubmitted(true);
+    startTransition(async () => {
+      const result = await submitAccessRequestAction(parsed.data);
+      if (result.success) setIsSubmitted(true);
+      else setSubmitError(result.error);
     });
   }
 
@@ -197,6 +202,27 @@ export default function SolicitarAccesoPage() {
                     </div>
                     {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
                   </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label htmlFor="req-password" className="text-xs font-semibold text-slate-700">Contraseña</label>
+                      <div className="relative flex items-center">
+                        <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <Input id="req-password" name="password" type="password" autoComplete="new-password" className={`pl-9.5 ${errors.password ? "border-red-500" : ""}`} disabled={isPending} />
+                      </div>
+                      {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="req-confirm-password" className="text-xs font-semibold text-slate-700">Confirmar</label>
+                      <div className="relative flex items-center">
+                        <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <Input id="req-confirm-password" name="confirmPassword" type="password" autoComplete="new-password" className={`pl-9.5 ${errors.confirmPassword ? "border-red-500" : ""}`} disabled={isPending} />
+                      </div>
+                      {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
+                    </div>
+                  </div>
+
+                  {submitError ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">{submitError}</p> : null}
 
                   <Button
                     type="submit"

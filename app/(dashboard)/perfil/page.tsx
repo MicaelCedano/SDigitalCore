@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { getUsers, updateUserProfile } from "@/lib/auth/roles-permissions";
-import { getProfileAction, updateProfileAction } from "@/app/actions/profile";
+import { changePasswordAction, getProfileAction, updateProfileAction } from "@/app/actions/profile";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,43 +22,49 @@ import {
 } from "lucide-react";
 
 export default function PerfilPage() {
-  const currentUsers = getUsers();
-  const currentUser = currentUsers[0] ?? {
-    id: "user-dev-admin",
-    name: "Admin Local",
-    username: "admin",
-    email: "admin@sdigital.local",
-    phone: "809-000-0000",
+  const [profileUser, setProfileUser] = useState({
+    id: "",
+    name: "",
+    username: "",
+    email: "",
+    phone: "",
     avatarUrl: "",
-    roleCode: "ADMIN",
-  };
-  const [profileUser, setProfileUser] = useState(currentUser);
+    roleCode: "",
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"profile" | "security">("profile");
 
   // Form states
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
-  const [username, setUsername] = useState(currentUser.username);
-  const [phone, setPhone] = useState(currentUser.phone);
-  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl ?? "");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
     void getProfileAction().then((result) => {
-      if (!result.success) return;
+      if (!result.success) {
+        setNotice(result.error);
+        setIsLoading(false);
+        return;
+      }
       const nextUser = {
-        ...currentUser,
-        id: result.data.id ?? currentUser.id,
-        name: result.data.name ?? currentUser.name,
-        email: result.data.email ?? currentUser.email,
-        username: result.data.username ?? currentUser.username,
-        avatarUrl: result.data.image ?? currentUser.avatarUrl ?? "",
+        id: result.data.id,
+        name: result.data.name ?? "",
+        email: result.data.email,
+        username: result.data.username ?? "",
+        phone: result.data.phone ?? "",
+        avatarUrl: result.data.image ?? "",
+        roleCode: result.data.roleCode,
       };
       setProfileUser(nextUser);
       setName(nextUser.name);
       setEmail(nextUser.email);
       setUsername(nextUser.username);
+      setPhone(nextUser.phone);
       setAvatarUrl(nextUser.avatarUrl ?? "");
+      setIsLoading(false);
     });
   }, []);
 
@@ -81,8 +86,7 @@ export default function PerfilPage() {
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setAvatarUrl(base64);
-      updateUserProfile(profileUser.id, { avatarUrl: base64 });
-      setNotice("¡Foto de perfil actualizada con éxito!");
+      setNotice("Vista previa lista. Guarda los cambios para actualizar la foto.");
       setTimeout(() => setNotice(null), 3000);
     };
     reader.readAsDataURL(file);
@@ -90,8 +94,7 @@ export default function PerfilPage() {
 
   function handleRemovePhoto() {
     setAvatarUrl("");
-    updateUserProfile(profileUser.id, { avatarUrl: "" });
-    setNotice("Foto de perfil removida.");
+    setNotice("La foto se eliminará cuando guardes los cambios.");
     setTimeout(() => setNotice(null), 3000);
   }
 
@@ -109,18 +112,17 @@ export default function PerfilPage() {
       setTimeout(() => setNotice(null), 4000);
       return;
     }
-    updateUserProfile(profileUser.id, { name, email, username, phone, avatarUrl });
-    setProfileUser({ ...profileUser, name, email, username, avatarUrl });
+    setProfileUser({ ...profileUser, name, email, username, phone, avatarUrl });
     setNotice(result.requiresRelogin ? "Perfil guardado. Cierra sesión y vuelve a entrar para activar el nuevo correo." : "¡Perfil actualizado con éxito!");
     setTimeout(() => setNotice(null), 3500);
   }
 
-  function handlePasswordSubmit(e: React.FormEvent) {
+  async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError(null);
 
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordError("La nueva contraseña debe tener al menos 6 caracteres.");
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError("La nueva contraseña debe tener al menos 8 caracteres.");
       return;
     }
 
@@ -129,6 +131,11 @@ export default function PerfilPage() {
       return;
     }
 
+    const result = await changePasswordAction({ currentPassword, newPassword });
+    if (!result.success) {
+      setPasswordError(result.error);
+      return;
+    }
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -143,6 +150,10 @@ export default function PerfilPage() {
       .map((p) => p[0])
       .join("")
       .toUpperCase();
+  }
+
+  if (isLoading) {
+    return <Card className="mx-auto max-w-4xl p-10 text-center text-sm text-slate-500">Cargando perfil...</Card>;
   }
 
   return (
@@ -206,7 +217,7 @@ export default function PerfilPage() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <h2 className="text-lg font-bold text-[#1c2434]">{name}</h2>
               <Badge variant="default" className="w-fit mx-auto sm:mx-0">
-                Rol: {currentUser.roleCode}
+                Rol: {profileUser.roleCode}
               </Badge>
             </div>
             <p className="text-xs font-semibold font-mono text-[#5750f1]">@{username}</p>

@@ -42,7 +42,7 @@ export function StockCountDetailModal({
     exportStockCountToExcel({
       countNumber: count.countNumber,
       title: count.title,
-      branch: count.branch || "Principal",
+      branch: count.branch,
       performedBy: count.performedBy || "Auditor del Sistema",
       status: count.status,
       notes: count.notes,
@@ -111,7 +111,7 @@ export function StockCountDetailModal({
               <span className="text-[11px] text-slate-500 block mb-1 font-medium">Sucursal Auditada</span>
               <span className="text-sm font-bold text-slate-800 block truncate flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-[#5750f1] shrink-0" />
-                {count.branch || "Principal"}
+                {count.branch}
               </span>
             </div>
 

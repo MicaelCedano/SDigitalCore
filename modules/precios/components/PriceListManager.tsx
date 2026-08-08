@@ -17,9 +17,6 @@ type Item = PriceListItemInput & { id: string; createdAt?: string | Date; update
 type Brand = { id: string; name: string; color: string; orderIndex: number };
 type Workspace = { inventory: Item[]; activeList: Item[]; brands: Brand[]; logo: string | null };
 
-const ACTIVE_KEY = "sdigitalcore.price-list.active";
-const INVENTORY_KEY = "sdigitalcore.price-list.inventory";
-const LOGO_KEY = "sdigitalcore.price-list.logo";
 const PREVIEW_WIDTH = 1080;
 
 const money = (value: unknown) => `RD$${Number(value || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`;
@@ -56,28 +53,17 @@ export function PriceListManager() {
       setActiveList(result.data.activeList as Item[]);
       setBrands(result.data.brands as Brand[]);
       setLogo(result.data.logo);
-      localStorage.setItem(INVENTORY_KEY, JSON.stringify(result.data.inventory));
+      workspaceHydrated.current = true;
     } else setMessage(result.error || "No se pudo cargar la lista");
-    workspaceHydrated.current = true;
     setLoading(false);
   };
 
   useEffect(() => {
-    try {
-      const cachedInventory = JSON.parse(localStorage.getItem(INVENTORY_KEY) || "[]") as Item[];
-      const cachedActive = JSON.parse(localStorage.getItem(ACTIVE_KEY) || "[]") as Item[];
-      if (cachedInventory.length) setInventory(cachedInventory);
-      if (cachedActive.length) setActiveList(syncActive(cachedActive, cachedInventory));
-      const cachedLogo = localStorage.getItem(LOGO_KEY);
-      if (cachedLogo) setLogo(cachedLogo);
-    } catch { /* cache corrupta: la fuente remota reemplaza el estado */ }
     void loadWorkspace();
   }, []);
 
   useEffect(() => {
     if (loading || !workspaceHydrated.current) return;
-    localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeList));
     const timer = setTimeout(async () => {
       const result = await setActivePriceListAction(activeList.map((item) => item.id));
       if (!result.success) setMessage(result.error || "No se pudo sincronizar la lista activa");
@@ -87,7 +73,6 @@ export function PriceListManager() {
 
   useEffect(() => {
     if (loading || !workspaceHydrated.current) return;
-    if (logo) localStorage.setItem(LOGO_KEY, logo); else localStorage.removeItem(LOGO_KEY);
     const timer = setTimeout(async () => { await savePriceListLogoAction(logo); }, 1200);
     return () => clearTimeout(timer);
   }, [logo, loading]);

@@ -3,71 +3,46 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import {
   ArrowRight,
-  BarChart3,
-  CheckCircle2,
   FileText,
-  Package,
   Settings,
-  ShieldCheck,
-  ShoppingCart,
   Tag,
-  Truck,
-  Users,
   Warehouse,
-  Wrench,
 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Resumen general" };
 
 const operations = [
-  { label: "Inventario", href: "/inventario", icon: Package },
   { label: "Almacén", href: "/almacen", icon: Warehouse },
-  { label: "Taller", href: "/taller", icon: Wrench },
-  { label: "RMA / Garantías", href: "/rma", icon: ShieldCheck },
-  { label: "Control QC", href: "/qc", icon: CheckCircle2 },
 ];
 
 const commercial = [
-  { label: "Ventas", href: "/ventas", icon: ShoppingCart },
-  { label: "Clientes", href: "/clientes", icon: Users },
-  { label: "Proveedores", href: "/proveedores", icon: Truck },
   { label: "Lista de precios", href: "/precios", icon: Tag },
   { label: "Facturas", href: "/facturas", icon: FileText },
 ];
 
 const administration = [
-  { label: "Reportes", href: "/reportes", icon: BarChart3 },
   { label: "Configuración", href: "/configuracion", icon: Settings },
 ];
 
 const groups = [
   {
     title: "Operaciones",
-    description: "Inventario, almacén, taller y calidad en cada etapa.",
-    icon: Package,
+    description: "Mercancía, movimientos, solicitudes y conteos persistidos.",
+    icon: Warehouse,
     items: operations,
   },
   {
     title: "Comercial",
-    description: "Ventas, clientes, proveedores y documentos comerciales.",
-    icon: ShoppingCart,
+    description: "Precios y documentos comerciales conectados a la base central.",
+    icon: FileText,
     items: commercial,
   },
   {
     title: "Administración",
     description: "Información consolidada y control del sistema.",
-    icon: BarChart3,
+    icon: Settings,
     items: administration,
   },
-];
-
-const workflow = [
-  { label: "Ventas", description: "Registra la operación", icon: ShoppingCart },
-  { label: "Inventario", description: "Verifica disponibilidad", icon: Package },
-  { label: "Almacén", description: "Prepara y despacha", icon: Warehouse },
-  { label: "Taller", description: "Repara y da seguimiento", icon: Wrench },
-  { label: "Control QC", description: "Valida la calidad", icon: CheckCircle2 },
-  { label: "RMA", description: "Gestiona garantías", icon: ShieldCheck },
 ];
 
 export default async function DashboardPage() {
@@ -133,27 +108,6 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="enterprise-panel px-5 py-5 sm:px-6 sm:py-6" aria-labelledby="workflow-title">
-        <h3 id="workflow-title" className="text-lg font-semibold tracking-[-0.02em] text-[#101828]">Flujo operativo</h3>
-        <p className="mt-1 text-sm text-[#667085]">Vista general de cómo se conectan los módulos principales.</p>
-        <ol className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
-          {workflow.map((step, index) => {
-            const Icon = step.icon;
-            return (
-              <li key={step.label} className="relative flex gap-3 lg:block">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#344054]">
-                  <Icon size={18} strokeWidth={1.75} />
-                </span>
-                {index < workflow.length - 1 ? <span className="absolute left-10 top-5 hidden h-px w-[calc(100%-2.5rem)] bg-[#d0d5dd] lg:block" /> : null}
-                <div className="lg:mt-3">
-                  <p className="text-[13px] font-semibold text-[#101828]">{step.label}</p>
-                  <p className="mt-0.5 text-xs leading-[18px] text-[#667085]">{step.description}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
     </div>
   );
 }

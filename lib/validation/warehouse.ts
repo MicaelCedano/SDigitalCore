@@ -22,7 +22,7 @@ export const warehouseMovementSchema = z.object({
 export const warehouseRequestSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1, "El título de la solicitud es requerido"),
-  branch: z.string().min(1, "La sucursal es requerida").default("Principal"),
+  branch: z.string().trim().min(1, "La sucursal es requerida"),
   requestedBy: z.string().optional(),
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).default("PENDING"),
   details: z.string().optional().nullable(),

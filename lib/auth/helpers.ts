@@ -22,7 +22,7 @@ export async function requireUser() {
 
 /**
  * Exige un permiso específico. Lanza error 403 si no lo tiene.
- * En Fase 3 se conectará a la tabla de permisos real.
+ * La comprobación se realiza contra el usuario persistido en PostgreSQL.
  */
 export async function requirePermission(permission: string) {
   const user = await requireUser();
@@ -37,34 +37,40 @@ export async function requirePermission(permission: string) {
 
 /**
  * Verifica si el usuario actual tiene un permiso. Retorna boolean.
- * Placeholder — se implementa completamente en Fase 3.
+ * Comprueba el permiso contra el rol y los módulos persistidos del usuario.
  */
 export async function can(permission: string): Promise<boolean> {
   const session = await auth();
   if (!session?.user) return false;
 
-  // El administrador debe conservar acceso total en local y producción.
-  // ADMIN_EMAILS permite agregar otros administradores sin modificar el código.
-  const configuredAdminEmails = process.env.ADMIN_EMAILS?.split(",") ?? [];
-  const adminEmails = new Set(
-    [
-      "admin@sdigital.local",
-      "micaelcedano.ai@gmail.com",
-      ...configuredAdminEmails,
-    ]
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  const email = (session.user.email ?? "").trim().toLowerCase();
-  if (adminEmails.has(email)) return true;
+  try {
+    const { prisma } = await import("@/lib/db/prisma");
+    const persistedUser = await prisma.user.findFirst({
+      where: session.user.id
+        ? { id: session.user.id }
+        : { email: { equals: session.user.email ?? "", mode: "insensitive" } },
+      select: { roleCode: true, allowedModules: true, status: true },
+    });
+    if (!persistedUser || persistedUser.status !== "ACTIVE") return false;
+    if (persistedUser.roleCode === "ADMIN") return true;
 
-  // El administrador local conserva acceso aunque cambie su correo desde Perfil.
-  if (session.user.id === "dev-admin-001") {
-    return true;
+    const permissionModule = permission.split(".")[0];
+    const moduleAliases: Record<string, string> = {
+      inventory: "inventario",
+      warehouse: "almacen",
+      sales: "ventas",
+      repair: "taller",
+      customers: "clientes",
+      suppliers: "proveedores",
+      prices: "precios",
+      invoices: "facturas",
+      reports: "reportes",
+      settings: "configuracion",
+    };
+    const moduleKey = moduleAliases[permissionModule] ?? permissionModule;
+    return persistedUser.allowedModules.includes(moduleKey);
+  } catch (error) {
+    console.error(`[can] No se pudo verificar el permiso "${permission}"`, error);
+    return false;
   }
-
-  console.warn(
-    `[can] Verificación de permiso "${permission}" pendiente de implementar en Fase 3`
-  );
-  return false;
 }

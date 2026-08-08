@@ -19,7 +19,7 @@ export const invoiceSchema = z.object({
   clientTaxId: z.string().optional().nullable(),
   clientPhone: z.string().optional().nullable(),
   clientAddress: z.string().optional().nullable(),
-  branch: z.string().default("Almacén Casita"),
+  branch: z.string().trim().min(1, "La sucursal es obligatoria"),
   paymentMethod: z.string().default("Efectivo"),
   subtotal: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),

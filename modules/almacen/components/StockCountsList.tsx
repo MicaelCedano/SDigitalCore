@@ -65,7 +65,7 @@ export function StockCountsList() {
       counts.map((c) => ({
         countNumber: c.countNumber,
         title: c.title,
-        branch: c.branch || "Principal",
+        branch: c.branch,
         performedBy: c.performedBy || "Auditor",
         status: c.status,
         notes: c.notes,
@@ -284,7 +284,7 @@ export function StockCountsList() {
                       <td className="px-4 py-3.5 text-slate-600">
                         <div className="flex items-center gap-1">
                           <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{c.branch || "Principal"}</span>
+                          <span>{c.branch}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-center whitespace-nowrap">
@@ -306,7 +306,7 @@ export function StockCountsList() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-slate-600 font-medium">
-                        {c.performedBy || "Usuario del Sistema"}
+                        {c.performedBy}
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span

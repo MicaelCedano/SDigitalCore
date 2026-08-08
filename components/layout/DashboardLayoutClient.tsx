@@ -7,12 +7,18 @@ import { Topbar } from "@/components/layout/Topbar";
 interface DashboardLayoutClientProps {
   userName?: string | null;
   userEmail?: string | null;
+  userRole?: string | null;
+  userAvatarUrl?: string | null;
+  allowedModules?: string[];
   children: React.ReactNode;
 }
 
 export function DashboardLayoutClient({
   userName,
   userEmail,
+  userRole,
+  userAvatarUrl,
+  allowedModules,
   children,
 }: DashboardLayoutClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -21,7 +27,7 @@ export function DashboardLayoutClient({
   return (
     <div className="dashboard-shell">
       <Sidebar
-        userEmail={userEmail ?? "admin@sdigital.local"}
+        allowedModules={allowedModules}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
         collapsed={collapsed}
@@ -31,6 +37,8 @@ export function DashboardLayoutClient({
         <Topbar
           userName={userName}
           userEmail={userEmail}
+          userRole={userRole}
+          userAvatarUrl={userAvatarUrl}
           onMobileToggle={() => setMobileOpen((v) => !v)}
         />
         <main className="dashboard-content">

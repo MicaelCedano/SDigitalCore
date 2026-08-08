@@ -32,7 +32,7 @@ export function WarehouseRequestsManager() {
 
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState("");
-  const [branch, setBranch] = useState("Principal");
+  const [branch, setBranch] = useState("");
   const [requestedBy, setRequestedBy] = useState("");
   const [details, setDetails] = useState("");
 
@@ -64,7 +64,7 @@ export function WarehouseRequestsManager() {
 
   const handleOpenCreate = () => {
     setTitle("");
-    setBranch(branchesList.length > 0 ? branchesList[0].name : "Principal");
+    setBranch(branchesList[0]?.name || "");
     setRequestedBy("");
     setDetails("");
     setErrorMsg(null);
@@ -77,6 +77,10 @@ export function WarehouseRequestsManager() {
 
     if (!title.trim()) {
       setErrorMsg("El título de la solicitud es obligatorio.");
+      return;
+    }
+    if (!branch) {
+      setErrorMsg("Debes crear y seleccionar una sucursal activa.");
       return;
     }
 
@@ -329,21 +333,15 @@ export function WarehouseRequestsManager() {
                 <select
                   value={branch}
                   onChange={(e) => setBranch(e.target.value)}
+                  required
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-medium focus:outline-none focus:border-[#5750f1]"
                 >
-                  {branchesList.length > 0 ? (
-                    branchesList.map((b) => (
+                  <option value="">Selecciona una sucursal activa</option>
+                  {branchesList.map((b) => (
                       <option key={b.id} value={b.name}>
                         {b.name}
                       </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Sucursal Principal">Sucursal Principal</option>
-                      <option value="Almacén Central">Almacén Central</option>
-                      <option value="Sucursal Bella Vista">Sucursal Bella Vista</option>
-                    </>
-                  )}
+                  ))}
                 </select>
               </div>
 
@@ -351,13 +349,7 @@ export function WarehouseRequestsManager() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Solicitado Por
                 </label>
-                <input
-                  type="text"
-                  value={requestedBy}
-                  onChange={(e) => setRequestedBy(e.target.value)}
-                  placeholder="Tu nombre o usuario"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
-                />
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">Se asignará automáticamente desde la sesión activa.</p>
               </div>
 
               <div>

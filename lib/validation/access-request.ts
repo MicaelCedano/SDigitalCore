@@ -15,6 +15,13 @@ export const accessRequestSchema = z.object({
   phone: z
     .string()
     .min(7, "El teléfono es requerido"),
+  password: z
+    .string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
 });
 
 export type AccessRequestInput = z.infer<typeof accessRequestSchema>;

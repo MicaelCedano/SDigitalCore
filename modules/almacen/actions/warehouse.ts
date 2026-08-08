@@ -1,7 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/db/prisma";
-import { getCurrentUser } from "@/lib/auth/helpers";
+import { requirePermission } from "@/lib/auth/helpers";
+import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import {
   warehouseProductSchema,
@@ -17,6 +18,7 @@ import {
  */
 export async function getWarehouseProductsAction(query?: string) {
   try {
+    await requirePermission("warehouse.read");
     const where: any = {};
     if (query && query.trim() !== "") {
       const q = query.trim();
@@ -45,6 +47,8 @@ export async function getWarehouseProductsAction(query?: string) {
  */
 export async function createWarehouseProductAction(input: WarehouseProductInput) {
   try {
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseProductSchema.parse(input);
     const boxes = Number(validated.boxes) || 0;
     const unitsPerBox = Number(validated.unitsPerBox) || 1;
@@ -65,6 +69,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
           totalUnits,
         },
       });
+      await logAudit({ userId: actor.id, action: "warehouse_product.update", module: "almacen", entityType: "warehouse_product", entityId: updated.id, afterData: { code: updated.code, name: updated.name, boxes: updated.boxes } });
 
       revalidatePath("/almacen");
       return { success: true, data: updated, message: "Producto actualizado exitosamente" };
@@ -92,6 +97,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
         totalUnits,
       },
     });
+    await logAudit({ userId: actor.id, action: "warehouse_product.create", module: "almacen", entityType: "warehouse_product", entityId: created.id, afterData: { code: created.code, name: created.name, boxes: created.boxes } });
 
     revalidatePath("/almacen");
     return { success: true, data: created, message: "Producto de almacén registrado exitosamente" };
@@ -105,9 +111,12 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
  */
 export async function deleteWarehouseProductAction(id: string) {
   try {
-    await prisma.warehouseProduct.delete({
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const deleted = await prisma.warehouseProduct.delete({
       where: { id },
     });
+    await logAudit({ userId: actor.id, action: "warehouse_product.delete", module: "almacen", entityType: "warehouse_product", entityId: deleted.id, beforeData: { code: deleted.code, name: deleted.name } });
 
     revalidatePath("/almacen");
     return { success: true, message: "Producto eliminado" };
@@ -121,7 +130,8 @@ export async function deleteWarehouseProductAction(id: string) {
  */
 export async function createWarehouseMovementAction(input: WarehouseMovementInput) {
   try {
-    const user = await getCurrentUser();
+    const user = await requirePermission("warehouse.write");
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseMovementSchema.parse(input);
     const boxesCount = Number(validated.boxesCount) || 1;
 
@@ -167,13 +177,14 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
           boxesCount,
           totalUnits: boxesCount * product.unitsPerBox,
           reason: validated.reason.trim(),
-          createdBy: user?.name || user?.email || "Usuario del Sistema",
+          createdBy: user.name || user.email || user.id,
         },
         include: {
           product: true,
         },
       });
     });
+    await logAudit({ userId: user.id, action: "warehouse_movement.create", module: "almacen", entityType: "warehouse_movement", entityId: movement.id, afterData: { type: movement.type, boxesCount: movement.boxesCount, productId: movement.productId } });
 
     revalidatePath("/almacen");
     revalidatePath("/almacen/movimientos");
@@ -192,6 +203,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
  */
 export async function getWarehouseMovementsAction(query?: string) {
   try {
+    await requirePermission("warehouse.read");
     const where: any = {};
     if (query && query.trim() !== "") {
       const q = query.trim();
@@ -248,8 +260,11 @@ async function generateRequestCode(): Promise<string> {
  */
 export async function createWarehouseRequestAction(input: WarehouseRequestInput) {
   try {
-    const user = await getCurrentUser();
+    const user = await requirePermission("warehouse.write");
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseRequestSchema.parse(input);
+    const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
+    if (!branchExists) return { success: false, error: "La sucursal seleccionada no existe o está inactiva." };
     const requestCode = await generateRequestCode();
 
     const created = await prisma.warehouseRequest.create({
@@ -257,11 +272,12 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
         requestCode,
         title: validated.title.trim(),
         branch: validated.branch,
-        requestedBy: validated.requestedBy || user?.name || user?.email || "Usuario del Sistema",
+        requestedBy: user.name || user.email || user.id,
         status: validated.status || "PENDING",
         details: validated.details?.trim() || null,
       },
     });
+    await logAudit({ userId: user.id, action: "warehouse_request.create", module: "almacen", entityType: "warehouse_request", entityId: created.id, afterData: { requestCode: created.requestCode, status: created.status } });
 
     revalidatePath("/almacen/transferencias");
     return { success: true, data: created, message: `Solicitud ${requestCode} registrada exitosamente` };
@@ -275,6 +291,7 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
  */
 export async function getWarehouseRequestsAction(query?: string, status?: string) {
   try {
+    await requirePermission("warehouse.read");
     const where: any = {};
     if (status && status !== "ALL") {
       where.status = status;
@@ -305,10 +322,13 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
  */
 export async function updateWarehouseRequestStatusAction(id: string, status: "APPROVED" | "REJECTED") {
   try {
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const updated = await prisma.warehouseRequest.update({
       where: { id },
       data: { status },
     });
+    await logAudit({ userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: updated.id, afterData: { status: updated.status } });
 
     revalidatePath("/almacen/transferencias");
     return {

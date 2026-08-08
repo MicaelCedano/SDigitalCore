@@ -14,22 +14,63 @@ datasource db {
 // ============================================================
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  username      String?   @unique @map("username")
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?   @map("password_hash")
-  status        UserStatus @default(ACTIVE)
-  lastLoginAt   DateTime? @map("last_login_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id             String     @id @default(cuid())
+  name           String?
+  username       String?    @unique @map("username")
+  email          String     @unique
+  emailVerified  DateTime?
+  image          String?
+  passwordHash   String?    @map("password_hash")
+  phone          String?
+  roleCode       String     @default("VENTAS") @map("role_code")
+  allowedModules String[]   @default([]) @map("allowed_modules")
+  status         UserStatus @default(ACTIVE)
+  lastLoginAt    DateTime?  @map("last_login_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
   accounts Account[]
   sessions Session[]
+  auditLogs AuditLog[]
 
   @@map("user")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  action     String
+  module     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  beforeData Json?    @map("before_data")
+  afterData  Json?    @map("after_data")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([module, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}
+
+model AccessRequest {
+  id            String              @id @default(cuid())
+  name          String
+  username      String              @unique
+  email         String              @unique
+  phone         String
+  passwordHash  String              @map("password_hash")
+  status        AccessRequestStatus @default(PENDING)
+  assignedRole  String?             @map("assigned_role")
+  customModules String[]            @default([]) @map("custom_modules")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  @@map("access_request")
 }
 
 model Account {
@@ -84,6 +125,14 @@ enum UserStatus {
   @@map("user_status")
 }
 
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("access_request_status")
+}
+
 enum GoodsReceiptStatus {
   DRAFT
   COMPLETED
@@ -100,7 +149,7 @@ model GoodsReceipt {
   id            String             @id @default(cuid())
   receiptNumber String             @unique @map("receipt_number")
   supplierName  String             @map("supplier_name")
-  branch        String             @default("Principal")
+  branch        String
   receivedBy    String             @map("received_by")
   status        GoodsReceiptStatus @default(COMPLETED)
   notes         String?            @db.Text
@@ -168,7 +217,7 @@ model StockCount {
   id          String           @id @default(cuid())
   countNumber String           @unique @map("count_number")
   title       String           @default("Conteo Físico de Stock")
-  branch      String           @default("Principal")
+  branch      String
   performedBy String           @map("performed_by")
   status      StockCountStatus @default(IN_PROGRESS)
   notes       String?          @db.Text
@@ -203,18 +252,18 @@ model StockCountItem {
 // ============================================================
 
 model WarehouseProduct {
-  id              String   @id @default(cuid())
-  code            String   @unique @map("codigo")
-  name            String   @map("nombre")
-  brand           String?  @map("marca")
-  color           String?  @map("color")
-  capacity        String?  @map("capacidad")
-  description     String?  @db.Text @map("descripcion")
-  boxes           Int      @default(0) @map("cajas")
-  unitsPerBox     Int      @default(1) @map("unidades_por_caja")
-  totalUnits      Int      @default(0) @map("cantidad")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  code        String   @unique @map("codigo")
+  name        String   @map("nombre")
+  brand       String?  @map("marca")
+  color       String?  @map("color")
+  capacity    String?  @map("capacidad")
+  description String?  @map("descripcion") @db.Text
+  boxes       Int      @default(0) @map("cajas")
+  unitsPerBox Int      @default(1) @map("unidades_por_caja")
+  totalUnits  Int      @default(0) @map("cantidad")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   movements WarehouseMovement[]
 
@@ -254,10 +303,10 @@ model WarehouseRequest {
   id          String                 @id @default(cuid())
   requestCode String                 @unique @map("request_code")
   title       String                 @map("titulo")
-  branch      String                 @default("Principal") @map("sucursal")
+  branch      String                 @map("sucursal")
   requestedBy String                 @map("requested_by")
   status      WarehouseRequestStatus @default(PENDING) @map("status")
-  details     String?                @db.Text @map("detalles")
+  details     String?                @map("detalles") @db.Text
   createdAt   DateTime               @default(now()) @map("created_at")
   updatedAt   DateTime               @updatedAt @map("updated_at")
 
@@ -279,7 +328,7 @@ model PriceListItem {
   wholesalePrice Float    @default(0) @map("precio_mayorista")
   retailPrice    Float    @default(0) @map("precio_detallista")
   minPrice       Float?   @map("precio_minimo")
-  notes          String?  @db.Text @map("notas")
+  notes          String?  @map("notas") @db.Text
   status         String   @default("ACTIVE") @map("status")
   isActive       Boolean  @default(false) @map("en_lista_activa")
   sortOrder      Int      @default(0) @map("orden_lista")
@@ -328,13 +377,13 @@ model Invoice {
   clientTaxId   String?     @map("cliente_rnc_cedula")
   clientPhone   String?     @map("cliente_telefono")
   clientAddress String?     @map("cliente_direccion")
-  branch        String      @default("Almacén Casita") @map("sucursal")
+  branch        String      @map("sucursal")
   paymentMethod String      @default("Efectivo") @map("metodo_pago")
   subtotal      Float       @default(0) @map("subtotal")
   tax           Float       @default(0) @map("itbis")
   discount      Float       @default(0) @map("descuento")
   total         Float       @default(0) @map("total")
-  notes         String?     @db.Text @map("notas")
+  notes         String?     @map("notas") @db.Text
   status        String      @default("EMITIDA") @map("status")
   createdBy     String?     @map("created_by")
   createdAt     DateTime    @default(now()) @map("created_at")
@@ -351,7 +400,7 @@ model InvoiceItem {
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   description String  @map("descripcion")
   sku         String? @map("sku")
-  imeis       String? @db.Text @map("imeis")
+  imeis       String? @map("imeis") @db.Text
   quantity    Int     @default(1) @map("cantidad")
   unitPrice   Float   @default(0) @map("precio_unitario")
   tax         Float   @default(0) @map("itbis")

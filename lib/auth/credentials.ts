@@ -5,7 +5,7 @@
  */
 export async function verifyUserCredentials(
   identifier: string,
-  _password: string
+  password: string
 ): Promise<{ id: string; email: string; name: string | null } | null> {
   const { prisma } = await import("@/lib/db/prisma");
 
@@ -30,11 +30,11 @@ export async function verifyUserCredentials(
     },
   });
 
-  if (!user || user.status !== "ACTIVE") return null;
+  if (!user || user.status !== "ACTIVE" || !user.passwordHash) return null;
 
-  // TODO (Fase 3): comparar con bcrypt
-  // const valid = await bcrypt.compare(_password, user.passwordHash ?? "");
-  // if (!valid) return null;
+  const { verifyPassword } = await import("@/lib/auth/password");
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) return null;
 
   return { id: user.id, email: user.email, name: user.name ?? user.username };
 }

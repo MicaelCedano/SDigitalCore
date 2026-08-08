@@ -22,7 +22,7 @@ export const goodsReceiptItemSchema = z.object({
 export const goodsReceiptSchema = z.object({
   id: z.string().optional(),
   supplierName: z.string().min(1, "El proveedor es requerido"),
-  branch: z.string().min(1, "La sucursal es requerida").default("Principal"),
+  branch: z.string().trim().min(1, "La sucursal es requerida"),
   receivedBy: z.string().optional(),
   status: z.enum(["DRAFT", "COMPLETED", "CANCELLED"]).default("COMPLETED"),
   notes: z.string().optional().nullable(),

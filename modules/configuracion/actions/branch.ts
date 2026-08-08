@@ -1,115 +1,64 @@
 "use server";
 
-import { prisma } from "@/lib/db/prisma";
-import { branchSchema, BranchInput } from "@/lib/validation/branch";
 import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db/prisma";
+import { requirePermission, requireUser } from "@/lib/auth/helpers";
+import { logAudit } from "@/lib/audit";
+import { branchSchema, type BranchInput } from "@/lib/validation/branch";
 
-const defaultBranches = [
-  { name: "Almacén Casita", code: "CASITA", address: "Almacén Principal La Casita", phone: "809-555-0100" },
-  { name: "Sucursal Principal", code: "PRINCIPAL", address: "Av. 27 de Febrero #100, Santo Domingo", phone: "809-555-0101" },
-  { name: "Almacén Central", code: "CENTRAL", address: "Zona Industrial Herrera, Santo Domingo", phone: "809-555-0102" },
-  { name: "Sucursal Bella Vista", code: "BELLA-VISTA", address: "Av. Rómulo Betancourt #450, Santo Domingo", phone: "809-555-0103" },
-  { name: "Sucursal Santiago", code: "SANTIAGO", address: "Calle del Sol #80, Santiago de los Caballeros", phone: "809-555-0104" },
-  { name: "Sucursal Megacentro", code: "MEGACENTRO", address: "Av. San Vicente de Paul, Santo Domingo Este", phone: "809-555-0105" },
-];
-
-/**
- * Garantiza que existan las sucursales por defecto la primera vez
- */
-async function ensureDefaultBranches() {
-  try {
-    for (const b of defaultBranches) {
-      await prisma.branch.upsert({
-        where: { name: b.name },
-        update: {},
-        create: {
-          name: b.name,
-          code: b.code,
-          address: b.address,
-          phone: b.phone,
-          status: "ACTIVE",
-        },
-      });
-    }
-  } catch (err) {
-    console.warn("Error inicializando sucursales por defecto:", err);
-  }
-}
-
-/**
- * Obtiene todas las sucursales activas o filtradas
- */
 export async function getBranchesAction(activeOnly = false) {
   try {
-    await ensureDefaultBranches();
-
-    const where = activeOnly ? { status: "ACTIVE" } : {};
+    await requireUser();
     const branches = await prisma.branch.findMany({
-      where,
+      where: activeOnly ? { status: "ACTIVE" } : {},
       orderBy: { createdAt: "asc" },
     });
-
     return { success: true, data: branches };
-  } catch (error: any) {
-    return { success: false, error: "Error al obtener sucursales", data: [] };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Error al obtener sucursales", data: [] };
   }
 }
 
-/**
- * Crea o actualiza una sucursal
- */
 export async function saveBranchAction(input: BranchInput) {
   try {
-    const validated = branchSchema.parse(input);
+    const actor = await requirePermission("settings.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const data = branchSchema.parse(input);
+    const branch = data.id
+      ? await prisma.branch.update({
+          where: { id: data.id },
+          data: { name: data.name, code: data.code || null, address: data.address || null, phone: data.phone || null, status: data.status },
+        })
+      : await prisma.branch.create({
+          data: { name: data.name, code: data.code || null, address: data.address || null, phone: data.phone || null, status: data.status },
+        });
 
-    if (validated.id) {
-      const updated = await prisma.branch.update({
-        where: { id: validated.id },
-        data: {
-          name: validated.name,
-          code: validated.code || null,
-          address: validated.address || null,
-          phone: validated.phone || null,
-          status: validated.status || "ACTIVE",
-        },
-      });
-
-      revalidatePath("/configuracion/sucursales");
-      revalidatePath("/almacen/recibos");
-      return { success: true, data: updated, message: "Sucursal actualizada exitosamente" };
-    }
-
-    const created = await prisma.branch.create({
-      data: {
-        name: validated.name,
-        code: validated.code || null,
-        address: validated.address || null,
-        phone: validated.phone || null,
-        status: validated.status || "ACTIVE",
-      },
+    await logAudit({
+      userId: actor.id,
+      action: data.id ? "branch.update" : "branch.create",
+      module: "configuracion",
+      entityType: "branch",
+      entityId: branch.id,
+      afterData: { name: branch.name, code: branch.code, status: branch.status },
     });
-
     revalidatePath("/configuracion/sucursales");
     revalidatePath("/almacen/recibos");
-    return { success: true, data: created, message: "Sucursal creada exitosamente" };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error al guardar la sucursal" };
+    return { success: true, data: branch, message: data.id ? "Sucursal actualizada exitosamente" : "Sucursal creada exitosamente" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Error al guardar la sucursal" };
   }
 }
 
-/**
- * Elimina una sucursal por ID
- */
 export async function deleteBranchAction(id: string) {
   try {
-    await prisma.branch.delete({
-      where: { id },
-    });
-
+    const actor = await requirePermission("settings.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const branch = await prisma.branch.update({ where: { id }, data: { status: "INACTIVE" } });
+    await logAudit({ userId: actor.id, action: "branch.deactivate", module: "configuracion", entityType: "branch", entityId: id, afterData: { status: branch.status } });
     revalidatePath("/configuracion/sucursales");
     revalidatePath("/almacen/recibos");
-    return { success: true, message: "Sucursal eliminada" };
-  } catch (error: any) {
-    return { success: false, error: "Error al eliminar la sucursal" };
+    return { success: true, message: "Sucursal desactivada" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Error al desactivar la sucursal" };
   }
 }

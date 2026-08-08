@@ -70,7 +70,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                   </div>
                 </div>
                 <div className="text-xs text-slate-600 space-y-0.5 pt-2">
-                  <p className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-slate-400" /> {invoice.branch || "Almacén Casita"}, Santo Domingo, R.D.</p>
+                  <p className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-slate-400" /> {invoice.branch}, República Dominicana</p>
                   <p className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" /> Tel: (809) 555-0100 | WhatsApp: (809) 555-0100</p>
                   <p className="font-mono text-[11px] text-slate-500">RNC: 1-30-99999-9</p>
                 </div>
@@ -102,7 +102,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
               <div className="space-y-1 text-right sm:text-left">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DETALLES DE DESPACHO</span>
                 {invoice.clientAddress && <p className="text-slate-700">Dirección: {invoice.clientAddress}</p>}
-                <p className="text-slate-600">Almacén Origen: <strong>{invoice.branch || "Almacén Casita"}</strong></p>
+                <p className="text-slate-600">Almacén Origen: <strong>{invoice.branch}</strong></p>
                 <p className="text-slate-600">Método de Pago: <strong>{invoice.paymentMethod || "Efectivo"}</strong></p>
               </div>
             </div>
@@ -197,7 +197,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
               </div>
             ) : (
               <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
-                <p className="font-bold">Conduce de Entrega Oficial — Almacén Casita</p>
+                <p className="font-bold">Conduce de Entrega Oficial — {invoice.branch}</p>
                 <p className="text-[11px] mt-0.5">
                   Este documento certifica la entrega física de los equipos y accesorios especificados más arriba en perfectas condiciones operativas.
                 </p>

@@ -14,7 +14,7 @@ export const stockCountItemSchema = z.object({
 export const stockCountSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1, "El título del conteo es requerido").default("Conteo Físico de Stock"),
-  branch: z.string().min(1, "La sucursal es requerida").default("Principal"),
+  branch: z.string().trim().min(1, "La sucursal es requerida"),
   performedBy: z.string().optional(),
   status: z.enum(["IN_PROGRESS", "COMPLETED", "CANCELLED"]).default("IN_PROGRESS"),
   notes: z.string().optional().nullable(),
