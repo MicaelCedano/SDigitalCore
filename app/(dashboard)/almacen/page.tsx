@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/helpers";
 import { WarehouseProductsManager } from "@/modules/almacen/components/WarehouseProductsManager";
 
 export const metadata: Metadata = {
@@ -6,6 +7,7 @@ export const metadata: Metadata = {
   description: "Gestión de productos por cajas, unidades por caja e inventario de almacén",
 };
 
-export default function AlmacenPage() {
-  return <WarehouseProductsManager />;
+export default async function AlmacenPage() {
+  const user = await getCurrentUser();
+  return <WarehouseProductsManager roleCode={user?.roleCode ?? "ADMIN"} />;
 }
