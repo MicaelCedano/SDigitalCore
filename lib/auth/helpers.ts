@@ -43,20 +43,23 @@ export async function can(permission: string): Promise<boolean> {
   const session = await auth();
   if (!session?.user) return false;
 
-  // TODO (Fase 3): Consultar roles y permisos reales desde la base de datos
-  // Por ahora el admin de prueba tiene todos los permisos
-  const adminEmails = process.env.ADMIN_EMAILS?.split(",") ?? [];
-  const email = session.user.email ?? "";
-  if (adminEmails.includes(email)) return true;
+  // El administrador debe conservar acceso total en local y producción.
+  // ADMIN_EMAILS permite agregar otros administradores sin modificar el código.
+  const configuredAdminEmails = process.env.ADMIN_EMAILS?.split(",") ?? [];
+  const adminEmails = new Set(
+    [
+      "admin@sdigital.local",
+      "micaelcedano.ai@gmail.com",
+      ...configuredAdminEmails,
+    ]
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const email = (session.user.email ?? "").trim().toLowerCase();
+  if (adminEmails.has(email)) return true;
 
   // El administrador local conserva acceso aunque cambie su correo desde Perfil.
-  if (session.user.id === "dev-admin-001" && process.env.NEXTAUTH_URL?.includes("localhost")) {
-    return true;
-  }
-
-  // El usuario demo definido en auth/config.ts debe poder probar las fases
-  // locales sin depender de una fila de permisos que todavía no existe.
-  if (process.env.NODE_ENV === "development" && email === "admin@sdigital.local") {
+  if (session.user.id === "dev-admin-001") {
     return true;
   }
 
