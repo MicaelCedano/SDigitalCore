@@ -65,7 +65,7 @@ export function WarehouseMovementsManager() {
     setType(initialType);
     setProductId(products.length > 0 ? products[0].id : "");
     setUnitsCount(1);
-    setReason(initialType === "ENTRY" ? "RecepciÃ³n de mercancÃ­a" : "Traslado / Salida de inventario");
+    setReason(initialType === "ENTRY" ? "Recepción de mercancía" : "Traslado / Salida de inventario");
     setErrorMsg(null);
     setShowModal(true);
   };
@@ -119,7 +119,7 @@ export function WarehouseMovementsManager() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-              Movimientos de AlmacÃ©n (Entradas & Salidas)
+              Movimientos de Almacén (Entradas & Salidas)
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Registro de ingresos, salidas de cajas, ajustes de stock y trazabilidad en tiempo real
@@ -160,14 +160,14 @@ export function WarehouseMovementsManager() {
         {loading ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <RefreshCw className="w-7 h-7 animate-spin mx-auto text-[#5750f1]" />
-            <p className="text-xs font-semibold">Cargando movimientos de almacÃ©n...</p>
+            <p className="text-xs font-semibold">Cargando movimientos de almacén...</p>
           </div>
         ) : movements.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <Boxes className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-sm font-bold text-slate-700">No hay movimientos registrados</p>
             <p className="text-xs text-slate-500">
-              Registra una Entrada o Salida para llevar la bitÃ¡cora del inventario.
+              Registra una Entrada o Salida para llevar la bitácora del inventario.
             </p>
           </div>
         ) : (
@@ -177,9 +177,9 @@ export function WarehouseMovementsManager() {
                 <tr>
                   <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Fecha & Hora</th>
-                  <th className="px-4 py-3">Producto / CÃ³digo</th>
+                  <th className="px-4 py-3">Producto / Código</th>
                   <th className="px-4 py-3 text-center">Impacto Unidades</th>
-                  <th className="px-4 py-3">Motivo / RazÃ³n</th>
+                  <th className="px-4 py-3">Motivo / Razón</th>
                   <th className="px-4 py-3">Registrado Por</th>
                 </tr>
               </thead>
@@ -260,11 +260,11 @@ export function WarehouseMovementsManager() {
               <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
                 {type === "ENTRY" ? (
                   <span className="text-emerald-600 flex items-center gap-1">
-                    <ArrowDownRight className="w-5 h-5" /> Nueva Entrada de AlmacÃ©n
+                    <ArrowDownRight className="w-5 h-5" /> Nueva Entrada de Almacén
                   </span>
                 ) : (
                   <span className="text-rose-600 flex items-center gap-1">
-                    <ArrowUpRight className="w-5 h-5" /> Nueva Salida de AlmacÃ©n
+                    <ArrowUpRight className="w-5 h-5" /> Nueva Salida de Almacén
                   </span>
                 )}
               </h2>
@@ -295,7 +295,7 @@ export function WarehouseMovementsManager() {
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.code} â€” {p.name} (Stock: {p.boxes} cajas)
+                      {p.code} — {p.name} (Stock: {p.boxes} cajas)
                     </option>
                   ))}
                 </select>
@@ -333,13 +333,13 @@ export function WarehouseMovementsManager() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Motivo / RazÃ³n <span className="text-red-500">*</span>
+                  Motivo / Razón <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Ej. RecepciÃ³n de proveedor, Venta mayorista, Traslado..."
+                  placeholder="Ej. Recepción de proveedor, Venta mayorista, Traslado..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
                 />
               </div>
