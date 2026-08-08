@@ -23,6 +23,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
   const [productSearch, setProductSearch] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const load = async () => {
     const [r, p, b] = await Promise.all([getWarehouseRequestsAction(search, "ALL"), getWarehouseProductsAction(), getBranchesAction(true)]);
@@ -78,9 +79,16 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
   };
 
   const update = async (id: string, status: "APPROVED" | "REJECTED") => {
-    const result = await updateWarehouseRequestStatusAction(id, status);
-    if (!result.success) setError(result.error ?? "No se pudo procesar la solicitud.");
-    await load();
+    if (updatingId) return;
+    setError("");
+    setUpdatingId(id);
+    try {
+      const result = await updateWarehouseRequestStatusAction(id, status);
+      if (!result.success) setError(result.error ?? "No se pudo procesar la solicitud.");
+      await load();
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const setQuantity = (productId: string, value: number, measure: Measure, max?: number) => {
@@ -101,7 +109,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     </div>
     {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
     <div className="flex items-center gap-2"><Search className="h-4 w-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar solicitudes..." className="w-full max-w-md rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></div>
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4">Código</th><th className="p-4">Tipo</th><th className="p-4">Productos</th><th className="p-4">Solicitante</th><th className="p-4">Estado</th><th className="p-4 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((r) => <tr key={r.id} className="hover:bg-slate-50/70"><td className="p-4 font-mono text-xs font-bold text-[#5750f1]">{r.requestCode}</td><td className="p-4 font-bold">{r.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</td><td className="p-4">{r.items?.map((i: any) => `${i.product?.name ?? i.productId} (${i.unitsCount})`).join(", ")}</td><td className="p-4">{r.requestedBy}</td><td className="p-4">{r.status === "PENDING" ? (isAdmin ? "PENDIENTE" : <span className="font-semibold text-amber-600">Esperando aprobación</span>) : r.status === "APPROVED" ? "APROBADA" : "RECHAZADA"}</td><td className="p-4 text-right">{isAdmin && r.status === "PENDING" && <span className="inline-flex gap-1"><button onClick={() => void update(r.id, "APPROVED")} className="rounded-lg bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-700"><CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />Aprobar</button><button onClick={() => void update(r.id, "REJECTED")} className="rounded-lg bg-red-50 px-2.5 py-1.5 font-bold text-red-700"><XCircle className="mr-1 inline h-3.5 w-3.5" />Rechazar</button></span>}{!isAdmin && r.status === "PENDING" && <span className="text-xs font-semibold text-slate-400">Sin acciones</span>}</td></tr>)}</tbody></table>{requests.length === 0 && <div className="p-12 text-center text-sm text-slate-500"><Send className="mx-auto mb-2 h-8 w-8 text-slate-300" />No hay solicitudes.</div>}</div>
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4">Código</th><th className="p-4">Tipo</th><th className="p-4">Productos</th><th className="p-4">Solicitante</th><th className="p-4">Estado</th><th className="p-4 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((r) => { const isUpdating = updatingId === r.id; return <tr key={r.id} className="hover:bg-slate-50/70"><td className="p-4 font-mono text-xs font-bold text-[#5750f1]">{r.requestCode}</td><td className="p-4 font-bold">{r.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</td><td className="p-4">{r.items?.map((i: any) => `${i.product?.name ?? i.productId} (${i.unitsCount})`).join(", ")}</td><td className="p-4">{r.requestedBy}</td><td className="p-4">{r.status === "PENDING" ? (isAdmin ? "PENDIENTE" : <span className="font-semibold text-amber-600">Esperando aprobación</span>) : r.status === "APPROVED" ? "APROBADA" : "RECHAZADA"}</td><td className="p-4 text-right">{isAdmin && r.status === "PENDING" && <span className="inline-flex gap-1"><button disabled={!!updatingId} onClick={() => void update(r.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-700 disabled:cursor-wait disabled:opacity-60">{isUpdating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{isUpdating ? "Procesando..." : "Aprobar"}</button><button disabled={!!updatingId} onClick={() => void update(r.id, "REJECTED")} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1.5 font-bold text-red-700 disabled:cursor-wait disabled:opacity-60"><XCircle className="h-3.5 w-3.5" />Rechazar</button></span>}{!isAdmin && r.status === "PENDING" && <span className="text-xs font-semibold text-slate-400">Sin acciones</span>}</td></tr>; })}</tbody></table>{requests.length === 0 && <div className="p-12 text-center text-sm text-slate-500"><Send className="mx-auto mb-2 h-8 w-8 text-slate-300" />No hay solicitudes.</div>}</div>
 
     {showCreate && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"><form onSubmit={submit} className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
       <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5 sm:px-8"><div><div className="mb-1 flex items-center gap-2 text-[#5750f1]"><PackagePlus className="h-5 w-5" /><span className="text-xs font-bold uppercase tracking-wider">Almacén</span></div><h2 className="text-2xl font-bold text-slate-900">Nueva solicitud de movimiento</h2><p className="mt-1 text-sm text-slate-500">Añade productos y después indica la presentación y cantidad.</p></div><button type="button" onClick={() => setShowCreate(false)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button></div>
