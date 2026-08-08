@@ -20,11 +20,10 @@ type Workspace = { inventory: Item[]; activeList: Item[]; brands: Brand[]; logo:
 const PREVIEW_WIDTH = 1080;
 
 const money = (value: unknown) => `RD$ ${Number(value || 0).toLocaleString("es-DO", { maximumFractionDigits: 0 })}`;
-const escapeXml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character] || character);
 
 type PriceListGroup = { brand: Brand; items: Item[] };
 
-const buildPriceListSvg = (groups: PriceListGroup[], logo: string | null) => {
+const getPriceListLayout = (groups: PriceListGroup[]) => {
   const width = PREVIEW_WIDTH;
   const headerHeight = 170;
   const productBarHeight = 56;
@@ -36,74 +35,129 @@ const buildPriceListSvg = (groups: PriceListGroup[], logo: string | null) => {
   const benefitsHeight = 112;
   const footerHeight = 52;
   const height = headerHeight + productsHeight + benefitsHeight + footerHeight;
-  const parts: string[] = [];
+  return { width, height, headerHeight, productBarHeight, cellWidth, rows, rowHeights, productsHeight, benefitsHeight, footerHeight };
+};
 
-  parts.push(`<rect width="${width}" height="${height}" fill="#ffffff"/>`);
-  if (logo) {
-    parts.push(`<image href="${escapeXml(logo)}" x="40" y="20" width="160" height="128" preserveAspectRatio="xMidYMid meet"/>`);
+const drawText = (context: CanvasRenderingContext2D, text: string, x: number, y: number, font: string, color: string, align: CanvasTextAlign = "left") => {
+  context.font = font;
+  context.fillStyle = color;
+  context.textAlign = align;
+  context.textBaseline = "alphabetic";
+  context.fillText(text, x, y);
+};
+
+const drawRoundedRect = (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) => {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
+  context.fillStyle = fill;
+  context.fill();
+  if (stroke) { context.strokeStyle = stroke; context.stroke(); }
+};
+
+const loadLogoForCanvas = (logo: string | null) => new Promise<HTMLImageElement | null>((resolve) => {
+  if (!logo) { resolve(null); return; }
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => resolve(null);
+  image.src = logo;
+});
+
+const renderPriceListCanvas = async (groups: PriceListGroup[], logo: string | null) => {
+  const layout = getPriceListLayout(groups);
+  const canvas = document.createElement("canvas");
+  canvas.width = layout.width;
+  canvas.height = layout.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("No se pudo crear el canvas");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, layout.width, layout.height);
+  context.font = "900 56px Arial, Helvetica, sans-serif";
+  context.textBaseline = "alphabetic";
+
+  const logoImage = await loadLogoForCanvas(logo);
+  if (logoImage) {
+    const scale = Math.min(160 / logoImage.naturalWidth, 128 / logoImage.naturalHeight, 1);
+    const logoWidth = logoImage.naturalWidth * scale;
+    const logoHeight = logoImage.naturalHeight * scale;
+    context.drawImage(logoImage, 120 - logoWidth / 2, 84 - logoHeight / 2, logoWidth, logoHeight);
   } else {
-    parts.push(`<rect x="40" y="20" width="160" height="128" rx="12" fill="#fff1f2"/><text x="120" y="82" text-anchor="middle" fill="#b91c1c" font-size="18" font-weight="900">SEÑAL</text><text x="120" y="108" text-anchor="middle" fill="#b91c1c" font-size="18" font-weight="900">DIGITAL</text>`);
+    drawRoundedRect(context, 40, 20, 160, 128, 12, "#fff1f2");
+    drawText(context, "SEÑAL", 120, 82, "900 18px Arial", "#b91c1c", "center");
+    drawText(context, "DIGITAL", 120, 108, "900 18px Arial", "#b91c1c", "center");
   }
-  parts.push(`<text x="225" y="78" fill="#000000" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="900">LISTA DE <tspan fill="#b91c1c">PRECIOS</tspan></text>`);
-  parts.push(`<text x="225" y="116" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">✓ Los mejores equipos, al <tspan fill="#b91c1c">mejor precio</tspan></text>`);
-  parts.push(`<rect x="875" y="42" width="165" height="86" rx="12" fill="#b91c1c"/><text x="957" y="70" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">ACTUALIZADO:</text><text x="957" y="102" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900">${escapeXml(new Date().toLocaleDateString("es-DO"))}</text>`);
-  parts.push(`<rect y="${headerHeight}" width="${width}" height="${productBarHeight}" fill="#b91c1c"/><text x="${width / 2}" y="${headerHeight + 37}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="900">PRODUCTOS</text>`);
+  drawText(context, "LISTA DE", 225, 78, "900 56px Arial", "#000000");
+  const titleWidth = context.measureText("LISTA DE").width;
+  drawText(context, "PRECIOS", 225 + titleWidth + 12, 78, "900 56px Arial", "#b91c1c");
+  drawText(context, "✓ Los mejores equipos, al", 225, 116, "700 22px Arial", "#475569");
+  const subtitleWidth = context.measureText("✓ Los mejores equipos, al").width;
+  drawText(context, "mejor precio", 225 + subtitleWidth + 10, 116, "700 22px Arial", "#b91c1c");
+  drawRoundedRect(context, 875, 42, 165, 86, 12, "#b91c1c");
+  drawText(context, "ACTUALIZADO:", 957, 70, "700 14px Arial", "#ffffff", "center");
+  drawText(context, new Date().toLocaleDateString("es-DO"), 957, 102, "900 20px Arial", "#ffffff", "center");
+  context.fillStyle = "#b91c1c";
+  context.fillRect(0, layout.headerHeight, layout.width, layout.productBarHeight);
+  drawText(context, "PRODUCTOS", layout.width / 2, layout.headerHeight + 37, "900 28px Arial", "#ffffff", "center");
 
-  let rowY = headerHeight + productBarHeight;
-  rows.forEach((row, rowIndex) => {
-    const rowHeight = rowHeights[rowIndex];
+  let rowY = layout.headerHeight + layout.productBarHeight;
+  layout.rows.forEach((row, rowIndex) => {
+    const rowHeight = layout.rowHeights[rowIndex];
     row.forEach((group, columnIndex) => {
-      const x = columnIndex * cellWidth;
+      const x = columnIndex * layout.cellWidth;
       const color = /^#[0-9a-f]{6}$/i.test(group.brand.color) ? group.brand.color : "#111827";
-      parts.push(`<rect x="${x}" y="${rowY}" width="${cellWidth}" height="${rowHeight}" fill="#ffffff" stroke="#e2e8f0"/>`);
-      parts.push(`<text x="${x + 14}" y="${rowY + 35}" fill="${color}" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="900">${escapeXml(group.brand.name).slice(0, 21)}</text><rect x="${x + 14}" y="${rowY + 47}" width="${cellWidth - 28}" height="2" fill="${color}"/>`);
+      context.fillStyle = "#ffffff";
+      context.fillRect(x, rowY, layout.cellWidth, rowHeight);
+      context.strokeStyle = "#e2e8f0";
+      context.strokeRect(x, rowY, layout.cellWidth, rowHeight);
+      drawText(context, group.brand.name.slice(0, 21), x + 14, rowY + 35, "900 23px Arial", color);
+      context.fillStyle = color;
+      context.fillRect(x + 14, rowY + 47, layout.cellWidth - 28, 2);
       group.items.forEach((item, itemIndex) => {
         const itemY = rowY + 82 + itemIndex * 38;
-        parts.push(`<text x="${x + 14}" y="${itemY}" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="900">${escapeXml(`${item.model} ${item.capacity || ""}`).slice(0, 25)}</text>`);
-        parts.push(`<text x="${x + cellWidth - 14}" y="${itemY}" text-anchor="end" fill="${color}" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900">${escapeXml(money(item.retailPrice))}</text>`);
-        parts.push(`<line x1="${x + 14}" y1="${itemY + 10}" x2="${x + cellWidth - 14}" y2="${itemY + 10}" stroke="#f1f5f9"/>`);
+        drawText(context, `${item.model} ${item.capacity || ""}`.slice(0, 25), x + 14, itemY, "900 16px Arial", "#111827");
+        drawText(context, money(item.retailPrice), x + layout.cellWidth - 14, itemY, "900 20px Arial", color, "right");
+        context.strokeStyle = "#f1f5f9";
+        context.beginPath(); context.moveTo(x + 14, itemY + 10); context.lineTo(x + layout.cellWidth - 14, itemY + 10); context.stroke();
       });
     });
     rowY += rowHeight;
   });
 
-  const benefitsY = headerHeight + productsHeight;
-  const benefits = [["GARANTÍA", "En todos nuestros productos"], ["PRODUCTOS 100% ORIGINALES", "Calidad garantizada"], ["SOPORTE Y ASESORÍA", "Estamos para ayudarte"]];
-  benefits.forEach(([title, subtitle], index) => {
-    const x = index * (width / 3) + 12;
-    parts.push(`<rect x="${x}" y="${benefitsY + 12}" width="${width / 3 - 24}" height="88" rx="8" fill="#ffffff" stroke="#e2e8f0"/><circle cx="${x + 30}" cy="${benefitsY + 56}" r="16" fill="#b91c1c"/><text x="${x + 58}" y="${benefitsY + 52}" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="900">${escapeXml(title)}</text><text x="${x + 58}" y="${benefitsY + 75}" fill="#475569" font-family="Arial, Helvetica, sans-serif" font-size="12">${escapeXml(subtitle)}</text>`);
+  const benefitsY = layout.headerHeight + layout.productsHeight;
+  [["GARANTÍA", "En todos nuestros productos"], ["PRODUCTOS 100% ORIGINALES", "Calidad garantizada"], ["SOPORTE Y ASESORÍA", "Estamos para ayudarte"]].forEach(([title, subtitle], index) => {
+    const x = index * (layout.width / 3) + 12;
+    drawRoundedRect(context, x, benefitsY + 12, layout.width / 3 - 24, 88, 8, "#ffffff", "#e2e8f0");
+    context.fillStyle = "#b91c1c"; context.beginPath(); context.arc(x + 30, benefitsY + 56, 16, 0, Math.PI * 2); context.fill();
+    drawText(context, title, x + 58, benefitsY + 52, "900 15px Arial", "#111827");
+    drawText(context, subtitle, x + 58, benefitsY + 75, "12px Arial", "#475569");
   });
-  parts.push(`<rect y="${height - footerHeight}" width="${width}" height="${footerHeight}" fill="#b91c1c"/><text x="32" y="${height - 20}" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Contáctanos por WhatsApp</text><text x="${width / 2}" y="${height - 20}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Precios sujetos a disponibilidad</text><text x="${width - 32}" y="${height - 20}" text-anchor="end" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">Gracias por elegir Señal Digital ♥</text>`);
-
-  return { width, height, markup: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${parts.join("")}</svg>` };
+  context.fillStyle = "#b91c1c";
+  context.fillRect(0, layout.height - layout.footerHeight, layout.width, layout.footerHeight);
+  drawText(context, "Contáctanos por WhatsApp", 32, layout.height - 20, "700 16px Arial", "#ffffff");
+  drawText(context, "Precios sujetos a disponibilidad", layout.width / 2, layout.height - 20, "700 14px Arial", "#ffffff", "center");
+  drawText(context, "Gracias por elegir Señal Digital ♥", layout.width - 32, layout.height - 20, "700 14px Arial", "#ffffff", "right");
+  return canvas;
 };
 
-const downloadSvgAsPng = (svgMarkup: string, width: number, height: number, filename: string) => new Promise<void>((resolve, reject) => {
-  const svgUrl = URL.createObjectURL(new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" }));
-  const image = new Image();
-  image.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) { URL.revokeObjectURL(svgUrl); reject(new Error("No se pudo crear el canvas")); return; }
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
-    URL.revokeObjectURL(svgUrl);
-    canvas.toBlob((blob) => {
-      if (!blob) { reject(new Error("No se pudo convertir el SVG a PNG")); return; }
-      const downloadUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = downloadUrl;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-      resolve();
-    }, "image/png");
-  };
-  image.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error("No se pudo cargar la imagen SVG")); };
-  image.src = svgUrl;
+const downloadCanvasAsPng = (canvas: HTMLCanvasElement, filename: string) => new Promise<void>((resolve, reject) => {
+  canvas.toBlob((blob) => {
+    if (!blob) { reject(new Error("No se pudo convertir el canvas a PNG")); return; }
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = downloadUrl;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    resolve();
+  }, "image/png");
 });
 const syncActive = (active: Item[], inventory: Item[]) => {
   const byId = new Map(inventory.map((item) => [item.id, item]));
@@ -270,8 +324,8 @@ export function PriceListManager() {
     if (!activeList.length) return;
     setExporting(true);
     try {
-      const svg = buildPriceListSvg(grouped, logo);
-      await downloadSvgAsPng(svg.markup, svg.width, svg.height, `lista-precios-${new Date().toISOString().slice(0, 10)}.png`);
+      const canvas = await renderPriceListCanvas(grouped, logo);
+      await downloadCanvasAsPng(canvas, `lista-precios-${new Date().toISOString().slice(0, 10)}.png`);
     } catch (error) {
       console.error("[price-list] Error al exportar PNG", error);
       setMessage("No se pudo generar la imagen. Intenta nuevamente.");
