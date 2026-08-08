@@ -73,7 +73,7 @@ export function WarehouseProductsManager() {
     setCapacity("");
     setDescription("");
     setBoxes(0);
-    setUnitsPerBox(1);
+    setUnitsPerBox(0);
     setLooseUnits(0);
     setErrorMsg(null);
     setShowModal(true);
@@ -88,7 +88,7 @@ export function WarehouseProductsManager() {
     setCapacity(prod.capacity || "");
     setDescription(prod.description || "");
     setBoxes(prod.boxes || 0);
-    setUnitsPerBox(prod.unitsPerBox || 1);
+    setUnitsPerBox(prod.unitsPerBox ?? 0);
     setLooseUnits(prod.looseUnits || 0);
     setErrorMsg(null);
     setShowModal(true);
@@ -464,7 +464,7 @@ export function WarehouseProductsManager() {
                   </label>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
                     value={unitsPerBox}
                     onChange={(e) => setUnitsPerBox(Number(e.target.value))}
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-[#5750f1] focus:outline-none focus:border-[#5750f1]"
