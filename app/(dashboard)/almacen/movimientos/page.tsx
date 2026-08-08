@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 
 export default async function MovimientosPage() {
   const user = await getCurrentUser();
-  return <WarehouseMovementsManager roleCode={user?.roleCode ?? "ADMIN"} />;
+  return <WarehouseMovementsManager roleCode={(user as { roleCode?: string } | null)?.roleCode ?? "ADMIN"} />;
 }
