@@ -57,6 +57,7 @@ export function PriceListManager() {
   const [brandForm, setBrandForm] = useState({ name: "", color: "#111827" });
   const previewRef = useRef<HTMLDivElement>(null);
   const workspaceHydrated = useRef(false);
+  const exportingRef = useRef(false);
 
   const loadWorkspace = async () => {
     setLoading(true);
@@ -112,6 +113,7 @@ export function PriceListManager() {
     if (!viewport || !preview) return;
 
     const updatePreviewSize = () => {
+      if (exportingRef.current) return;
       const availableWidth = Math.max(viewport.clientWidth - 32, 320);
       const nextScale = Math.min(1, availableWidth / PREVIEW_WIDTH);
       preview.style.zoom = String(nextScale);
@@ -198,52 +200,39 @@ export function PriceListManager() {
     const preview = previewRef.current;
     if (!preview) return;
     setExporting(true);
+    exportingRef.current = true;
     const previousZoom = preview.style.zoom;
     preview.dataset.exportPreview = "true";
     try {
       preview.style.zoom = "1";
-      const baseOptions = {
+      const canvas = await html2canvas(preview, {
         scale: 1,
         backgroundColor: "#ffffff",
         useCORS: true,
         imageTimeout: 15000,
         windowWidth: PREVIEW_WIDTH,
-      } as const;
-      let canvas: HTMLCanvasElement;
-      try {
-        canvas = await html2canvas(preview, {
-          ...baseOptions,
-          foreignObjectRendering: true,
-          onclone: (clonedDocument) => {
-            const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
-            if (!clonedPreview) return;
-            clonedPreview.style.backgroundColor = "#ffffff";
-            clonedPreview.style.backgroundImage = "none";
-          },
-        });
-      } catch (nativeError) {
-        console.warn("[price-list] Renderizado nativo no disponible; usando respaldo CSS", nativeError);
-        canvas = await html2canvas(preview, {
-          ...baseOptions,
-          onclone: (clonedDocument) => {
-            const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
-            if (!clonedPreview) return;
-            clonedPreview.style.backgroundColor = "#ffffff";
-            clonedPreview.style.backgroundImage = "none";
-            const elements = [clonedPreview, ...Array.from(clonedPreview.querySelectorAll<HTMLElement>("*"))];
-            for (const element of elements) {
-              const styles = clonedDocument.defaultView?.getComputedStyle(element);
-              if (!styles) continue;
-              for (const property of EXPORT_STYLE_PROPERTIES) {
-                const value = styles.getPropertyValue(property);
-                if (!value || isUnsupportedCanvasValue(value)) continue;
-                element.style.setProperty(property, value);
-              }
+        width: PREVIEW_WIDTH,
+        onclone: (clonedDocument) => {
+          const clonedPreview = clonedDocument.querySelector<HTMLElement>("[data-export-preview]");
+          if (!clonedPreview) return;
+          clonedPreview.style.width = `${PREVIEW_WIDTH}px`;
+          clonedPreview.style.zoom = "1";
+          clonedPreview.style.transform = "none";
+          clonedPreview.style.backgroundColor = "#ffffff";
+          clonedPreview.style.backgroundImage = "none";
+          const elements = [clonedPreview, ...Array.from(clonedPreview.querySelectorAll<HTMLElement>("*"))];
+          for (const element of elements) {
+            const styles = clonedDocument.defaultView?.getComputedStyle(element);
+            if (!styles) continue;
+            for (const property of EXPORT_STYLE_PROPERTIES) {
+              const value = styles.getPropertyValue(property);
+              if (!value || isUnsupportedCanvasValue(value)) continue;
+              element.style.setProperty(property, value);
             }
-            clonedDocument.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => node.remove());
-          },
-        });
-      }
+          }
+          clonedDocument.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => node.remove());
+        },
+      });
       const link = document.createElement("a"); link.download = `lista-precios-${new Date().toISOString().slice(0, 10)}.png`; link.href = canvas.toDataURL("image/png"); link.click();
     } catch (error) {
       console.error("[price-list] Error al exportar PNG", error);
@@ -251,6 +240,7 @@ export function PriceListManager() {
     } finally {
       preview.style.zoom = previousZoom;
       delete preview.dataset.exportPreview;
+      exportingRef.current = false;
       setExporting(false);
     }
   };
