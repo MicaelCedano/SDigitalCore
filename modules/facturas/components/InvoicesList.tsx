@@ -14,7 +14,6 @@ import {
   Trash2,
   Calendar,
   User,
-  Building2,
   Truck,
   DollarSign,
   Eye,
@@ -216,7 +215,6 @@ export function InvoicesList() {
                   <th className="px-4 py-3">Número Documento</th>
                   <th className="px-4 py-3">Fecha & Hora</th>
                   <th className="px-4 py-3">Cliente</th>
-                  <th className="px-4 py-3">Sucursal / Origen</th>
                   <th className="px-4 py-3 text-right">Monto Total</th>
                   <th className="px-4 py-3 text-right">Acciones PDF</th>
                 </tr>
@@ -262,12 +260,6 @@ export function InvoicesList() {
                             RNC: {inv.clientTaxId}
                           </span>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5 text-slate-600">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{inv.branch}</span>
-                        </div>
                       </td>
                       <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 text-sm">
                         {inv.type === "CONDUCE"
