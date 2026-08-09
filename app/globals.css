@@ -137,6 +137,26 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
+  body.invoice-printing #invoice-print-root .print-document {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    min-height: 260px !important;
+  }
+
+  body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden > table {
+    height: 100% !important;
+  }
+
+  body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden > table > tbody {
+    height: 100% !important;
+  }
 }
 
 ::-webkit-scrollbar-track {
