@@ -19,9 +19,9 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
     const documentNode = printRef.current?.querySelector(".print-document");
     if (!(documentNode instanceof HTMLElement)) return;
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
     if (!printWindow) {
-      window.print();
+      window.alert("Permite las ventanas emergentes para imprimir el conduce.");
       return;
     }
 
@@ -57,7 +57,16 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
       </html>`);
     printWindow.document.close();
 
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    await new Promise((resolve) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        resolve(undefined);
+      };
+      printWindow.addEventListener("load", finish, { once: true });
+      window.setTimeout(finish, 1000);
+    });
     printWindow.focus();
     printWindow.print();
     printWindow.addEventListener("afterprint", () => printWindow.close(), { once: true });
