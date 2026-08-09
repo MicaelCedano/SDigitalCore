@@ -96,20 +96,12 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
             </div>
 
             {/* Client Info Grid */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+            <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DATOS DEL CLIENTE / RECEPTOR</span>
                 <p className="font-bold text-slate-900 text-sm">{invoice.clientName}</p>
                 {invoice.clientTaxId && <p className="text-slate-600 font-mono">RNC/Cédula: <strong>{invoice.clientTaxId}</strong></p>}
                 {invoice.clientPhone && <p className="text-slate-600">Tel: {invoice.clientPhone}</p>}
-              </div>
-
-              <div className="space-y-1 text-right sm:text-left">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DETALLES DE DESPACHO</span>
-                {invoice.notes && <p className="text-slate-700 whitespace-pre-line"><strong>Nota:</strong> {invoice.notes}</p>}
-                {invoice.clientAddress && <p className="text-slate-700">Dirección: {invoice.clientAddress}</p>}
-                <p className="text-slate-600">Almacén Origen: <strong>{displayBranch}</strong></p>
-                <p className="text-slate-600">Método de Pago: <strong>{invoice.paymentMethod || "Efectivo"}</strong></p>
               </div>
             </div>
 
