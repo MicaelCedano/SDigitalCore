@@ -15,8 +15,52 @@ interface InvoicePDFPreviewModalProps {
 export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const documentNode = printRef.current?.querySelector(".print-document");
+    if (!(documentNode instanceof HTMLElement)) return;
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((node) => node.outerHTML)
+      .join("\n");
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <title>Conduce de Entrega Final</title>
+          ${styles}
+          <style>
+            @page { margin: 0; }
+            html, body { margin: 0; padding: 0; background: #fff; }
+            .print-document {
+              position: static !important;
+              width: 100% !important;
+              max-width: none !important;
+              margin: 0 !important;
+              padding: 12mm !important;
+              border: 0 !important;
+              border-radius: 0 !important;
+              box-shadow: none !important;
+              overflow: visible !important;
+              background: #fff !important;
+            }
+          </style>
+        </head>
+        <body>${documentNode.outerHTML}</body>
+      </html>`);
+    printWindow.document.close();
+
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    printWindow.focus();
+    printWindow.print();
+    printWindow.addEventListener("afterprint", () => printWindow.close(), { once: true });
   };
 
   const formattedDate = new Date(invoice.createdAt || Date.now()).toLocaleDateString("es-DO", {
