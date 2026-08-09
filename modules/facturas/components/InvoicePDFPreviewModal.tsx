@@ -19,57 +19,21 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
     const documentNode = printRef.current?.querySelector(".print-document");
     if (!(documentNode instanceof HTMLElement)) return;
 
-    const printWindow = window.open("", "_blank", "width=1000,height=800");
-    if (!printWindow) {
-      window.alert("Permite las ventanas emergentes para imprimir el conduce.");
-      return;
-    }
+    document.getElementById("invoice-print-root")?.remove();
+    const printRoot = document.createElement("div");
+    printRoot.id = "invoice-print-root";
+    printRoot.innerHTML = documentNode.outerHTML;
+    document.body.appendChild(printRoot);
+    document.body.classList.add("invoice-printing");
 
-    const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-      .map((node) => node.outerHTML)
-      .join("\n");
+    const cleanup = () => {
+      document.body.classList.remove("invoice-printing");
+      printRoot.remove();
+    };
 
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html>
-      <html lang="es">
-        <head>
-          <meta charset="utf-8" />
-          <title>Conduce de Entrega Final</title>
-          ${styles}
-          <style>
-            @page { margin: 0; }
-            html, body { margin: 0; padding: 0; background: #fff; }
-            .print-document {
-              position: static !important;
-              width: 100% !important;
-              max-width: none !important;
-              margin: 0 !important;
-              padding: 12mm !important;
-              border: 0 !important;
-              border-radius: 0 !important;
-              box-shadow: none !important;
-              overflow: visible !important;
-              background: #fff !important;
-            }
-          </style>
-        </head>
-        <body>${documentNode.outerHTML}</body>
-      </html>`);
-    printWindow.document.close();
-
-    await new Promise((resolve) => {
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        resolve(undefined);
-      };
-      printWindow.addEventListener("load", finish, { once: true });
-      window.setTimeout(finish, 1000);
-    });
-    printWindow.focus();
-    printWindow.print();
-    printWindow.addEventListener("afterprint", () => printWindow.close(), { once: true });
+    window.addEventListener("afterprint", cleanup, { once: true });
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
+    window.print();
   };
 
   const formattedDate = new Date(invoice.createdAt || Date.now()).toLocaleDateString("es-DO", {

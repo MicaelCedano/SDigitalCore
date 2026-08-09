@@ -105,6 +105,41 @@
   height: 8px;
 }
 
+@media print {
+  @page {
+    margin: 0;
+  }
+
+  body.invoice-printing > *:not(#invoice-print-root) {
+    display: none !important;
+  }
+
+  body.invoice-printing,
+  body.invoice-printing #invoice-print-root {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.invoice-printing #invoice-print-root .print-document {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
