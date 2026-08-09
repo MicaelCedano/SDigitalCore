@@ -61,7 +61,6 @@ const drawFittedText = (context: CanvasRenderingContext2D, text: string, x: numb
     size -= 0.5;
     context.font = `${prefix}${size}px${suffix}`;
   }
-
   if (context.measureText(text).width > maxWidth) {
     const scaleX = maxWidth / context.measureText(text).width;
     context.save();
@@ -71,7 +70,6 @@ const drawFittedText = (context: CanvasRenderingContext2D, text: string, x: numb
     context.restore();
     return;
   }
-
   drawText(context, text, x, y, `${prefix}${size}px${suffix}`, color);
 };
 

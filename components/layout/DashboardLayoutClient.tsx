@@ -28,6 +28,7 @@ export function DashboardLayoutClient({
     <div className="dashboard-shell">
       <Sidebar
         allowedModules={allowedModules}
+        roleCode={userRole}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
         collapsed={collapsed}

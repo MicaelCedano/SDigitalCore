@@ -19,6 +19,7 @@ import {
 interface SubNavItem {
   label: string;
   href: string;
+  adminOnly?: boolean;
 }
 
 interface NavItem {
@@ -35,8 +36,8 @@ const navItems: NavItem[] = [
   { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse, section: "Operaciones", children: [
     { label: "Productos", href: "/almacen" },
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
-    { label: "Movimientos", href: "/almacen/movimientos" },
-    { label: "Transferencias", href: "/almacen/transferencias" },
+    { label: "Movimientos", href: "/almacen/movimientos", adminOnly: true },
+    { label: "Solicitudes de almacén", href: "/almacen/transferencias" },
   ] },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },
@@ -48,6 +49,7 @@ const navItems: NavItem[] = [
 
 interface SidebarProps {
   allowedModules?: string[];
+  roleCode?: string | null;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
   collapsed?: boolean;
@@ -56,6 +58,7 @@ interface SidebarProps {
 
 export function Sidebar({
   allowedModules,
+  roleCode,
   mobileOpen = false,
   onMobileClose,
   collapsed = false,
@@ -146,7 +149,7 @@ export function Sidebar({
                         </div>
                         {!collapsed && open && item.children?.length ? (
                           <div className="ml-5 mt-1 space-y-0.5 border-l border-[#e4e7ec] pl-4">
-                            {item.children.map((child) => (
+                            {item.children.filter((child) => !child.adminOnly || roleCode === "ADMIN").map((child) => (
                               <Link
                                 key={child.href}
                                 href={child.href}
