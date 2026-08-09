@@ -5,13 +5,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Menu, Settings, User } from "lucide-react";
+import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User } from "lucide-react";
+
+export interface TopbarNotification {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  createdAt: string;
+  kind: "action" | "activity";
+}
 
 interface TopbarProps {
   userName?: string | null;
   userEmail?: string | null;
   userRole?: string | null;
   userAvatarUrl?: string | null;
+  notifications?: TopbarNotification[];
+  notificationCount?: number;
   onMobileToggle?: () => void;
 }
 
@@ -40,14 +51,27 @@ function getInitials(name?: string | null) {
   return name?.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
 }
 
-export function Topbar({ userName, userEmail, userRole, userAvatarUrl, onMobileToggle }: TopbarProps) {
+function formatNotificationDate(value: string) {
+  return new Intl.DateTimeFormat("es-DO", {
+    timeZone: "America/Santo_Domingo",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notifications = [], notificationCount = 0, onMobileToggle }: TopbarProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function closeOnOutsideClick(event: MouseEvent) {
       if (!dropdownRef.current?.contains(event.target as Node)) setDropdownOpen(false);
+      if (!notificationsRef.current?.contains(event.target as Node)) setNotificationsOpen(false);
     }
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
@@ -63,17 +87,73 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, onMobileT
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <button type="button" className="focus-ring relative flex h-10 w-10 items-center justify-center rounded-[10px] text-[#475467] hover:bg-[#f2f4f7]" aria-label="Notificaciones">
-          <Bell size={20} strokeWidth={1.75} />
-          <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[#4f46e5] ring-2 ring-white" />
-        </button>
+        <div className="relative" ref={notificationsRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setNotificationsOpen((open) => !open);
+              setDropdownOpen(false);
+            }}
+            className="focus-ring relative flex h-10 w-10 items-center justify-center rounded-[10px] text-[#475467] hover:bg-[#f2f4f7]"
+            aria-label={notificationCount > 0 ? `Notificaciones, ${notificationCount} pendientes` : "Notificaciones"}
+            aria-expanded={notificationsOpen}
+            aria-haspopup="dialog"
+          >
+            <Bell size={20} strokeWidth={1.75} />
+            {notificationCount > 0 ? (
+              <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#d92d20] px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                {notificationCount > 99 ? "99+" : notificationCount}
+              </span>
+            ) : null}
+          </button>
+
+          {notificationsOpen ? (
+            <div role="dialog" aria-label="Centro de notificaciones" className="animate-fade-in absolute right-0 mt-2 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white shadow-[0_18px_44px_-12px_rgba(16,24,40,.24)]">
+              <div className="flex items-center justify-between border-b border-[#f0f1f3] px-4 py-3.5">
+                <div>
+                  <p className="text-sm font-semibold text-[#101828]">Notificaciones</p>
+                  <p className="mt-0.5 text-xs text-[#667085]">Actividad y acciones que requieren atención.</p>
+                </div>
+                {notificationCount > 0 ? <span className="rounded-full bg-[#fef3f2] px-2 py-1 text-xs font-semibold text-[#b42318]">{notificationCount} pendientes</span> : null}
+              </div>
+              <div className="max-h-[420px] overflow-y-auto p-2">
+                {notifications.length > 0 ? notifications.map((notification) => (
+                  <Link
+                    key={notification.id}
+                    href={notification.href}
+                    onClick={() => setNotificationsOpen(false)}
+                    className="group flex gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[#f8fafc]"
+                  >
+                    <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${notification.kind === "action" ? "bg-[#fff4e5] text-[#b54708]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
+                      {notification.kind === "action" ? <Clock3 size={17} /> : <CheckCircle2 size={17} />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-[#344054] group-hover:text-[#4338ca]">{notification.title}</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-[#667085]">{notification.description}</span>
+                      <span className="mt-1 block text-[11px] font-medium text-[#98a2b3]">{formatNotificationDate(notification.createdAt)}</span>
+                    </span>
+                  </Link>
+                )) : (
+                  <div className="px-4 py-9 text-center">
+                    <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#ecfdf3] text-[#027a48]"><CheckCircle2 size={20} /></span>
+                    <p className="mt-3 text-sm font-semibold text-[#344054]">Todo está al día</p>
+                    <p className="mt-1 text-xs text-[#667085]">No hay acciones pendientes.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div className="hidden h-7 w-px bg-[#e4e7ec] sm:block" />
 
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
-            onClick={() => setDropdownOpen((open) => !open)}
+            onClick={() => {
+              setDropdownOpen((open) => !open);
+              setNotificationsOpen(false);
+            }}
             className="focus-ring flex items-center gap-2 rounded-[10px] p-1 pr-1.5 text-left hover:bg-[#f8fafc]"
             aria-expanded={dropdownOpen}
             aria-haspopup="menu"

@@ -127,6 +127,8 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
         await logAudit({ userId: user.id, action: "goods_receipt.update", module: "almacen", entityType: "goods_receipt", entityId: updated.id, afterData: { receiptNumber: updated.receiptNumber, status: updated.status, itemCount: updated.items.length } });
 
         revalidatePath("/almacen/recibos");
+        revalidatePath("/dashboard");
+        revalidatePath("/", "layout");
         return { success: true, data: updated, message: "Recibo actualizado exitosamente" };
       }
     }
@@ -162,6 +164,8 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
     await logAudit({ userId: user.id, action: "goods_receipt.create", module: "almacen", entityType: "goods_receipt", entityId: created.id, afterData: { receiptNumber: created.receiptNumber, status: created.status, itemCount: created.items.length } });
 
     revalidatePath("/almacen/recibos");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true, data: created, message: `Recibo ${receiptNumber} registrado exitosamente` };
   } catch (error: any) {
     console.error("Error al guardar recibo de mercancía:", error);
@@ -258,6 +262,8 @@ export async function deleteGoodsReceiptAction(id: string) {
     await logAudit({ userId: actor.id, action: "goods_receipt.delete", module: "almacen", entityType: "goods_receipt", entityId: deleted.id, beforeData: { receiptNumber: deleted.receiptNumber, status: deleted.status } });
 
     revalidatePath("/almacen/recibos");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true, message: "Recibo eliminado correctamente" };
   } catch (error: any) {
     return { success: false, error: "Error al eliminar el recibo" };

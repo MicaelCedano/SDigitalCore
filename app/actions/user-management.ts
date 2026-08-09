@@ -125,6 +125,8 @@ export async function submitAccessRequestAction(input: AccessRequestInput) {
       await prisma.accessRequest.create({ data: { name: validated.name, username, email, phone: validated.phone, passwordHash } });
     }
     revalidatePath("/configuracion");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo enviar la solicitud.") };
@@ -179,6 +181,8 @@ export async function approveAccessRequestAction(requestId: string, roleCode: st
     });
     await logAudit({ userId: actor.id, action: "access_request.approve", module: "configuracion", entityType: "access_request", entityId: requestId, afterData: { createdUserId: created.id, roleCode } });
     revalidatePath("/configuracion");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true as const, data: serializeUser(created) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo aprobar la solicitud.") };
@@ -191,6 +195,8 @@ export async function rejectAccessRequestAction(requestId: string) {
     const updated = await prisma.accessRequest.update({ where: { id: requestId }, data: { status: "REJECTED" } });
     await logAudit({ userId: actor.id, action: "access_request.reject", module: "configuracion", entityType: "access_request", entityId: requestId });
     revalidatePath("/configuracion");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true as const, data: serializeRequest(updated) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo rechazar la solicitud.") };
@@ -270,6 +276,8 @@ export async function deleteAccessRequestAction(requestId: string) {
       beforeData: { email: deleted.email, status: deleted.status },
     });
     revalidatePath("/configuracion");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo eliminar la solicitud.") };

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import type { TopbarNotification } from "@/components/layout/Topbar";
 
 interface DashboardLayoutClientProps {
   userName?: string | null;
@@ -10,6 +11,8 @@ interface DashboardLayoutClientProps {
   userRole?: string | null;
   userAvatarUrl?: string | null;
   allowedModules?: string[];
+  notifications?: TopbarNotification[];
+  notificationCount?: number;
   children: React.ReactNode;
 }
 
@@ -19,6 +22,8 @@ export function DashboardLayoutClient({
   userRole,
   userAvatarUrl,
   allowedModules,
+  notifications,
+  notificationCount,
   children,
 }: DashboardLayoutClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -40,6 +45,8 @@ export function DashboardLayoutClient({
           userEmail={userEmail}
           userRole={userRole}
           userAvatarUrl={userAvatarUrl}
+          notifications={notifications}
+          notificationCount={notificationCount}
           onMobileToggle={() => setMobileOpen((v) => !v)}
         />
         <main className="dashboard-content">

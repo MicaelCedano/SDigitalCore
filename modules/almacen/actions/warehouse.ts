@@ -379,6 +379,8 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
     await logAudit({ userId: user.id, action: "warehouse_request.create", module: "almacen", entityType: "warehouse_request", entityId: created.id, afterData: { requestCode: created.requestCode, status: created.status } });
 
     revalidatePath("/almacen/transferencias");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return { success: true, data: created, message: `Solicitud ${requestCode} registrada exitosamente` };
   } catch (error: any) {
     return { success: false, error: error.message || "Error al crear la solicitud" };
@@ -447,6 +449,8 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
     await logAudit({ userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: updated.id, afterData: { status: updated.status } });
 
     revalidatePath("/almacen/transferencias");
+    revalidatePath("/dashboard");
+    revalidatePath("/", "layout");
     return {
       success: true,
       data: updated,
