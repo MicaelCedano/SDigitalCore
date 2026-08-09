@@ -27,15 +27,16 @@ const getPriceListLayout = (groups: PriceListGroup[]) => {
   const width = PREVIEW_WIDTH;
   const headerHeight = 170;
   const productBarHeight = 56;
+  const itemRowHeight = 46;
   const cellWidth = width / 4;
   const rows: PriceListGroup[][] = [];
   for (let index = 0; index < groups.length; index += 4) rows.push(groups.slice(index, index + 4));
-  const rowHeights = rows.map((row) => Math.max(190, ...row.map((group) => 70 + group.items.length * 38)));
+  const rowHeights = rows.map((row) => Math.max(190, ...row.map((group) => 70 + group.items.length * itemRowHeight)));
   const productsHeight = productBarHeight + rowHeights.reduce((sum, height) => sum + height, 0);
   const benefitsHeight = 112;
   const footerHeight = 52;
   const height = headerHeight + productsHeight + benefitsHeight + footerHeight;
-  return { width, height, headerHeight, productBarHeight, cellWidth, rows, rowHeights, productsHeight, benefitsHeight, footerHeight };
+  return { width, height, headerHeight, productBarHeight, cellWidth, itemRowHeight, rows, rowHeights, productsHeight, benefitsHeight, footerHeight };
 };
 
 const drawText = (context: CanvasRenderingContext2D, text: string, x: number, y: number, font: string, color: string, align: CanvasTextAlign = "left") => {
@@ -46,12 +47,32 @@ const drawText = (context: CanvasRenderingContext2D, text: string, x: number, y:
   context.fillText(text, x, y);
 };
 
-const drawFittedText = (context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, font: string, color: string) => {
+const drawFittedText = (context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, font: string, color: string, minimumSize = 10) => {
+  const fontMatch = font.match(/^(.*?)(\d+(?:\.\d+)?)px(.*)$/);
+  if (!fontMatch) {
+    drawText(context, text, x, y, font, color);
+    return;
+  }
+
+  const [, prefix, originalSize, suffix] = fontMatch;
+  let size = Number(originalSize);
   context.font = font;
-  let fitted = text;
-  while (fitted.length > 1 && context.measureText(fitted).width > maxWidth) fitted = fitted.slice(0, -1);
-  if (fitted !== text) fitted = `${fitted.slice(0, -1)}…`;
-  drawText(context, fitted, x, y, font, color);
+  while (size > minimumSize && context.measureText(text).width > maxWidth) {
+    size -= 0.5;
+    context.font = `${prefix}${size}px${suffix}`;
+  }
+
+  if (context.measureText(text).width > maxWidth) {
+    const scaleX = maxWidth / context.measureText(text).width;
+    context.save();
+    context.translate(x, y);
+    context.scale(scaleX, 1);
+    drawText(context, text, 0, 0, `${prefix}${size}px${suffix}`, color);
+    context.restore();
+    return;
+  }
+
+  drawText(context, text, x, y, `${prefix}${size}px${suffix}`, color);
 };
 
 const drawRoundedRect = (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) => {
@@ -129,16 +150,17 @@ const renderPriceListCanvas = async (groups: PriceListGroup[], logo: string | nu
       context.fillStyle = color;
       context.fillRect(x + 14, rowY + 47, layout.cellWidth - 28, 2);
       group.items.forEach((item, itemIndex) => {
-        const itemY = rowY + 82 + itemIndex * 38;
+        const itemY = rowY + 82 + itemIndex * layout.itemRowHeight;
         const price = money(item.retailPrice);
-        const priceFont = "900 18px Arial";
+        const priceFont = "900 17px Arial";
         context.font = priceFont;
         const priceWidth = context.measureText(price).width;
         const labelMaxWidth = layout.cellWidth - 28 - priceWidth - 10;
-        drawFittedText(context, `${item.model} ${item.capacity || ""}`, x + 14, itemY, labelMaxWidth, "900 16px Arial", "#111827");
-        drawText(context, price, x + layout.cellWidth - 14, itemY, priceFont, color, "right");
+        drawFittedText(context, item.model, x + 14, itemY, labelMaxWidth, "900 15px Arial", "#111827", 11);
+        if (item.capacity) drawFittedText(context, item.capacity, x + 14, itemY + 16, labelMaxWidth, "700 11px Arial", "#475569", 10);
+        drawText(context, price, x + layout.cellWidth - 14, itemY + 4, priceFont, color, "right");
         context.strokeStyle = "#f1f5f9";
-        context.beginPath(); context.moveTo(x + 14, itemY + 10); context.lineTo(x + layout.cellWidth - 14, itemY + 10); context.stroke();
+        context.beginPath(); context.moveTo(x + 14, itemY + 27); context.lineTo(x + layout.cellWidth - 14, itemY + 27); context.stroke();
       });
     });
     rowY += rowHeight;
