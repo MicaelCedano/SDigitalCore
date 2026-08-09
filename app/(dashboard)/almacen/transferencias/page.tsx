@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db/prisma";
 import { WarehouseRequestsManager } from "@/modules/almacen/components/WarehouseRequestsManager";
 
 export const metadata: Metadata = {
-  title: "Solicitudes & Transferencias de Almacén | SDigitalCore",
-  description: "Solicitudes de productos entre sucursales y transferencias de almacén",
+  title: "Solicitudes de almacén | SDigitalCore",
+  description: "Solicitudes de productos entre sucursales y almacén",
 };
 
 export default async function TransferenciasPage() {

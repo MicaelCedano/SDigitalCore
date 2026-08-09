@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import { WarehouseMovementsManager } from "@/modules/almacen/components/WarehouseMovementsManager";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Movimientos de Almacén | SDigitalCore",
@@ -17,5 +18,9 @@ export default async function MovimientosPage() {
       })
     : null;
 
-  return <WarehouseMovementsManager roleCode={persistedUser?.roleCode ?? "VENTAS"} />;
+  if (persistedUser?.roleCode !== "ADMIN") {
+    redirect("/almacen/transferencias");
+  }
+
+  return <WarehouseMovementsManager roleCode="ADMIN" />;
 }
