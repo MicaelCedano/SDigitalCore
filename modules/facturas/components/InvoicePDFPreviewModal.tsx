@@ -23,10 +23,11 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
     const printRoot = document.createElement("div");
     printRoot.id = "invoice-print-root";
     printRoot.innerHTML = documentNode.outerHTML;
-    printRoot.querySelectorAll<HTMLElement>("[class]").forEach((element) => {
-      element.className = Array.from(element.classList)
+    printRoot.querySelectorAll("[class]").forEach((element) => {
+      const classNames = Array.from(element.classList)
         .filter((className) => !className.startsWith("print:"))
         .join(" ");
+      element.setAttribute("class", classNames);
     });
     document.body.appendChild(printRoot);
     document.body.classList.add("invoice-printing");
