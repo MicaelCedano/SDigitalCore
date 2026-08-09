@@ -128,15 +128,9 @@
   body.invoice-printing #invoice-print-root .print-document {
     display: block !important;
     position: static !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 12mm !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
     overflow: visible !important;
-    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
