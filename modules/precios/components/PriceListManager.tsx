@@ -47,11 +47,31 @@ const drawText = (context: CanvasRenderingContext2D, text: string, x: number, y:
 };
 
 const drawFittedText = (context: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, font: string, color: string) => {
+  const fontMatch = font.match(/^(.*?)(\d+(?:\.\d+)?)px(.*)$/);
+  if (!fontMatch) {
+    drawText(context, text, x, y, font, color);
+    return;
+  }
+
+  const [, prefix, originalSize, suffix] = fontMatch;
+  let size = Number(originalSize);
+  const minimumSize = 9;
   context.font = font;
-  let fitted = text;
-  while (fitted.length > 1 && context.measureText(fitted).width > maxWidth) fitted = fitted.slice(0, -1);
-  if (fitted !== text) fitted = `${fitted.slice(0, -1)}…`;
-  drawText(context, fitted, x, y, font, color);
+  while (size > minimumSize && context.measureText(text).width > maxWidth) {
+    size -= 0.5;
+    context.font = `${prefix}${size}px${suffix}`;
+  }
+  // Nunca agregamos puntos suspensivos: las especificaciones deben salir completas.
+  if (context.measureText(text).width > maxWidth) {
+    const scaleX = maxWidth / context.measureText(text).width;
+    context.save();
+    context.translate(x, y);
+    context.scale(scaleX, 1);
+    drawText(context, text, 0, 0, `${prefix}${size}px${suffix}`, color);
+    context.restore();
+    return;
+  }
+  drawText(context, text, x, y, `${prefix}${size}px${suffix}`, color);
 };
 
 const drawRoundedRect = (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: string, stroke?: string) => {
