@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Award, CalendarDays, Download, GripVertical, Headphones,
+  Archive, Award, CalendarDays, Download, GripVertical, Headphones,
   Image as ImageIcon, ListPlus, Loader2, Pencil, Plus, Search, Settings2,
-  Package, ShieldCheck, Trash2, Upload, X,
+  Package, ShieldCheck, Trash2, Upload, X, AlertTriangle,
 } from "lucide-react";
 import {
   deletePriceListBrandAction, deletePriceListItemAction, getPriceListWorkspaceAction,
@@ -22,6 +22,7 @@ const PREVIEW_WIDTH = 1080;
 const money = (value: unknown) => `RD$ ${Number(value || 0).toLocaleString("es-DO", { maximumFractionDigits: 0 })}`;
 
 type PriceListGroup = { brand: Brand; items: Item[] };
+type ArchiveTarget = { type: "item"; item: Item } | { type: "brand"; brand: Brand };
 
 const getPriceListLayout = (groups: PriceListGroup[]) => {
   const width = PREVIEW_WIDTH;
@@ -211,6 +212,8 @@ export function PriceListManager() {
   const [draggedBrand, setDraggedBrand] = useState<string | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState({ brand: "", model: "", specs: "", price: "", cost: "0", wholesale: "0" });
   const [brandForm, setBrandForm] = useState({ name: "", color: "#111827" });
@@ -325,12 +328,7 @@ export function PriceListManager() {
     setSaving(false);
   };
   const toggleActive = (item: Item) => setActiveList((current) => activeIds.has(item.id) ? current.filter((old) => old.id !== item.id) : [...current, item]);
-  const removeItem = async (item: Item) => {
-    if (!confirm(`¿Archivar ${item.model}?`)) return;
-    const result = await deletePriceListItemAction(item.id);
-    if (result.success) { setInventory((current) => current.filter((old) => old.id !== item.id)); setActiveList((current) => current.filter((old) => old.id !== item.id)); }
-    else setMessage(result.error || "No se pudo archivar el producto");
-  };
+  const removeItem = (item: Item) => setArchiveTarget({ type: "item", item });
   const addBrand = async (event: React.FormEvent) => {
     event.preventDefault();
     const result = await savePriceListBrandAction(brandForm);
@@ -342,11 +340,25 @@ export function PriceListManager() {
     const next = [...orderedBrands]; [next[from], next[to]] = [next[to], next[from]]; setBrands(next.map((brand, index) => ({ ...brand, orderIndex: index })));
     await reorderPriceListBrandsAction(next.map((brand) => brand.id));
   };
-  const deleteBrand = async (brand: Brand) => {
-    if (!confirm(`¿Archivar la marca ${brand.name} y sus productos?`)) return;
-    const result = await deletePriceListBrandAction(brand.id);
-    if (result.success) { setBrands((current) => current.filter((item) => item.id !== brand.id)); setInventory((current) => current.filter((item) => item.brand !== brand.name)); setActiveList((current) => current.filter((item) => item.brand !== brand.name)); }
-    else setMessage(result.error || "No se pudo archivar la marca");
+  const deleteBrand = (brand: Brand) => setArchiveTarget({ type: "brand", brand });
+  const confirmArchive = async () => {
+    if (!archiveTarget) return;
+    setArchiving(true);
+    const result = archiveTarget.type === "item"
+      ? await deletePriceListItemAction(archiveTarget.item.id)
+      : await deletePriceListBrandAction(archiveTarget.brand.id);
+    if (result.success) {
+      if (archiveTarget.type === "item") {
+        setInventory((current) => current.filter((old) => old.id !== archiveTarget.item.id));
+        setActiveList((current) => current.filter((old) => old.id !== archiveTarget.item.id));
+      } else {
+        setBrands((current) => current.filter((item) => item.id !== archiveTarget.brand.id));
+        setInventory((current) => current.filter((item) => item.brand !== archiveTarget.brand.name));
+        setActiveList((current) => current.filter((item) => item.brand !== archiveTarget.brand.name));
+      }
+      setArchiveTarget(null);
+    } else setMessage(result.error || "No se pudo archivar");
+    setArchiving(false);
   };
   const handleLogo = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
@@ -388,5 +400,6 @@ export function PriceListManager() {
     </div>
     {showItemModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><form onSubmit={saveItem} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-black text-slate-900">{editing ? "Editar producto" : "Agregar producto"}</h2><p className="text-xs text-slate-500">Los cambios actualizan inventario y lista activa.</p></div><button type="button" onClick={() => setShowItemModal(false)}><X /></button></div><div className="grid gap-4 sm:grid-cols-2">{[["Marca", "brand"], ["Modelo", "model"], ["Especificación", "specs"], ["Precio público", "price"], ["Precio costo", "cost"], ["Precio mayorista", "wholesale"]].map(([label, key]) => <label key={key} className="text-xs font-bold text-slate-700">{label}<input required={key === "brand" || key === "model" || key === "price"} type={key === "price" || key === "cost" || key === "wholesale" ? "number" : "text"} value={form[key as keyof typeof form]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-500" /></label>)}</div>{message && <p className="mt-4 text-sm font-semibold text-red-600">{message}</p>}<button disabled={saving} className="mt-6 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">{saving ? "Guardando..." : "Guardar producto"}</button></form></div>}
     {showBrandModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-black text-slate-900">Marcas y orden de publicación</h2><p className="text-xs text-slate-500">Arrastra para cambiar el orden de la vista previa.</p></div><button onClick={() => setShowBrandModal(false)}><X /></button></div><form onSubmit={addBrand} className="mb-5 flex gap-2"><input required value={brandForm.name} onChange={(event) => setBrandForm({ ...brandForm, name: event.target.value })} placeholder="Nueva marca" className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" /><input type="color" value={brandForm.color} onChange={(event) => setBrandForm({ ...brandForm, color: event.target.value })} className="h-10 w-12 rounded-lg border border-slate-200" /><button className="rounded-xl bg-indigo-600 px-3 text-xs font-black text-white"><Plus className="inline h-4 w-4" /></button></form><div className="space-y-2">{orderedBrands.map((brand, index) => <div key={brand.id} draggable onDragStart={() => setDraggedBrand(brand.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const from = orderedBrands.findIndex((item) => item.id === draggedBrand); void reorderBrand(from, index); setDraggedBrand(null); }} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><GripVertical className="h-4 w-4 cursor-grab text-slate-400" /><span style={{ backgroundColor: brand.color }} className="h-4 w-4 rounded-full" /><span className="flex-1 text-sm font-bold text-slate-800">{brand.name}</span><button onClick={() => void reorderBrand(index, index - 1)} className="px-2 text-slate-500">↑</button><button onClick={() => void reorderBrand(index, index + 1)} className="px-2 text-slate-500">↓</button><button onClick={() => void deleteBrand(brand)} className="p-1 text-red-500"><Trash2 className="h-4 w-4" /></button></div>)}</div></div></div>}
+    {archiveTarget && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="archive-dialog-title"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"><div className="flex items-start gap-4 border-b border-slate-100 px-6 py-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><AlertTriangle className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700">Confirmar archivo</p><h2 id="archive-dialog-title" className="mt-1 text-lg font-black text-slate-900">¿Archivar {archiveTarget.type === "item" ? archiveTarget.item.model : archiveTarget.brand.name}?</h2><p className="mt-1 text-sm leading-5 text-slate-500">{archiveTarget.type === "item" ? "Este producto dejará de aparecer en el inventario y en la lista activa." : "La marca y sus productos dejarán de aparecer en el inventario y en la lista activa."}</p></div><button type="button" onClick={() => setArchiveTarget(null)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar"><X className="h-5 w-5" /></button></div><div className="flex items-center gap-2 bg-slate-50 px-6 py-4 text-xs font-semibold text-slate-600"><Archive className="h-4 w-4 text-slate-400" />La información se conservará archivada.</div><div className="flex justify-end gap-3 px-6 py-4"><button type="button" onClick={() => setArchiveTarget(null)} disabled={archiving} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">Cancelar</button><button type="button" onClick={() => void confirmArchive()} disabled={archiving} className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60">{archiving ? "Archivando..." : "Archivar"}</button></div></div></div>}
   </div>;
 }
