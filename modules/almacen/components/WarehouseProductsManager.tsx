@@ -146,6 +146,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
   };
 
   const totalBoxes = products.reduce((acc, p) => acc + (p.boxes || 0), 0);
+  const totalLooseUnits = products.reduce((acc, p) => acc + (p.looseUnits || 0), 0);
   const totalUnits = products.reduce((acc, p) => acc + (p.totalUnits || 0), 0);
   const visibleProducts = showOutOfStock
     ? products
@@ -181,9 +182,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-500 font-medium block">Variedad de Productos</span>
+            <span className="text-xs text-slate-500 font-medium block">Equipos sin caja</span>
             <span className="text-2xl font-black text-slate-800 mt-1 block">
-              {visibleProducts.length}
+              {totalLooseUnits} <span className="text-xs font-semibold text-slate-500">uds</span>
             </span>
           </div>
           <div className="p-3 bg-slate-100 text-slate-600 rounded-xl">
