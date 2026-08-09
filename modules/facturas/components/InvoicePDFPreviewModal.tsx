@@ -204,14 +204,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
             ) : (
               <div className="space-y-3">
                 <div className="border-y border-slate-300 py-3 text-[10px] leading-4 text-slate-800">
-                <p className="font-bold">Conduce de Entrega Oficial — {displayBranch}</p>
-                <p className="mt-0.5">
-                  Este documento certifica la entrega física de los equipos y accesorios especificados más arriba en perfectas condiciones operativas.
-                </p>
-                </div>
-
-                <div className="border-b border-slate-300 pb-3 text-[10px] leading-4 text-slate-800">
-                  <p className="font-bold">Nota Importante:</p>
+                  <p className="font-bold">Conduce de Entrega Final — {displayBranch}</p>
                   <p>
                     Al firmar como "Recibido Conforme", el cliente acepta las políticas de la empresa y certifica que ha recibido la mercancía detallada.
                     Cualquier reclamo debe realizarse antes de retirar la mercancía. No nos hacemos responsables tras la salida.
