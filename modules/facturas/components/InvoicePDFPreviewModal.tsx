@@ -29,7 +29,6 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
 
   const isConduce = invoice.type === "CONDUCE";
   const displayBranch = isConduce ? COMPANY_LABEL : invoice.branch;
-  if (isConduce) invoice.branch = displayBranch;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:static">
@@ -61,11 +60,11 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
 
         {/* PDF Document Printable Content Body */}
         <div className="p-8 overflow-y-auto flex-1 bg-slate-100 print:bg-white print:p-0" ref={printRef}>
-          <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-3xl mx-auto shadow-sm print:shadow-none print:border-none print:p-0 space-y-6">
+          <div className="print-document bg-white border border-slate-200 rounded-xl p-8 max-w-3xl mx-auto shadow-sm print:shadow-none print:border-none print:p-0 space-y-6">
             
             {/* Document Header */}
-            <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-              <div className="space-y-1">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-6">
+              <div className="min-w-0 flex-1 space-y-1 pr-2">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 bg-[#5750f1] text-white font-black text-xl rounded-lg flex items-center justify-center shadow-md">
                     S
@@ -76,13 +75,13 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                   </div>
                 </div>
                 <div className="text-xs text-slate-600 space-y-0.5 pt-2">
-                  <p className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-slate-400" /> {invoice.branch}, República Dominicana</p>
+                  <p className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5 text-slate-400" /> {displayBranch}, República Dominicana</p>
                   <p className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" /> WhatsApp: {COMPANY_WHATSAPP}</p>
-                  <p className="font-mono text-[11px] text-slate-500">{COMPANY_ADDRESS}</p>
+                  <p className="max-w-[30rem] break-words font-mono text-[11px] leading-4 text-slate-500">{COMPANY_ADDRESS}</p>
                 </div>
               </div>
 
-              <div className="text-right space-y-1">
+              <div className="w-[14rem] shrink-0 space-y-1 text-right">
                 <span className={`inline-block px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider ${isConduce ? "bg-amber-100 text-amber-800 border border-amber-300" : "bg-[#5750f1]/10 text-[#5750f1] border border-[#5750f1]/20"}`}>
                   {isConduce ? "CONDUCE DE ENTREGA" : "FACTURA DE VENTA"}
                 </span>
@@ -109,15 +108,15 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DETALLES DE DESPACHO</span>
                 {invoice.notes && <p className="text-slate-700 whitespace-pre-line"><strong>Nota:</strong> {invoice.notes}</p>}
                 {invoice.clientAddress && <p className="text-slate-700">Dirección: {invoice.clientAddress}</p>}
-                <p className="text-slate-600">Almacén Origen: <strong>{invoice.branch}</strong></p>
+                <p className="text-slate-600">Almacén Origen: <strong>{displayBranch}</strong></p>
                 <p className="text-slate-600">Método de Pago: <strong>{invoice.paymentMethod || "Efectivo"}</strong></p>
               </div>
             </div>
 
             {/* Items Table */}
             <div className="overflow-hidden border border-slate-200 rounded-xl">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead className="bg-slate-900 text-white font-bold text-[11px] uppercase">
+              <table className="w-full text-left text-[10px] leading-4 text-slate-700">
+                <thead className="border-b-2 border-slate-700 text-slate-900 font-bold text-[10px] uppercase">
                   <tr>
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Descripción de Equipo / Artículo</th>
@@ -129,28 +128,28 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {invoice.items?.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3.5 font-mono font-bold text-slate-500">{idx + 1}</td>
-                      <td className="px-4 py-3.5 space-y-1">
-                        <span className="font-bold text-slate-900 block">{item.description}</span>
+                    <tr key={idx} className="border-b border-slate-200">
+                      <td className="px-3 py-2 font-mono font-bold text-slate-500">{idx + 1}</td>
+                      <td className="px-3 py-2">
+                        <span className="font-semibold text-slate-900 block">{item.description}</span>
                         {item.sku && <span className="text-[10px] font-mono text-slate-400 block">SKU: {item.sku}</span>}
                       </td>
-                      <td className="px-4 py-3.5 text-center font-black text-slate-800 text-sm">
+                      <td className="px-3 py-2 text-center font-black text-slate-800 text-xs">
                         {item.quantity}
                       </td>
                       {!isConduce && (
-                        <td className="px-4 py-3.5 text-right font-medium text-slate-700">
+                        <td className="px-3 py-2 text-right font-medium text-slate-700">
                           RD$ {Number(item.unitPrice || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
                         </td>
                       )}
                       {!isConduce && (
-                        <td className="px-4 py-3.5 text-right font-medium text-slate-500">
+                        <td className="px-3 py-2 text-right font-medium text-slate-500">
                           RD$ {Number(item.tax || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
                         </td>
                       )}
-                      <td className="px-4 py-3.5 text-right font-extrabold text-slate-900">
+                      <td className="px-3 py-2 text-right font-extrabold text-slate-900">
                         {isConduce ? (
-                          <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 font-bold">
+                          <span className="text-slate-900 font-bold">
                             ENTREGADO
                           </span>
                         ) : (
@@ -203,11 +202,21 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 </div>
               </div>
             ) : (
-              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
-                <p className="font-bold">Conduce de Entrega Oficial — {invoice.branch}</p>
-                <p className="text-[11px] mt-0.5">
+              <div className="space-y-3">
+                <div className="border-y border-slate-300 py-3 text-[10px] leading-4 text-slate-800">
+                <p className="font-bold">Conduce de Entrega Oficial — {displayBranch}</p>
+                <p className="mt-0.5">
                   Este documento certifica la entrega física de los equipos y accesorios especificados más arriba en perfectas condiciones operativas.
                 </p>
+                </div>
+
+                <div className="border-b border-slate-300 pb-3 text-[10px] leading-4 text-slate-800">
+                  <p className="font-bold">Nota Importante:</p>
+                  <p>
+                    Al firmar como "Recibido Conforme", el cliente acepta las políticas de la empresa y certifica que ha recibido la mercancía detallada.
+                    Cualquier reclamo debe realizarse antes de retirar la mercancía. No nos hacemos responsables tras la salida.
+                  </p>
+                </div>
               </div>
             )}
 
