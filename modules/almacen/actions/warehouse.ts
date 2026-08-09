@@ -18,7 +18,7 @@ import {
 async function requireWarehouseAdmin() {
   const actor = await requirePermission("warehouse.read");
   const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
-  if (persisted?.roleCode !== "ADMIN") throw new Error("Solo un administrador puede aprobar o rechazar solicitudes.");
+  if (persisted?.roleCode !== "ADMIN") throw new Error("Solo un administrador puede gestionar movimientos y solicitudes.");
   return actor;
 }
 
@@ -288,7 +288,7 @@ export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMov
  */
 export async function getWarehouseMovementsAction(query?: string) {
   try {
-    await requirePermission("warehouse.read");
+    await requireWarehouseAdmin();
     const where: any = {};
     if (query && query.trim() !== "") {
       const q = query.trim();
