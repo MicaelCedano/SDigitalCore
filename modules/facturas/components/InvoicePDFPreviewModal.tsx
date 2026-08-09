@@ -115,8 +115,8 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
 
             {/* Items Table */}
             <div className="overflow-hidden border border-slate-200 rounded-xl">
-              <table className="w-full text-left text-[10px] leading-4 text-slate-700">
-                <thead className="border-b-2 border-slate-700 text-slate-900 font-bold text-[10px] uppercase">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-900 text-white font-bold text-[11px] uppercase">
                   <tr>
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Descripción de Equipo / Artículo</th>
@@ -128,28 +128,28 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {invoice.items?.map((item: any, idx: number) => (
-                    <tr key={idx} className="border-b border-slate-200">
-                      <td className="px-3 py-2 font-mono font-bold text-slate-500">{idx + 1}</td>
-                      <td className="px-3 py-2">
-                        <span className="font-semibold text-slate-900 block">{item.description}</span>
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="px-4 py-3.5 font-mono font-bold text-slate-500">{idx + 1}</td>
+                      <td className="px-4 py-3.5 space-y-1">
+                        <span className="font-bold text-slate-900 block">{item.description}</span>
                         {item.sku && <span className="text-[10px] font-mono text-slate-400 block">SKU: {item.sku}</span>}
                       </td>
-                      <td className="px-3 py-2 text-center font-black text-slate-800 text-xs">
+                      <td className="px-4 py-3.5 text-center font-black text-slate-800 text-sm">
                         {item.quantity}
                       </td>
                       {!isConduce && (
-                        <td className="px-3 py-2 text-right font-medium text-slate-700">
+                        <td className="px-4 py-3.5 text-right font-medium text-slate-700">
                           RD$ {Number(item.unitPrice || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
                         </td>
                       )}
                       {!isConduce && (
-                        <td className="px-3 py-2 text-right font-medium text-slate-500">
+                        <td className="px-4 py-3.5 text-right font-medium text-slate-500">
                           RD$ {Number(item.tax || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
                         </td>
                       )}
-                      <td className="px-3 py-2 text-right font-extrabold text-slate-900">
+                      <td className="px-4 py-3.5 text-right font-extrabold text-slate-900">
                         {isConduce ? (
-                          <span className="text-slate-900 font-bold">
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 font-bold">
                             ENTREGADO
                           </span>
                         ) : (
@@ -202,14 +202,12 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="border-y border-slate-300 py-3 text-[10px] leading-4 text-slate-800">
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
                   <p className="font-bold">Conduce de Entrega Final — {displayBranch}</p>
-                  <p>
+                  <p className="text-[11px] mt-0.5">
                     Al firmar como "Recibido Conforme", el cliente acepta las políticas de la empresa y certifica que ha recibido la mercancía detallada.
                     Cualquier reclamo debe realizarse antes de retirar la mercancía. No nos hacemos responsables tras la salida.
                   </p>
-                </div>
               </div>
             )}
 
