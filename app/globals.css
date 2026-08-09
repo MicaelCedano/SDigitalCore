@@ -115,13 +115,17 @@
   }
 
   .print-document {
-    position: absolute !important;
+    position: fixed !important;
     top: 0 !important;
     left: 0 !important;
+    z-index: 2147483647 !important;
     width: 100% !important;
     max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 12mm !important;
+    overflow: visible !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;

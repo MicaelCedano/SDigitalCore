@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { Printer, Download, X, Building2, Phone, Calendar, User, FileText, CheckCircle2, ShieldCheck } from "lucide-react";
 
-const COMPANY_ADDRESS = "Calle Duarte esquina Dr. Teofilo Ferry #54, La Romana, Dominican Republic 22000";
+const COMPANY_ADDRESS = "Calle Duarte esquina Dr. Teofilo Ferry #54, La Romana";
 const COMPANY_WHATSAPP = "(829) 266-0404";
 const COMPANY_LABEL = "Se\u00f1al Digital";
 
