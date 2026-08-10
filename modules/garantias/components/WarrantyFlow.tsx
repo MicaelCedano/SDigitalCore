@@ -44,10 +44,60 @@ export function WarrantyFlow({ operation, cases }: { operation: WarrantyFlowOper
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [confirmOpen, document]);
 
+  // Auto-seleccionar y auto-llenar contraparte al escribir o escanear un IMEI o código de caso
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) return;
+
+    const match = cases.find(
+      (item) => item.imei === query || item.caseCode.toLowerCase() === query.toLowerCase()
+    );
+
+    if (match) {
+      if (!selected.includes(match.caseCode)) {
+        setSelected((prev) => [...prev, match.caseCode]);
+      }
+      const suggested =
+        operation === "receiveTech"
+          ? match.assignedTechnicianName
+          : operation === "receiveSupplier"
+          ? match.currentSupplierName
+          : operation === "deliver"
+          ? match.clientName
+          : null;
+
+      if (suggested && !counterparty.trim()) {
+        setCounterparty(suggested);
+      }
+    }
+  }, [search, cases, operation, counterparty, selected]);
+
+  // Auto-llenar contraparte si todos los casos elegibles corresponden al mismo suplidor/técnico
+  useEffect(() => {
+    if (counterparty.trim()) return;
+    const counterparties = cases
+      .map((c) =>
+        operation === "receiveTech"
+          ? c.assignedTechnicianName
+          : operation === "receiveSupplier"
+          ? c.currentSupplierName
+          : operation === "deliver"
+          ? c.clientName
+          : null
+      )
+      .filter(Boolean);
+
+    if (counterparties.length > 0) {
+      const first = counterparties[0];
+      if (first && counterparties.every((item) => item === first)) {
+        setCounterparty(first);
+      }
+    }
+  }, [cases, operation, counterparty]);
+
   function validateBeforeConfirm() {
     if (selected.length === 0) return setMessage("Selecciona al menos un equipo.");
     if (operation !== "credit" && !counterparty.trim()) return setMessage(`Indica el ${label.toLowerCase()}.`);
-    if (needsReason && !reason.trim()) return setMessage("El motivo es obligatorio.");
     setMessage("");
     setConfirmOpen(true);
   }
@@ -87,8 +137,8 @@ export function WarrantyFlow({ operation, cases }: { operation: WarrantyFlowOper
         <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-[#667085]"><span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-[#e4e7ec]">{selected.length} seleccionado(s)</span><span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">Documento con identidad roja</span></div>
       </div>
       {operation !== "credit" && <div className="grid gap-4 border-b border-[#e4e7ec] p-5 sm:grid-cols-2 sm:p-6"><label className="text-sm font-semibold text-[#344054]">{label}<input value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder={operation === "assign" ? "Ej. Sahul" : "Nombre o empresa"} className="mt-2 h-11 w-full rounded-xl border border-[#d0d5dd] px-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-500/10" /></label>{operation === "receiveTech" && <label className="flex items-center gap-3 self-end pb-2 text-sm font-medium text-[#344054]"><input type="checkbox" checked={repaired} onChange={(event) => setRepaired(event.target.checked)} className="h-4 w-4 accent-red-600" /> Equipo reparado</label>}</div>}
-      {needsReason && <div className="border-b border-[#e4e7ec] p-5 sm:p-6"><label className="text-sm font-semibold text-[#344054]">{reasonLabel}<textarea required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={operation === "deliver" ? "Indica cómo se resolvió y la conformidad de entrega" : operation === "credit" ? "Explica por qué se cierra mediante nota de crédito" : "Describe el trabajo realizado, resultado o condición de retorno"} className="mt-2 min-h-24 w-full rounded-xl border border-[#d0d5dd] p-3 outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-500/10" /></label><p className="mt-1 text-right text-[11px] text-[#98a2b3]">{reason.length}/1000</p></div>}
-      <div className="border-b border-[#e4e7ec] bg-[#fcfcfd] p-4 sm:p-5"><div className="relative"><Search size={16} className="absolute left-3 top-3 text-[#98a2b3]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por caso, cliente, modelo o IMEI" className="h-11 w-full rounded-xl border border-[#d0d5dd] bg-white pl-9 pr-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10" /></div><div className="mt-3 flex items-center justify-between text-xs text-[#667085]"><span>{visibleCases.length} equipos elegibles</span><button type="button" onClick={toggleAll} className="inline-flex items-center gap-1 font-bold text-red-600 hover:underline"><CheckSquare size={14} /> {allVisibleSelected ? "Quitar selección" : "Seleccionar visibles"}</button></div></div>
+      {needsReason && <div className="border-b border-[#e4e7ec] p-5 sm:p-6"><label className="text-sm font-semibold text-[#344054]">{reasonLabel} <span className="text-xs font-normal text-[#98a2b3]">(Opcional)</span><textarea maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={operation === "deliver" ? "Indica cómo se resolvió y la conformidad de entrega (opcional)" : operation === "credit" ? "Explica por qué se cierra mediante nota de crédito (opcional)" : "Describe el trabajo realizado, resultado o condición de retorno (opcional)"} className="mt-2 min-h-20 w-full rounded-xl border border-[#d0d5dd] p-3 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-500/10" /></label><p className="mt-1 text-right text-[11px] text-[#98a2b3]">{reason.length}/1000</p></div>}
+      <div className="border-b border-[#e4e7ec] bg-[#fcfcfd] p-4 sm:p-5"><div className="relative"><Search size={16} className="absolute left-3 top-3 text-[#98a2b3]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar o escanear por IMEI, caso o cliente..." className="h-11 w-full rounded-xl border border-[#d0d5dd] bg-white pl-9 pr-3 text-sm outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10" /></div><div className="mt-3 flex items-center justify-between text-xs text-[#667085]"><span>{visibleCases.length} equipos elegibles</span><button type="button" onClick={toggleAll} className="inline-flex items-center gap-1 font-bold text-red-600 hover:underline"><CheckSquare size={14} /> {allVisibleSelected ? "Quitar selección" : "Seleccionar visibles"}</button></div></div>
       <div className="max-h-[520px] divide-y divide-[#f0f1f3] overflow-y-auto">{visibleCases.map((item) => <label key={item.id} className={`flex cursor-pointer items-center gap-3 p-4 transition hover:bg-red-50/40 ${selected.includes(item.caseCode) ? "bg-red-50/60" : ""}`}><input type="checkbox" checked={selected.includes(item.caseCode)} onChange={(event) => selectCase(item, event.target.checked)} className="h-4 w-4 rounded border-[#d0d5dd] accent-red-600" /><span className="min-w-0 flex-1"><span className="font-mono text-xs font-bold text-red-600">{item.caseCode}</span><span className="ml-2 text-sm font-semibold text-[#344054]">{item.clientName} · {item.model}</span><span className="mt-1 block font-mono text-xs text-[#667085]">IMEI {item.imei}</span>{operation === "receiveTech" && item.assignedTechnicianName && <span className="mt-1 block text-[11px] text-violet-600">Asignado a {item.assignedTechnicianName}</span>}{operation === "receiveSupplier" && item.currentSupplierName && <span className="mt-1 block text-[11px] text-orange-600">Enviado a {item.currentSupplierName}</span>}</span><UserRound size={17} className="text-[#98a2b3]" /></label>)}{visibleCases.length === 0 && <p className="p-10 text-center text-sm text-[#667085]">No hay casos elegibles para este flujo.</p>}</div>
       <div className="flex flex-col gap-3 border-t border-[#e4e7ec] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"><span className="text-xs text-[#667085]">Puedes revisar los datos antes de confirmar.</span><button type="button" disabled={busy || loadingDocument || selected.length === 0} onClick={validateBeforeConfirm} className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Procesando..." : loadingDocument ? "Abriendo documento..." : actionLabel}</button></div>
       {message && <p role="status" className="m-5 rounded-xl bg-red-50 p-4 text-sm font-medium text-red-800">{message}</p>}
