@@ -178,7 +178,33 @@
 
   body.warranty-printing > *:not(#warranty-print-root) { display: none !important; }
   body.warranty-printing, body.warranty-printing #warranty-print-root { display: block !important; width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
-  body.warranty-printing #warranty-print-root .warranty-print-document { display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 10mm !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body.warranty-printing #warranty-print-root .warranty-print-document {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: calc(100vh - 20mm) !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.warranty-printing #warranty-print-root .warranty-print-document > div.overflow-hidden {
+    flex: 1 1 auto !important;
+    min-height: 38mm !important;
+  }
+
+  body.warranty-printing #warranty-print-root .warranty-print-document > div.overflow-hidden > table {
+    height: 100% !important;
+  }
+
+  body.warranty-printing #warranty-print-root .warranty-print-document > div.overflow-hidden > table > tbody {
+    height: 100% !important;
+  }
 }
 
 ::-webkit-scrollbar-track {
