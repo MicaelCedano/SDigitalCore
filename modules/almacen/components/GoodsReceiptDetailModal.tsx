@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { exportSingleReceiptToExcel } from "@/lib/utils/excel-export";
 import {
-  Barcode,
   Check,
   Copy,
   FileSpreadsheet,
@@ -15,6 +14,8 @@ import {
 } from "lucide-react";
 
 type ReceiptColorVariant = {
+  color?: string | null;
+  quantity?: number | null;
   imeis?: string | null;
 };
 
@@ -46,6 +47,12 @@ type ModelSummary = {
   key: string;
   description: string;
   quantity: number;
+  colors: ColorImeiSummary[];
+};
+
+type ColorImeiSummary = {
+  key: string;
+  color: string;
   imeis: string[];
 };
 
@@ -72,6 +79,33 @@ function getItemImeis(item: ReceiptItem) {
   return variantImeis.length > 0 ? variantImeis : parseImeis(item.imeiOrSerial);
 }
 
+function getItemColorImeis(item: ReceiptItem): ColorImeiSummary[] {
+  const groupedVariants = new Map<string, ColorImeiSummary>();
+
+  for (const variant of item.colorVariants || []) {
+    const color = variant.color?.trim() || "General";
+    const key = color.toLocaleLowerCase("es-DO");
+    const imeis = parseImeis(variant.imeis);
+    if (imeis.length === 0) continue;
+
+    const current = groupedVariants.get(key);
+    if (current) {
+      current.imeis = [...new Set([...current.imeis, ...imeis])];
+    } else {
+      groupedVariants.set(key, { key, color, imeis: [...new Set(imeis)] });
+    }
+  }
+
+  const variants = [...groupedVariants.values()];
+
+  if (variants.length > 0) return variants;
+
+  const legacyImeis = parseImeis(item.imeiOrSerial);
+  return legacyImeis.length > 0
+    ? [{ key: "general", color: "General", imeis: [...new Set(legacyImeis)] }]
+    : [];
+}
+
 function summarizeModels(items: ReceiptItem[]): ModelSummary[] {
   const grouped = new Map<string, ModelSummary>();
 
@@ -79,11 +113,18 @@ function summarizeModels(items: ReceiptItem[]): ModelSummary[] {
     const description = item.description?.trim() || "Modelo no especificado";
     const key = description.toLocaleLowerCase("es-DO");
     const current = grouped.get(key);
-    const imeis = getItemImeis(item);
+    const colorGroups = getItemColorImeis(item);
 
     if (current) {
       current.quantity += item.quantity || 1;
-      current.imeis = [...new Set([...current.imeis, ...imeis])];
+      for (const colorGroup of colorGroups) {
+        const existingColor = current.colors.find((color) => color.key === colorGroup.key);
+        if (existingColor) {
+          existingColor.imeis = [...new Set([...existingColor.imeis, ...colorGroup.imeis])];
+        } else {
+          current.colors.push(colorGroup);
+        }
+      }
       continue;
     }
 
@@ -91,7 +132,7 @@ function summarizeModels(items: ReceiptItem[]): ModelSummary[] {
       key,
       description,
       quantity: item.quantity || 1,
-      imeis: [...new Set(imeis)],
+      colors: colorGroups,
     });
   }
 
@@ -120,7 +161,6 @@ export function GoodsReceiptDetailModal({
   });
 
   const totalQty = models.reduce((sum, model) => sum + model.quantity, 0);
-  const allImeis = [...new Set(models.flatMap((model) => model.imeis))];
   const receiptSummary = [
     `Recibiendo de ${receipt.supplierName}`,
     ...models.map((model) => `${model.description} - ${model.quantity}`),
@@ -281,59 +321,50 @@ export function GoodsReceiptDetailModal({
           </div>
 
           <div className="space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-800">
-                <Layers className="h-4 w-4 text-[#5750f1]" /> IMEIs por modelo
-              </h3>
-              {allImeis.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => void copyText(allImeis.join("\n"), "all-imeis")}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
-                >
-                  {copiedKey === "all-imeis" ? (
-                    <><Check className="h-4 w-4" /> Copiados</>
-                  ) : (
-                    <><Copy className="h-4 w-4" /> Copiar todos ({allImeis.length})</>
-                  )}
-                </button>
-              )}
-            </div>
+            <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-800">
+              <Layers className="h-4 w-4 text-[#5750f1]" /> IMEIs por modelo y color
+            </h3>
 
             <div className="space-y-3">
               {models.map((model) => (
                 <article key={model.key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">{model.description}</h4>
-                      <p className="mt-0.5 text-xs font-semibold text-[#5750f1]">
-                        {model.quantity} unidades · {model.imeis.length} IMEIs
-                      </p>
-                    </div>
-                    {model.imeis.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => void copyText(model.imeis.join("\n"), `model-${model.key}`)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:border-[#5750f1]/30 hover:bg-[#5750f1]/5 hover:text-[#5750f1]"
-                      >
-                        {copiedKey === `model-${model.key}` ? (
-                          <><Check className="h-3.5 w-3.5 text-emerald-600" /> Copiados</>
-                        ) : (
-                          <><Copy className="h-3.5 w-3.5" /> Copiar IMEIs</>
-                        )}
-                      </button>
-                    )}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{model.description}</h4>
+                    <p className="mt-0.5 text-xs font-semibold text-[#5750f1]">
+                      {model.quantity} unidades
+                    </p>
                   </div>
 
-                  {model.imeis.length > 0 ? (
-                    <div className="mt-3 grid grid-cols-1 gap-1.5 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {model.imeis.map((imei) => (
-                        <span
-                          key={imei}
-                          className="flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 font-mono text-[11px] text-emerald-800"
+                  {model.colors.length > 0 ? (
+                    <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                      {model.colors.map((color) => (
+                        <div
+                          key={color.key}
+                          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                         >
-                          <Barcode className="h-3 w-3 shrink-0" /> {imei}
-                        </span>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{color.color}</p>
+                            <p className="text-[11px] font-medium text-slate-500">
+                              {color.imeis.length} {color.imeis.length === 1 ? "IMEI" : "IMEIs"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void copyText(
+                                color.imeis.join("\n"),
+                                `color-${model.key}-${color.key}`,
+                              )
+                            }
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-50"
+                          >
+                            {copiedKey === `color-${model.key}-${color.key}` ? (
+                              <><Check className="h-3.5 w-3.5" /> Copiados</>
+                            ) : (
+                              <><Copy className="h-3.5 w-3.5" /> Copiar IMEIs</>
+                            )}
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
