@@ -157,6 +157,10 @@
   body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden > table > tbody {
     height: 100% !important;
   }
+
+  body.warranty-printing > *:not(#warranty-print-root) { display: none !important; }
+  body.warranty-printing, body.warranty-printing #warranty-print-root { display: block !important; width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body.warranty-printing #warranty-print-root .warranty-print-document { display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 10mm !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
 ::-webkit-scrollbar-track {
