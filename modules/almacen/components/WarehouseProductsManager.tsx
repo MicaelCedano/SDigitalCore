@@ -41,9 +41,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
   const [color, setColor] = useState("");
   const [capacity, setCapacity] = useState("");
   const [description, setDescription] = useState("");
-  const [boxes, setBoxes] = useState<number>(0);
-  const [unitsPerBox, setUnitsPerBox] = useState<number>(1);
-  const [looseUnits, setLooseUnits] = useState<number>(0);
+  const [boxes, setBoxes] = useState<number | string>("");
+  const [unitsPerBox, setUnitsPerBox] = useState<number | string>("");
+  const [looseUnits, setLooseUnits] = useState<number | string>("");
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -72,9 +72,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
     setColor("");
     setCapacity("");
     setDescription("");
-    setBoxes(0);
-    setUnitsPerBox(0);
-    setLooseUnits(0);
+    setBoxes("");
+    setUnitsPerBox("");
+    setLooseUnits("");
     setErrorMsg(null);
     setShowModal(true);
   };
@@ -87,9 +87,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
     setColor(prod.color || "");
     setCapacity(prod.capacity || "");
     setDescription(prod.description || "");
-    setBoxes(prod.boxes || 0);
-    setUnitsPerBox(prod.unitsPerBox ?? 0);
-    setLooseUnits(prod.looseUnits || 0);
+    setBoxes(prod.boxes ?? "");
+    setUnitsPerBox(prod.unitsPerBox ?? "");
+    setLooseUnits(prod.looseUnits ?? "");
     setErrorMsg(null);
     setShowModal(true);
   };
@@ -514,7 +514,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                     type="number"
                     min={0}
                     value={boxes}
-                    onChange={(e) => setBoxes(Number(e.target.value))}
+                    onChange={(e) => setBoxes(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="0"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-amber-700 focus:outline-none focus:border-[#5750f1]"
                   />
                 </div>
@@ -527,7 +529,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                     type="number"
                     min={0}
                     value={unitsPerBox}
-                    onChange={(e) => setUnitsPerBox(Number(e.target.value))}
+                    onChange={(e) => setUnitsPerBox(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="0"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-[#5750f1] focus:outline-none focus:border-[#5750f1]"
                   />
                 </div>
@@ -538,7 +542,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                     type="number"
                     min={0}
                     value={looseUnits}
-                    onChange={(e) => setLooseUnits(Number(e.target.value))}
+                    onChange={(e) => setLooseUnits(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="0"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-emerald-700 focus:outline-none focus:border-[#5750f1]"
                   />
                 </div>

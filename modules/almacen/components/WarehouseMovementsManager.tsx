@@ -315,6 +315,7 @@ export function WarehouseMovementsManager({ roleCode = "ADMIN" }: { roleCode?: s
                   min={1}
                   value={unitsCount}
                   onChange={(e) => setUnitsCount(Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-slate-800 focus:outline-none focus:border-[#5750f1]"
                 />
               </div>
