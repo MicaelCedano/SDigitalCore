@@ -5,11 +5,11 @@ import { CheckSquare, Search, ShieldCheck, UserRound, X } from "lucide-react";
 import { assignCasesToTechnician, deliverCasesToCustomer, getWarrantyDocument, markWarrantyCreditNote, receiveCasesFromSupplier, receiveCasesFromTechnician, sendCasesToSupplier } from "@/modules/garantias/actions/warranty";
 import { WarrantyDocumentPreviewModal } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
 
-type Row = { id: string; caseCode: string; imei: string; model: string; clientName: string; status: string };
-type Operation = "assign" | "receiveTech" | "sendSupplier" | "receiveSupplier" | "deliver" | "credit";
+export type WarrantyFlowCase = { id: string; caseCode: string; imei: string; model: string; clientName: string; status: string };
+export type WarrantyFlowOperation = "assign" | "receiveTech" | "sendSupplier" | "receiveSupplier" | "deliver" | "credit";
 type Document = { documentCode: string; type: string; documentDate: string | Date; counterpartyName: string; notes?: string | null; items: Array<{ id: string; case: { caseCode: string; imei: string; model: string; clientName: string; problem: string } }> };
 
-const config: Record<Operation, [string, string, string, string]> = {
+const config: Record<WarrantyFlowOperation, [string, string, string, string]> = {
   assign: ["Enviar equipos a técnico", "Técnico responsable", "Selecciona los equipos recibidos que pasarán a revisión.", "Generar entrega a técnico"],
   receiveTech: ["Recibir equipos del técnico", "Técnico que entrega", "Confirma qué equipos regresan del taller y en qué condición.", "Registrar recepción"],
   sendSupplier: ["Enviar a suplidor / marca", "Suplidor o marca", "Agrupa equipos elegibles y genera el documento de despacho.", "Generar despacho"],
@@ -18,7 +18,7 @@ const config: Record<Operation, [string, string, string, string]> = {
   credit: ["Crear nota de crédito", "", "Selecciona los casos que se cerrarán mediante nota de crédito.", "Crear nota de crédito"],
 };
 
-export function WarrantyFlow({ operation, cases }: { operation: Operation; cases: Row[] }) {
+export function WarrantyFlow({ operation, cases }: { operation: WarrantyFlowOperation; cases: WarrantyFlowCase[] }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [counterparty, setCounterparty] = useState("");
   const [reason, setReason] = useState("");

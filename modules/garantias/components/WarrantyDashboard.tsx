@@ -22,6 +22,8 @@ import {
 import { listWarrantyCases } from "@/modules/garantias/actions/warranty";
 import { WarrantyStatusBadge } from "@/modules/garantias/components/WarrantyStatusBadge";
 import { WARRANTY_STATUS_LABELS } from "@/modules/garantias/lib/status-machine";
+import { WarrantyQuickActions } from "@/modules/garantias/components/WarrantyQuickActions";
+import type { WarrantyFlowCase, WarrantyFlowOperation } from "@/modules/garantias/components/WarrantyFlow";
 
 type CaseRow = {
   id: string;
@@ -54,12 +56,16 @@ export function WarrantyDashboard({
   page,
   pageSize,
   stats,
+  quickCases,
+  canCreate,
 }: {
   initialCases: CaseRow[];
   total: number;
   page: number;
   pageSize: number;
   stats: Record<string, number>;
+  quickCases: Partial<Record<WarrantyFlowOperation, WarrantyFlowCase[]>>;
+  canCreate: boolean;
 }) {
   const [rows, setRows] = useState(initialCases);
   const [totalRows, setTotalRows] = useState(total);
@@ -115,7 +121,7 @@ export function WarrantyDashboard({
   }
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-6 pb-8">
+    <div className="warranty-dashboard mx-auto max-w-[1440px] space-y-6 pb-8">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <div className="flex items-center gap-3">
@@ -139,6 +145,7 @@ export function WarrantyDashboard({
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
+        <WarrantyQuickActions cases={quickCases} canCreate={canCreate} />
         <div className="enterprise-panel overflow-hidden">
           <div className="border-b border-[#e4e7ec] p-4 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

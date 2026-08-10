@@ -105,6 +105,11 @@
   height: 8px;
 }
 
+/* The dashboard now owns the operational warranty popups; keep the legacy action rail hidden. */
+.warranty-dashboard > section > aside.enterprise-panel:last-child {
+  display: none;
+}
+
 @media print {
   @page {
     margin: 0;

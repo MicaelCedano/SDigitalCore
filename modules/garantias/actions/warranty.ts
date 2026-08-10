@@ -30,11 +30,12 @@ export async function listWarrantyCases(input?: { search?: string; status?: Warr
     await requirePermission("warranties.read");
     const page = Math.max(1, input?.page ?? 1); const pageSize = Math.min(100, Math.max(10, input?.pageSize ?? 25));
     const search = input?.search?.trim();
+    const searchDigits = search?.replace(/\D/g, "");
     const where: Prisma.WarrantyCaseWhereInput = {
       archivedAt: null,
       ...(input?.status && input.status !== "ALL" ? { status: input.status } : {}),
       ...(input?.olderThan30 ? { status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: new Date(Date.now() - 30 * 86400000) } } : {}),
-      ...(search ? { OR: [{ caseCode: { contains: search, mode: "insensitive" } }, { imei: { contains: search } }, { model: { contains: search, mode: "insensitive" } }, { clientName: { contains: search, mode: "insensitive" } }] } : {}),
+      ...(search ? { OR: [{ caseCode: { contains: search, mode: "insensitive" } }, { imei: { contains: search } }, ...(searchDigits && searchDigits.length >= 4 ? [{ imei: { endsWith: searchDigits } }] : []), { model: { contains: search, mode: "insensitive" } }, { clientName: { contains: search, mode: "insensitive" } }] } : {}),
     };
     const cases = await prisma.warrantyCase.findMany({ where, orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize, include: { _count: { select: { events: true, documentItems: true } } } });
     const total = await prisma.warrantyCase.count({ where });

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Building2, Calendar, FileText, Printer, ShieldCheck, X } from "lucide-react";
 import { formatDateRD } from "@/lib/utils/format";
 
-type WarrantyDocument = { documentCode: string; type: string; documentDate: string | Date; counterpartyName: string; notes?: string | null; items: Array<{ id: string; case: { caseCode: string; imei: string; model: string; clientName: string; problem: string } }> };
+export type WarrantyDocument = { documentCode: string; type: string; documentDate: string | Date; counterpartyName: string; notes?: string | null; items: Array<{ id: string; case: { caseCode: string; imei: string; model: string; clientName: string; problem: string } }> };
 const typeLabel: Record<string, string> = { INTAKE_RECEIPT: "RECIBO DE INGRESO", TECHNICIAN_ASSIGNMENT: "ENTREGA A TÉCNICO", TECHNICIAN_RECEIPT_REPAIRED: "RECEPCIÓN DE TÉCNICO · REPARADO", TECHNICIAN_RECEIPT_UNREPAIRED: "RECEPCIÓN DE TÉCNICO · NO REPARADO", SUPPLIER_SHIPMENT: "ENVÍO A SUPLIDOR", SUPPLIER_RECEIPT: "RECEPCIÓN DE SUPLIDOR", CUSTOMER_DELIVERY: "ENTREGA AL CLIENTE" };
 
 export function WarrantyDocumentPreviewModal({ document: doc, onClose }: { document: WarrantyDocument; onClose: () => void }) {
