@@ -13,16 +13,14 @@ export function toAdminNotifications(overview: AdminOverview) {
       createdAt: request.createdAt.toISOString(),
       kind: "action" as const,
     })),
-    ...(overview.pendingAccessRequestCount > 0
-      ? [{
-          id: "pending-access-requests",
-          title: `${overview.pendingAccessRequestCount} solicitud${overview.pendingAccessRequestCount === 1 ? "" : "es"} de acceso`,
-          description: "Hay usuarios esperando aprobación y asignación de permisos.",
-          href: "/configuracion",
-          createdAt: overview.latestAccessRequestAt?.toISOString() ?? new Date().toISOString(),
-          kind: "action" as const,
-        }]
-      : []),
+    ...(overview.pendingAccessRequests ?? []).map((req) => ({
+      id: `access-req-${req.id}`,
+      title: `Solicitud de acceso: ${req.name}`,
+      description: `${req.username} (${req.email}) solicita aprobación y asignación de permisos.`,
+      href: "/configuracion",
+      createdAt: req.createdAt.toISOString(),
+      kind: "action" as const,
+    })),
     ...(overview.latestReceipt
       ? [{
           id: `receipt-${overview.latestReceipt.id}`,

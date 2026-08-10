@@ -15,7 +15,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     pendingWarehouseRequestCount,
     pendingWarehouseRequests,
     pendingAccessRequestCount,
-    latestAccessRequest,
+    pendingAccessRequests,
     latestReceipt,
     recentWarrantyCases,
     recentWarrantyEvents,
@@ -38,10 +38,17 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
       },
     }),
     prisma.accessRequest.count({ where: { status: "PENDING" } }),
-    prisma.accessRequest.findFirst({
+    prisma.accessRequest.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        createdAt: true,
+      },
     }),
     prisma.goodsReceipt.findFirst({
       where: { status: { not: "CANCELLED" } },
@@ -118,7 +125,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     pendingWarehouseRequestCount,
     pendingWarehouseRequests,
     pendingAccessRequestCount,
-    latestAccessRequestAt: latestAccessRequest?.createdAt ?? null,
+    pendingAccessRequests,
+    latestAccessRequestAt: pendingAccessRequests[0]?.createdAt ?? null,
     latestReceipt: latestReceipt
       ? {
           ...latestReceipt,

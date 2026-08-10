@@ -81,6 +81,11 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, []);
 
+  useEffect(() => {
+    setLoadedNotifications(null);
+    setLoadedNotificationCount(null);
+  }, [pathname]);
+
   const visibleNotifications = loadedNotifications ?? notifications;
   const visibleNotificationCount = loadedNotificationCount ?? notificationCount;
 
@@ -88,7 +93,7 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
     const nextOpen = !notificationsOpen;
     setNotificationsOpen(nextOpen);
     setDropdownOpen(false);
-    if (!nextOpen || loadedNotifications !== null || notificationsLoading) return;
+    if (!nextOpen) return;
 
     setNotificationsLoading(true);
     try {
@@ -152,7 +157,11 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
                   <Link
                     key={notification.id}
                     href={notification.href}
-                    onClick={() => setNotificationsOpen(false)}
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      setLoadedNotifications(null);
+                      setLoadedNotificationCount(null);
+                    }}
                     className="group flex gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[#f8fafc]"
                   >
                     <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${notification.kind === "action" ? "bg-[#fff4e5] text-[#b54708]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
