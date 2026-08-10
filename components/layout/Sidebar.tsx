@@ -102,7 +102,7 @@ export function Sidebar({
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-[#e4e7ec] bg-white transition-[width,transform] duration-200 md:relative md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-[#e4e7ec] bg-white transition-[width,transform] duration-200 print:hidden md:relative md:translate-x-0 ${
           collapsed ? "w-[76px]" : "w-[276px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >

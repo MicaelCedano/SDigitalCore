@@ -109,7 +109,7 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center justify-between border-b border-[#e4e7ec] bg-white px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center justify-between border-b border-[#e4e7ec] bg-white px-4 sm:px-6 lg:px-8 print:hidden">
       <div className="flex min-w-0 items-center gap-3">
         <button type="button" onClick={onMobileToggle} className="focus-ring -ml-1 rounded-lg p-2 text-[#475467] hover:bg-[#f2f4f7] md:hidden" aria-label="Abrir navegación">
           <Menu size={21} />

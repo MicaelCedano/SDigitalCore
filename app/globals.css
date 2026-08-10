@@ -107,15 +107,27 @@
 
 @media print {
   @page {
-    margin: 0;
+    margin: 8mm;
   }
 
-  body.invoice-printing > *:not(#invoice-print-root) {
+  /* Ocultar navegacion, topbar, sidebar y elementos print:hidden al imprimir */
+  header,
+  aside,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Soporte para impresiones en ventana modal de facturas y garantias */
+  body.invoice-printing > *:not(#invoice-print-root),
+  body.warranty-printing > *:not(#warranty-print-root) {
     display: none !important;
   }
 
   body.invoice-printing,
-  body.invoice-printing #invoice-print-root {
+  body.invoice-printing #invoice-print-root,
+  body.warranty-printing,
+  body.warranty-printing #warranty-print-root {
     display: block !important;
     width: 100% !important;
     min-height: 0 !important;
@@ -125,41 +137,7 @@
     background: #fff !important;
   }
 
-  body.invoice-printing #invoice-print-root .print-document {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: none !important;
-    min-height: calc(100vh - 20mm) !important;
-    margin: 0 !important;
-    padding: 10mm !important;
-    overflow: visible !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  body.invoice-printing #invoice-print-root .print-document {
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden {
-    display: flex !important;
-    flex: 1 1 auto !important;
-    flex-direction: column !important;
-    min-height: 260px !important;
-  }
-
-  body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden > table {
-    height: 100% !important;
-  }
-
-  body.invoice-printing #invoice-print-root .print-document > div.overflow-hidden > table > tbody {
-    height: 100% !important;
-  }
-
-  body.warranty-printing > *:not(#warranty-print-root) { display: none !important; }
-  body.warranty-printing, body.warranty-printing #warranty-print-root { display: block !important; width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body.invoice-printing #invoice-print-root .print-document,
   body.warranty-printing #warranty-print-root .warranty-print-document {
     display: flex !important;
     flex-direction: column !important;
@@ -180,12 +158,22 @@
     min-height: 38mm !important;
   }
 
-  body.warranty-printing #warranty-print-root .warranty-print-document > div.overflow-hidden > table {
-    height: 100% !important;
+  /* Ajustes para impresion directa de paginas de documentos */
+  .dashboard-shell {
+    display: block !important;
+    background: #fff !important;
+    min-height: auto !important;
   }
 
-  body.warranty-printing #warranty-print-root .warranty-print-document > div.overflow-hidden > table > tbody {
-    height: 100% !important;
+  .dashboard-main {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
   }
 }
 
