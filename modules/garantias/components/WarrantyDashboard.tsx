@@ -23,6 +23,7 @@ import { listWarrantyCases } from "@/modules/garantias/actions/warranty";
 import { WarrantyStatusBadge } from "@/modules/garantias/components/WarrantyStatusBadge";
 import { WARRANTY_STATUS_LABELS } from "@/modules/garantias/lib/status-machine";
 import { WarrantyQuickActions } from "@/modules/garantias/components/WarrantyQuickActions";
+import { WarrantyCaseDetailDrawer } from "@/modules/garantias/components/WarrantyCaseDetailDrawer";
 import type { WarrantyFlowCase, WarrantyFlowOperation } from "@/modules/garantias/components/WarrantyFlow";
 
 type CaseRow = {
@@ -78,6 +79,7 @@ export function WarrantyDashboard({
   const [olderThan30, setOlderThan30] = useState(false);
   const [archive, setArchive] = useState<"active" | "archived" | "all">("active");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<CaseRow | null>(null);
   const [isPending, startTransition] = useTransition();
   const [refreshVersion, setRefreshVersion] = useState(0);
   const firstRender = useRef(true);
@@ -171,13 +173,62 @@ export function WarrantyDashboard({
           <div className={`overflow-x-auto transition-opacity ${isPending ? "opacity-50" : ""}`}>
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="bg-[#f8fafc] text-[11px] uppercase tracking-[0.08em] text-[#667085]"><tr><th className="px-5 py-3 font-semibold">Caso</th><th className="px-5 py-3 font-semibold">Cliente</th><th className="px-5 py-3 font-semibold">Equipo</th><th className="px-5 py-3 font-semibold">Falla reportada</th><th className="px-5 py-3 font-semibold">Estado</th><th className="px-5 py-3 font-semibold">Ingreso</th></tr></thead>
-              <tbody className="divide-y divide-[#f0f1f3]">{rows.map((item) => <tr key={item.id} className={`group transition hover:bg-[#f8fafc] ${item.archivedAt ? "bg-slate-50/70 opacity-75" : ""}`}><td className="px-5 py-4"><Link href={`/garantias/${item.caseCode}`} className="font-mono text-xs font-bold text-indigo-600 hover:underline">{item.caseCode}</Link><p className="mt-1 text-[11px] text-[#98a2b3]">{item.archivedAt ? <><Archive size={11} className="inline" /> Archivado</> : <>Ver detalle <ArrowUpRight size={12} className="inline" /></>}</p></td><td className="px-5 py-4 font-medium text-[#344054]">{item.clientName}</td><td className="px-5 py-4"><p className="font-medium text-[#344054]">{item.model}</p><p className="mt-1 font-mono text-[11px] text-[#667085]">IMEI {item.imei}</p></td><td className="max-w-[260px] px-5 py-4 text-[#667085]"><p className="truncate" title={item.problem}>{item.problem}</p></td><td className="px-5 py-4"><WarrantyStatusBadge status={item.status} /></td><td className="whitespace-nowrap px-5 py-4 text-xs text-[#667085]">{formatDate(item.entryDate)}</td></tr>)}{rows.length === 0 && <tr><td colSpan={6} className="px-5 py-16 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f4f7] text-[#667085]"><Search size={20} /></span><p className="mt-3 font-medium text-[#344054]">No encontramos casos</p><p className="mt-1 text-sm text-[#667085]">Prueba cambiando la búsqueda o los filtros.</p></td></tr>}</tbody>
+              <tbody className="divide-y divide-[#f0f1f3]">
+                {rows.map((item) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => setSelectedCase(item)}
+                    className={`group cursor-pointer transition hover:bg-[#f8fafc] ${item.archivedAt ? "bg-slate-50/70 opacity-75" : ""}`}
+                  >
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCase(item);
+                        }}
+                        className="font-mono text-xs font-bold text-indigo-600 hover:underline"
+                      >
+                        {item.caseCode}
+                      </button>
+                      <p className="mt-1 text-[11px] text-[#98a2b3]">
+                        {item.archivedAt ? (
+                          <><Archive size={11} className="inline" /> Archivado</>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCase(item);
+                            }}
+                            className="hover:text-indigo-600 hover:underline"
+                          >
+                            Ver detalle <ArrowUpRight size={12} className="inline" />
+                          </button>
+                        )}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4 font-medium text-[#344054]">{item.clientName}</td>
+                    <td className="px-5 py-4"><p className="font-medium text-[#344054]">{item.model}</p><p className="mt-1 font-mono text-[11px] text-[#667085]">IMEI {item.imei}</p></td>
+                    <td className="max-w-[260px] px-5 py-4 text-[#667085]"><p className="truncate" title={item.problem}>{item.problem}</p></td>
+                    <td className="px-5 py-4"><WarrantyStatusBadge status={item.status} /></td>
+                    <td className="whitespace-nowrap px-5 py-4 text-xs text-[#667085]">{formatDate(item.entryDate)}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={6} className="px-5 py-16 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f4f7] text-[#667085]"><Search size={20} /></span><p className="mt-3 font-medium text-[#344054]">No encontramos casos</p><p className="mt-1 text-sm text-[#667085]">Prueba cambiando la búsqueda o los filtros.</p></td></tr>
+                )}
+              </tbody>
             </table>
           </div>
           <div className="flex flex-col gap-3 border-t border-[#e4e7ec] px-5 py-3 text-xs text-[#667085] sm:flex-row sm:items-center sm:justify-between"><span>Mostrando {rows.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, totalRows)} de {totalRows}</span><div className="flex items-center gap-2"><button type="button" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1 || isPending} className="rounded-lg border border-[#d0d5dd] p-1.5 disabled:opacity-40"><ChevronLeft size={16} /></button><span className="min-w-16 text-center">Página {currentPage} / {pageCount}</span><button type="button" onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))} disabled={currentPage >= pageCount || isPending} className="rounded-lg border border-[#d0d5dd] p-1.5 disabled:opacity-40"><ChevronRight size={16} /></button></div></div>
         </div>
-
       </section>
+
+      <WarrantyCaseDetailDrawer
+        item={selectedCase}
+        onClose={() => setSelectedCase(null)}
+      />
     </div>
   );
 }
