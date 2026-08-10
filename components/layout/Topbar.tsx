@@ -29,23 +29,25 @@ interface TopbarProps {
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Resumen general",
-  "/inventario": "Inventario y equipos",
   "/almacen": "Almacén y solicitudes",
+  "/garantias": "Gestión de Garantías",
+  "/precios": "Lista de precios",
+  "/facturas": "Facturas y comprobantes",
+  "/inventario": "Inventario y equipos",
   "/ventas": "Ventas y facturación",
   "/taller": "Taller y reparaciones",
-  "/rma": "RMA y garantías",
+  "/rma": "Gestión de Garantías",
   "/qc": "Control de calidad",
   "/clientes": "Clientes",
   "/proveedores": "Proveedores",
-  "/precios": "Lista de precios",
-  "/facturas": "Facturas y comprobantes",
   "/reportes": "Reportes",
   "/configuracion": "Configuración",
   "/perfil": "Mi perfil",
 };
 
 function getPageTitle(pathname: string) {
-  return Object.entries(pageTitles).find(([path]) => pathname === path || pathname.startsWith(`${path}/`))?.[1] ?? "SDigitalCore";
+  const match = Object.entries(pageTitles).find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
+  return match?.[1] ?? "Señal Digital";
 }
 
 function getInitials(name?: string | null) {
