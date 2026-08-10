@@ -100,9 +100,9 @@ export async function getWarehouseProductsAction(query?: string) {
 
     return { success: true, data: products };
   } catch (error: unknown) {
-    const prismaError = error as { code?: string; meta?: { column?: string } };
+    const prismaError = error as { code?: string; meta?: { modelName?: string } };
     const missingStatusColumn =
-      prismaError.code === "P2022" && String(prismaError.meta?.column ?? "").toLowerCase().includes("status");
+      prismaError.code === "P2022" && prismaError.meta?.modelName === "WarehouseProduct";
 
     if (missingStatusColumn) {
       const legacyWhere: Prisma.WarehouseProductWhereInput = {};
