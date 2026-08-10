@@ -34,7 +34,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 horas
+    // Sesión persistente: evita expulsar al usuario durante la jornada y
+    // permite que Auth.js renueve el JWT mientras siga usando la aplicación.
+    maxAge: 30 * 24 * 60 * 60, // 30 días
+    updateAge: 24 * 60 * 60, // renovar como máximo una vez al día
   },
   callbacks: {
     async jwt({ token, user }) {
