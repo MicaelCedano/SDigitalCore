@@ -244,6 +244,14 @@ export function GoodsReceiptForm({
     });
   };
 
+  const countValidImeis = (text: string | null | undefined): number => {
+    if (!text) return 0;
+    return text
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0).length;
+  };
+
   const handleColorVariantChange = (
     itemIndex: number,
     variantIndex: number,
@@ -253,16 +261,26 @@ export function GoodsReceiptForm({
     setItems((prev) => {
       const updated = [...prev];
       const currentVariants = [...(updated[itemIndex].colorVariants || [])];
-      currentVariants[variantIndex] = {
+      
+      const updatedVariant: any = {
         ...currentVariants[variantIndex],
         [field]: value,
       };
 
-      // Si el campo modificado es la cantidad o imeis, recalculamos la cantidad total del ítem
+      if (field === "imeis") {
+        const imeiCount = countValidImeis(value);
+        if (imeiCount > 0) {
+          updatedVariant.quantity = imeiCount;
+        }
+      }
+
+      currentVariants[variantIndex] = updatedVariant;
+
+      // Recalcular la cantidad total del ítem sumando variantes
       const newTotalQty = currentVariants.reduce((sum, v) => {
-        const imeiCount = v.imeis ? v.imeis.split("\n").filter((s: string) => s.trim() !== "").length : 0;
+        const imeiCount = countValidImeis(v.imeis);
         const qty = Number(v.quantity) || 1;
-        return sum + Math.max(qty, imeiCount);
+        return sum + (imeiCount > 0 ? imeiCount : qty);
       }, 0);
 
       updated[itemIndex] = {
@@ -306,24 +324,27 @@ export function GoodsReceiptForm({
             .filter(Boolean)
             .join("\n");
 
-          const totalQty = (i.colorVariants || []).reduce(
-            (sum: number, v: any) => sum + (Number(v.quantity) || 1),
-            0
-          );
+          const totalQty = (i.colorVariants || []).reduce((sum: number, v: any) => {
+            const imeiCount = countValidImeis(v.imeis);
+            return sum + (imeiCount > 0 ? imeiCount : Number(v.quantity) || 1);
+          }, 0);
 
           return {
             code: i.code ? String(i.code).trim() : null,
             description: String(i.description).trim(),
             quantity: Math.max(1, totalQty || Number(i.quantity) || 1),
-            unitPrice: i.unitPrice !== undefined && i.unitPrice !== "" ? Number(i.unitPrice) : null,
+            unitPrice: null,
             condition: i.condition || "Nuevo",
             imeiOrSerial: allImeis || i.imeiOrSerial || null,
-            colorVariants: (i.colorVariants || []).map((v: any) => ({
-              color: v.color || "General",
-              quantity: Number(v.quantity) || 1,
-              unitPrice: v.unitPrice ? Number(v.unitPrice) : null,
-              imeis: v.imeis || null,
-            })),
+            colorVariants: (i.colorVariants || []).map((v: any) => {
+              const vImeiCount = countValidImeis(v.imeis);
+              return {
+                color: v.color && v.color.trim() ? v.color.trim() : "General",
+                quantity: vImeiCount > 0 ? vImeiCount : Number(v.quantity) || 1,
+                unitPrice: null,
+                imeis: v.imeis || null,
+              };
+            }),
             notes: i.notes ? String(i.notes).trim() : null,
           };
         }),
@@ -357,11 +378,11 @@ export function GoodsReceiptForm({
       items: items.map((i) => ({
         code: i.code,
         description: i.description || "Producto no especificado",
-        quantity: (i.colorVariants || []).reduce(
-          (sum: number, v: any) => sum + (Number(v.quantity) || 1),
-          0
-        ) || Number(i.quantity) || 1,
-        unitPrice: i.unitPrice ? Number(i.unitPrice) : 0,
+        quantity: (i.colorVariants || []).reduce((sum: number, v: any) => {
+          const imeiCount = countValidImeis(v.imeis);
+          return sum + (imeiCount > 0 ? imeiCount : Number(v.quantity) || 1);
+        }, 0) || Number(i.quantity) || 1,
+        unitPrice: 0,
         condition: i.condition || "Nuevo",
         imeiOrSerial: (i.colorVariants || []).map((v: any) => `${v.color ? v.color + ": " : ""}${v.imeis || ""}`).join(" | "),
         notes: i.notes,
@@ -370,20 +391,14 @@ export function GoodsReceiptForm({
   };
 
   const totalQty = items.reduce((acc, item) => {
-    const itemQty = (item.colorVariants || []).reduce(
-      (sum: number, v: any) => sum + (Number(v.quantity) || 1),
-      0
-    );
+    const itemQty = (item.colorVariants || []).reduce((sum: number, v: any) => {
+      const imeiCount = countValidImeis(v.imeis);
+      return sum + (imeiCount > 0 ? imeiCount : Number(v.quantity) || 1);
+    }, 0);
     return acc + (itemQty || Number(item.quantity) || 1);
   }, 0);
 
-  const totalAmount = items.reduce((acc, item) => {
-    const itemSubtotal = (item.colorVariants || []).reduce(
-      (sum: number, v: any) => sum + (Number(v.quantity) || 1) * (Number(v.unitPrice || item.unitPrice) || 0),
-      0
-    );
-    return acc + itemSubtotal;
-  }, 0);
+  const totalAmount = 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -725,10 +740,10 @@ export function GoodsReceiptForm({
                               )}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                                  Nombre del Color <span className="text-red-500">*</span>
+                                  Nombre del Color <span className="text-slate-400 font-normal">(Opcional)</span>
                                 </label>
                                 <input
                                   type="text"
@@ -736,47 +751,47 @@ export function GoodsReceiptForm({
                                   onChange={(e) =>
                                     handleColorVariantChange(itemIdx, vIdx, "color", e.target.value)
                                   }
-                                  placeholder="Ej. Azul Titania"
+                                  placeholder="Ej. Azul Titania (ó General)"
                                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                                  Cantidad
+                                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5 flex items-center justify-between">
+                                  <span>Cantidad</span>
+                                  {countValidImeis(v.imeis) > 0 && (
+                                    <span className="text-[10px] font-bold text-emerald-600">
+                                      Calculada por IMEIs ({countValidImeis(v.imeis)} uds)
+                                    </span>
+                                  )}
                                 </label>
                                 <input
                                   type="number"
                                   min={1}
-                                  value={v.quantity}
+                                  value={countValidImeis(v.imeis) > 0 ? countValidImeis(v.imeis) : (v.quantity || 1)}
                                   onChange={(e) =>
                                     handleColorVariantChange(itemIdx, vIdx, "quantity", e.target.value)
                                   }
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#5750f1]"
+                                  disabled={countValidImeis(v.imeis) > 0}
+                                  className={`w-full border rounded-md px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#5750f1] ${
+                                    countValidImeis(v.imeis) > 0
+                                      ? "bg-emerald-50 text-emerald-800 border-emerald-300 cursor-not-allowed"
+                                      : "bg-slate-50 border-slate-200"
+                                  }`}
                                 />
                               </div>
 
-                              <div>
-                                <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                                  Costo Unitario (RD$)
-                                </label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={v.unitPrice ?? ""}
-                                  onChange={(e) =>
-                                    handleColorVariantChange(itemIdx, vIdx, "unitPrice", e.target.value)
-                                  }
-                                  placeholder="0.00"
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
-                                />
-                              </div>
-
-                              <div className="sm:col-span-3">
-                                <label className="block text-[10px] font-semibold text-slate-700 mb-0.5 flex items-center gap-1">
-                                  <Barcode className="w-3 h-3 text-emerald-600" /> IMEIs / Series para el color{" "}
-                                  <strong className="text-emerald-700">{v.color || "seleccionado"}</strong>
+                              <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-semibold text-slate-700 mb-0.5 flex items-center justify-between">
+                                  <span className="flex items-center gap-1">
+                                    <Barcode className="w-3 h-3 text-emerald-600" /> IMEIs / Series para el color{" "}
+                                    <strong className="text-emerald-700">{v.color || "General"}</strong>
+                                  </span>
+                                  {countValidImeis(v.imeis) > 0 && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                                      {countValidImeis(v.imeis)} {countValidImeis(v.imeis) === 1 ? "IMEI detectado" : "IMEIs detectados"}
+                                    </span>
+                                  )}
                                 </label>
                                 <textarea
                                   rows={2}
@@ -784,7 +799,7 @@ export function GoodsReceiptForm({
                                   onChange={(e) =>
                                     handleColorVariantChange(itemIdx, vIdx, "imeis", e.target.value)
                                   }
-                                  placeholder="356891092837461&#10;356891092837462"
+                                  placeholder="Pegar o escanear IMEIs (uno por línea o separados por comas)"
                                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs font-mono text-emerald-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                                 />
                               </div>

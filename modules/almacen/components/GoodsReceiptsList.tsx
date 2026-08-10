@@ -25,6 +25,7 @@ import {
   Filter,
   Truck,
   PackageCheck,
+  Pencil,
 } from "lucide-react";
 
 export function GoodsReceiptsList() {
@@ -147,7 +148,13 @@ export function GoodsReceiptsList() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-2xs flex items-center justify-between">
+        <div
+          onClick={() => setStatusFilter("DRAFT")}
+          className={`bg-white border p-4 rounded-xl shadow-2xs flex items-center justify-between cursor-pointer transition-all hover:border-amber-400 ${
+            statusFilter === "DRAFT" ? "ring-2 ring-amber-500/20 border-amber-400 bg-amber-50/20" : "border-slate-200"
+          }`}
+          title="Ver solo borradores pendientes"
+        >
           <div>
             <span className="text-xs text-slate-500 block font-medium">Borradores Pendientes</span>
             <span className="text-2xl font-bold text-amber-600">{draftReceipts}</span>
@@ -258,11 +265,22 @@ export function GoodsReceiptsList() {
                     year: "numeric",
                   });
 
+                  const isDraft = receipt.status === "DRAFT";
+
                   return (
                     <tr
                       key={receipt.id}
-                      onClick={() => setSelectedReceiptForDetail(receipt)}
-                      className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                      onClick={() => {
+                        if (isDraft) {
+                          setSelectedReceiptForEdit(receipt);
+                          setShowFormModal(true);
+                        } else {
+                          setSelectedReceiptForDetail(receipt);
+                        }
+                      }}
+                      className={`hover:bg-slate-50/80 cursor-pointer transition-colors group ${
+                        isDraft ? "bg-amber-50/30" : ""
+                      }`}
                     >
                       <td className="px-4 py-4 font-mono font-bold text-[#5750f1] group-hover:underline">
                         {receipt.receiptNumber}
@@ -297,16 +315,30 @@ export function GoodsReceiptsList() {
                       <td className="px-4 py-4 text-slate-600">{receipt.receivedBy}</td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedReceiptForDetail(receipt);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-[#5750f1] hover:bg-slate-100 rounded-lg transition-colors"
-                            title="Ver Detalle"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          {isDraft ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedReceiptForEdit(receipt);
+                                setShowFormModal(true);
+                              }}
+                              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs"
+                              title="Continuar o Editar Borrador"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-amber-600" /> Editar Borrador
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedReceiptForDetail(receipt);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-[#5750f1] hover:bg-slate-100 rounded-lg transition-colors"
+                              title="Ver Detalle"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
 
                           {receipt.status !== "CANCELLED" ? <button
                             onClick={(e) => handleDelete(receipt.id, e)}
@@ -347,6 +379,11 @@ export function GoodsReceiptsList() {
         <GoodsReceiptDetailModal
           receipt={selectedReceiptForDetail}
           onClose={() => setSelectedReceiptForDetail(null)}
+          onEdit={(r) => {
+            setSelectedReceiptForDetail(null);
+            setSelectedReceiptForEdit(r);
+            setShowFormModal(true);
+          }}
         />
       )}
     </div>

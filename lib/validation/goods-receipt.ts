@@ -2,7 +2,10 @@ import { z } from "zod";
 
 export const colorVariantSchema = z.object({
   id: z.string().optional(),
-  color: z.string().min(1, "El color es requerido"),
+  color: z.preprocess(
+    (val) => (typeof val === "string" && val.trim() === "" ? "General" : val),
+    z.string().optional().nullable().default("General")
+  ),
   quantity: z.number().int().min(1, "La cantidad debe ser al menos 1").default(1),
   unitPrice: z.number().min(0).optional().nullable(),
   imeis: z.string().optional().nullable(),

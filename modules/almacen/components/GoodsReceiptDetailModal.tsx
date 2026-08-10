@@ -9,16 +9,19 @@ import {
   Layers,
   Palette,
   Truck,
+  Pencil,
 } from "lucide-react";
 
 interface GoodsReceiptDetailModalProps {
   receipt: any;
   onClose: () => void;
+  onEdit?: (receipt: any) => void;
 }
 
 export function GoodsReceiptDetailModal({
   receipt,
   onClose,
+  onEdit,
 }: GoodsReceiptDetailModalProps) {
   if (!receipt) return null;
 
@@ -285,12 +288,26 @@ export function GoodsReceiptDetailModal({
           >
             <FileSpreadsheet className="w-4 h-4" /> Descargar Excel
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs transition-colors"
-          >
-            Cerrar
-          </button>
+          
+          <div className="flex items-center gap-2">
+            {receipt.status === "DRAFT" && onEdit && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit(receipt);
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <Pencil className="w-4 h-4" /> Editar / Finalizar Borrador
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     </div>
