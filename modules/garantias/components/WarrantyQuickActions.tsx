@@ -153,18 +153,21 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             aria-modal="true"
             aria-label="Registrar ingreso"
           >
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-600">Garantías · Lateral</p>
-                <h2 className="mt-0.5 text-xl font-black text-[#101828]">Registrar Ingreso de Garantía</h2>
+            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-3.5">
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                  Garantías
+                </span>
+                <span className="text-xs text-[#98a2b3]">/</span>
+                <span className="text-xs font-semibold text-[#344054]">Registrar Ingreso</span>
               </div>
               <button
                 type="button"
                 onClick={() => setIntakeOpen(false)}
-                className="rounded-lg p-2 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
+                className="rounded-lg p-1.5 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
                 aria-label="Cerrar panel lateral"
               >
-                <X size={20} />
+                <X size={19} />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -187,34 +190,21 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             aria-modal="true"
             aria-label={active.label}
           >
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-4">
-              <div>
-                <p
-                  className={`text-xs font-bold uppercase tracking-[0.15em] ${
-                    active.tone === "violet"
-                      ? "text-violet-600"
-                      : active.tone === "blue"
-                      ? "text-blue-600"
-                      : active.tone === "orange"
-                      ? "text-orange-600"
-                      : active.tone === "amber"
-                      ? "text-amber-600"
-                      : active.tone === "emerald"
-                      ? "text-emerald-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  Garantías · Panel Lateral
-                </p>
-                <h2 className="mt-0.5 text-xl font-black text-[#101828]">{active.label}</h2>
+            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-3.5">
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                  Garantías
+                </span>
+                <span className="text-xs text-[#98a2b3]">/</span>
+                <span className="text-xs font-semibold text-[#344054]">{active.label}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setOpenOperation(null)}
-                className="rounded-lg p-2 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
+                className="rounded-lg p-1.5 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
                 aria-label="Cerrar panel lateral"
               >
-                <X size={20} />
+                <X size={19} />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
