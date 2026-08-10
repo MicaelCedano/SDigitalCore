@@ -1,0 +1,7 @@
+import { requirePermission } from "@/lib/auth/helpers";
+import { prisma } from "@/lib/db/prisma";
+import { WarrantyFlow } from "@/modules/garantias/components/WarrantyFlow";
+import type { WarrantyStatus } from "@prisma/client";
+const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED"], receiveTech: ["IN_REPAIR"], sendSupplier: ["RECEIVED","IN_REPAIR","RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], deliver: ["RECEIVED","RECEIVED_FROM_TECHNICIAN","RECEIVED_FROM_SUPPLIER"], credit: ["RECEIVED","IN_REPAIR","RECEIVED_FROM_TECHNICIAN","SENT_TO_SUPPLIER","RECEIVED_FROM_SUPPLIER"] };
+type Operation = "assign" | "receiveTech" | "sendSupplier" | "receiveSupplier" | "deliver" | "credit";
+export async function renderWarrantyFlow(operation: Operation) { await requirePermission("warranties.transition"); const cases = await prisma.warrantyCase.findMany({ where: { archivedAt: null, status: { in: eligible[operation] } }, orderBy: { entryDate: "asc" }, take: 200, select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true } }); return <div className="mx-auto max-w-[1000px]"><WarrantyFlow operation={operation} cases={cases}/></div>; }

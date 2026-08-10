@@ -33,6 +33,13 @@ model User {
   sessions Session[]
   auditLogs AuditLog[]
 
+  warrantiesCreated WarrantyCase[] @relation("WarrantyCreatedBy")
+  warrantiesUpdated WarrantyCase[] @relation("WarrantyUpdatedBy")
+  warrantiesAssigned WarrantyCase[] @relation("WarrantyAssignedTechnician")
+  warrantiesArchived WarrantyCase[] @relation("WarrantyArchivedBy")
+  warrantyEvents WarrantyEvent[]
+  warrantyDocuments WarrantyDocument[]
+
   @@map("user")
 }
 
@@ -139,6 +146,142 @@ enum GoodsReceiptStatus {
   CANCELLED
 
   @@map("goods_receipt_status")
+}
+
+enum WarrantyStatus {
+  RECEIVED
+  IN_REPAIR
+  RECEIVED_FROM_TECHNICIAN
+  SENT_TO_SUPPLIER
+  RECEIVED_FROM_SUPPLIER
+  DELIVERED
+  CREDIT_NOTE
+
+  @@map("warranty_status")
+}
+
+enum WarrantyEventType {
+  CREATED
+  DETAILS_UPDATED
+  STATUS_CHANGED
+  ASSIGNED_TO_TECHNICIAN
+  RECEIVED_REPAIRED
+  RECEIVED_UNREPAIRED
+  SENT_TO_SUPPLIER
+  RECEIVED_FROM_SUPPLIER
+  DELIVERED_TO_CUSTOMER
+  CREDIT_NOTE_MARKED
+  ARCHIVED
+  RESTORED
+
+  @@map("warranty_event_type")
+}
+
+enum WarrantyDocumentType {
+  INTAKE_RECEIPT
+  TECHNICIAN_ASSIGNMENT
+  TECHNICIAN_RECEIPT_REPAIRED
+  TECHNICIAN_RECEIPT_UNREPAIRED
+  SUPPLIER_SHIPMENT
+  SUPPLIER_RECEIPT
+  CUSTOMER_DELIVERY
+
+  @@map("warranty_document_type")
+}
+
+model WarrantyCase {
+  id                    String   @id @default(cuid())
+  caseCode              String   @unique @map("case_code")
+  imei                  String
+  model                 String
+  clientName            String   @map("client_name")
+  problem               String   @db.Text
+  status                WarrantyStatus @default(RECEIVED)
+  entryDate             DateTime @db.Date @map("entry_date")
+  createdById           String?  @map("created_by_id")
+  updatedById           String?  @map("updated_by_id")
+  assignedTechnicianId  String?  @map("assigned_technician_id")
+  assignedTechnicianName String? @map("assigned_technician_name")
+  currentSupplierName   String?  @map("current_supplier_name")
+  archivedAt            DateTime? @map("archived_at")
+  archivedById          String?  @map("archived_by_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  createdBy User? @relation("WarrantyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User? @relation("WarrantyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  assignedTechnician User? @relation("WarrantyAssignedTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  archivedBy User? @relation("WarrantyArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+  events WarrantyEvent[]
+  documentItems WarrantyDocumentItem[]
+
+  @@index([imei, createdAt])
+  @@index([status, entryDate])
+  @@index([clientName])
+  @@index([archivedAt])
+  @@map("warranty_case")
+}
+
+model WarrantyEvent {
+  id String @id @default(cuid())
+  caseId String @map("case_id")
+  type WarrantyEventType
+  fromStatus WarrantyStatus? @map("from_status")
+  toStatus WarrantyStatus? @map("to_status")
+  actorId String? @map("actor_id")
+  actorNameSnapshot String? @map("actor_name_snapshot")
+  counterpartyName String? @map("counterparty_name")
+  reason String? @db.Text
+  beforeData Json? @map("before_data")
+  afterData Json? @map("after_data")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([caseId, createdAt])
+  @@map("warranty_event")
+}
+
+model WarrantyDocument {
+  id String @id @default(cuid())
+  documentCode String @unique @map("document_code")
+  type WarrantyDocumentType
+  counterpartyName String @map("counterparty_name")
+  documentDate DateTime @db.Date @map("document_date")
+  createdById String? @map("created_by_id")
+  notes String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items WarrantyDocumentItem[]
+
+  @@index([type, documentDate])
+  @@map("warranty_document")
+}
+
+model WarrantyDocumentItem {
+  id String @id @default(cuid())
+  documentId String @map("document_id")
+  caseId String @map("case_id")
+  sortOrder Int @default(0) @map("sort_order")
+
+  document WarrantyDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  case WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, caseId])
+  @@index([caseId])
+  @@map("warranty_document_item")
+}
+
+model WarrantyDailySequence {
+  id String @id @default(cuid())
+  sequenceDate DateTime @db.Date @map("sequence_date")
+  sequenceType String @map("sequence_type")
+  lastValue Int @default(0) @map("last_value")
+
+  @@unique([sequenceDate, sequenceType])
+  @@map("warranty_daily_sequence")
 }
 
 // ============================================================

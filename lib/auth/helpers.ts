@@ -26,13 +26,14 @@ export async function requireUser() {
  */
 export async function requirePermission(permission: string) {
   const user = await requireUser();
+  if (!user.id) throw new Error("La sesiÃ³n no tiene un usuario persistido.");
   const hasPermission = await can(permission);
   if (!hasPermission) {
     throw new Error(
       `Acceso denegado: no tienes el permiso "${permission}". Usuario: ${user.email}`
     );
   }
-  return user;
+  return user as typeof user & { id: string };
 }
 
 /**
@@ -66,6 +67,7 @@ export async function can(permission: string): Promise<boolean> {
       invoices: "facturas",
       reports: "reportes",
       settings: "configuracion",
+      warranties: "garantias",
     };
     const moduleKey = moduleAliases[permissionModule] ?? permissionModule;
     return persistedUser.allowedModules.includes(moduleKey);
