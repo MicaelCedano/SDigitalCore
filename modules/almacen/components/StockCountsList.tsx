@@ -54,7 +54,7 @@ export function StockCountsList() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Estás seguro de eliminar este registro de conteo?")) {
+    if (confirm("¿Deseas anular este conteo? Se conservará en el historial.")) {
       await deleteStockCountAction(id);
       fetchCounts();
     }
@@ -350,13 +350,13 @@ export function StockCountsList() {
                               <Pencil className="w-4 h-4" />
                             </button>
                           )}
-                          <button
+                          {c.status !== "CANCELLED" ? <button
                             onClick={(e) => handleDelete(c.id, e)}
                             className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                            title="Eliminar conteo"
+                            title="Anular conteo"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button> : null}
                         </div>
                       </td>
                     </tr>

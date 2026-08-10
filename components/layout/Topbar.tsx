@@ -6,6 +6,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User } from "lucide-react";
+import { GlobalImeiSearch } from "@/components/layout/GlobalImeiSearch";
 
 export interface TopbarNotification {
   id: string;
@@ -117,6 +118,7 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
+        <GlobalImeiSearch />
         <div className="relative" ref={notificationsRef}>
           <button
             type="button"

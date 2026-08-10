@@ -5,26 +5,11 @@ import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { stockCountSchema, StockCountInput } from "@/lib/validation/stock-count";
+import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 
 /**
  * Genera un número de folio correlativo único para conteo (Ej: CNT-20260807-001)
  */
-async function generateCountNumber(): Promise<string> {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const prefix = `CNT-${dateStr}-`;
-
-  const countToday = await prisma.stockCount.count({
-    where: {
-      countNumber: {
-        startsWith: prefix,
-      },
-    },
-  });
-
-  const nextNum = (countToday + 1).toString().padStart(3, "0");
-  return `${prefix}${nextNum}`;
-}
-
 /**
  * Crea o guarda una auditoría de conteo de stock (En Proceso o Completado)
  */
@@ -44,6 +29,9 @@ export async function saveStockCountAction(input: StockCountInput) {
       });
 
       if (existing) {
+        if (existing.status !== "IN_PROGRESS") {
+          return { success: false, error: "Solo los conteos en proceso pueden modificarse." };
+        }
         const updated = await prisma.$transaction(async (tx) => {
           await tx.stockCountItem.deleteMany({
             where: { countId: validated.id },
@@ -89,10 +77,9 @@ export async function saveStockCountAction(input: StockCountInput) {
     }
 
     // Crear nuevo conteo
-    const countNumber = await generateCountNumber();
-
-    const created = await prisma.stockCount.create({
-      data: {
+    const created = await prisma.$transaction(async (tx) => {
+      const countNumber = await nextOperationalNumber(tx, "STOCK_COUNT", "CNT");
+      return tx.stockCount.create({ data: {
         countNumber,
         title: validated.title,
         branch: validated.branch,
@@ -118,14 +105,13 @@ export async function saveStockCountAction(input: StockCountInput) {
           }),
         },
       },
-      include: {
-        items: true,
-      },
+      include: { items: true },
+      });
     });
     await logAudit({ userId: user.id, action: "stock_count.create", module: "almacen", entityType: "stock_count", entityId: created.id, afterData: { countNumber: created.countNumber, status: created.status, itemCount: created.items.length } });
 
     revalidatePath("/almacen/conteos");
-    return { success: true, data: created, message: `Conteo ${countNumber} registrado exitosamente` };
+    return { success: true, data: created, message: `Conteo ${created.countNumber} registrado exitosamente` };
   } catch (error: any) {
     console.error("Error al guardar conteo de stock:", error);
     return {
@@ -215,14 +201,15 @@ export async function deleteStockCountAction(id: string) {
   try {
     const actor = await requirePermission("warehouse.write");
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
-    const deleted = await prisma.stockCount.delete({
-      where: { id },
-    });
-    await logAudit({ userId: actor.id, action: "stock_count.delete", module: "almacen", entityType: "stock_count", entityId: deleted.id, beforeData: { countNumber: deleted.countNumber, status: deleted.status } });
+    const existing = await prisma.stockCount.findUnique({ where: { id } });
+    if (!existing) return { success: false, error: "Conteo no encontrado" };
+    if (existing.status === "CANCELLED") return { success: false, error: "El conteo ya está anulado" };
+    const cancelled = await prisma.stockCount.update({ where: { id }, data: { status: "CANCELLED", completedAt: null } });
+    await logAudit({ userId: actor.id, action: "stock_count.cancel", module: "almacen", entityType: "stock_count", entityId: cancelled.id, beforeData: { countNumber: existing.countNumber, status: existing.status }, afterData: { status: cancelled.status } });
 
     revalidatePath("/almacen/conteos");
-    return { success: true, message: "Conteo eliminado" };
+    return { success: true, message: "Conteo anulado; su historial fue conservado" };
   } catch (error: any) {
-    return { success: false, error: "Error al eliminar el conteo" };
+    return { success: false, error: "Error al anular el conteo" };
   }
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requirePermission } from "@/lib/auth/helpers";
+import { getPersistedCurrentUser, requirePermission } from "@/lib/auth/helpers";
 import { hashPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
 import { accessRequestSchema, type AccessRequestInput } from "@/lib/validation/access-request";
@@ -86,6 +86,10 @@ function messageFrom(error: unknown, fallback: string) {
 
 async function requireUserAdmin() {
   const user = await requirePermission("settings.manage");
+  const persistedUser = await getPersistedCurrentUser();
+  if (!persistedUser || persistedUser.status !== "ACTIVE" || persistedUser.roleCode !== "ADMIN") {
+    throw new Error("Acceso denegado: esta operación requiere el rol ADMIN.");
+  }
   if (!user.id) throw new Error("La sesión no tiene un usuario identificable.");
   return { ...user, id: user.id };
 }
@@ -192,7 +196,9 @@ export async function approveAccessRequestAction(requestId: string, roleCode: st
 export async function rejectAccessRequestAction(requestId: string) {
   try {
     const actor = await requireUserAdmin();
-    const updated = await prisma.accessRequest.update({ where: { id: requestId }, data: { status: "REJECTED" } });
+    const changed = await prisma.accessRequest.updateMany({ where: { id: requestId, status: "PENDING" }, data: { status: "REJECTED" } });
+    if (changed.count !== 1) throw new Error("La solicitud ya fue procesada o no existe.");
+    const updated = await prisma.accessRequest.findUniqueOrThrow({ where: { id: requestId } });
     await logAudit({ userId: actor.id, action: "access_request.reject", module: "configuracion", entityType: "access_request", entityId: requestId });
     revalidatePath("/configuracion");
     revalidatePath("/dashboard");
@@ -254,10 +260,12 @@ export async function deleteUserAction(userId: string) {
   try {
     const actor = await requireUserAdmin();
     if (userId === actor.id) return { success: false as const, error: "La cuenta actual está protegida." };
-    await prisma.user.delete({ where: { id: userId } });
-    await logAudit({ userId: actor.id, action: "user.delete", module: "configuracion", entityType: "user", entityId: userId });
+    const existing = await prisma.user.findUnique({ where: { id: userId }, select: { status: true, email: true, roleCode: true } });
+    if (!existing) return { success: false as const, error: "Usuario no encontrado." };
+    await prisma.user.update({ where: { id: userId }, data: { status: "BLOCKED" } });
+    await logAudit({ userId: actor.id, action: "user.archive", module: "configuracion", entityType: "user", entityId: userId, beforeData: existing, afterData: { status: "BLOCKED" } });
     revalidatePath("/configuracion");
-    return { success: true as const };
+    return { success: true as const, message: "Usuario bloqueado; su historial fue conservado." };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo eliminar el usuario.") };
   }
@@ -266,19 +274,23 @@ export async function deleteUserAction(userId: string) {
 export async function deleteAccessRequestAction(requestId: string) {
   try {
     const actor = await requireUserAdmin();
-    const deleted = await prisma.accessRequest.delete({ where: { id: requestId } });
+    const existing = await prisma.accessRequest.findUnique({ where: { id: requestId } });
+    if (!existing) return { success: false as const, error: "Solicitud no encontrada." };
+    if (existing.status !== "PENDING") return { success: false as const, error: "Las solicitudes procesadas se conservan como historial." };
+    const archived = await prisma.accessRequest.update({ where: { id: requestId }, data: { status: "REJECTED" } });
     await logAudit({
       userId: actor.id,
-      action: "access_request.delete",
+      action: "access_request.archive",
       module: "configuracion",
       entityType: "access_request",
-      entityId: deleted.id,
-      beforeData: { email: deleted.email, status: deleted.status },
+      entityId: archived.id,
+      beforeData: { email: existing.email, status: existing.status },
+      afterData: { status: archived.status },
     });
     revalidatePath("/configuracion");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
-    return { success: true as const };
+    return { success: true as const, message: "Solicitud rechazada y conservada en el historial." };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo eliminar la solicitud.") };
   }

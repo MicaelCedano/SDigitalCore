@@ -8,26 +8,11 @@ import {
   goodsReceiptSchema,
   GoodsReceiptInput,
 } from "@/lib/validation/goods-receipt";
+import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 
 /**
  * Genera un número de folio correlativo único (Ej: REC-20260807-001)
  */
-async function generateReceiptNumber(): Promise<string> {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const prefix = `REC-${dateStr}-`;
-
-  const countToday = await prisma.goodsReceipt.count({
-    where: {
-      receiptNumber: {
-        startsWith: prefix,
-      },
-    },
-  });
-
-  const nextNum = (countToday + 1).toString().padStart(3, "0");
-  return `${prefix}${nextNum}`;
-}
-
 /**
  * Auto-guarda nombres de modelos en el catálogo para autocompletado posterior
  */
@@ -93,6 +78,9 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
       });
 
       if (existing) {
+        if (existing.status !== "DRAFT") {
+          return { success: false, error: "Solo los recibos en borrador pueden modificarse." };
+        }
         const updated = await prisma.$transaction(async (tx) => {
           await tx.goodsReceiptItem.deleteMany({
             where: { receiptId: validated.id },
@@ -134,10 +122,9 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
     }
 
     // Crear nuevo recibo
-    const receiptNumber = await generateReceiptNumber();
-
-    const created = await prisma.goodsReceipt.create({
-      data: {
+    const created = await prisma.$transaction(async (tx) => {
+      const receiptNumber = await nextOperationalNumber(tx, "GOODS_RECEIPT", "REC");
+      return tx.goodsReceipt.create({ data: {
         receiptNumber,
         supplierName: validated.supplierName,
         branch: validated.branch,
@@ -157,16 +144,15 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
           })),
         },
       },
-      include: {
-        items: true,
-      },
+      include: { items: true },
+      });
     });
     await logAudit({ userId: user.id, action: "goods_receipt.create", module: "almacen", entityType: "goods_receipt", entityId: created.id, afterData: { receiptNumber: created.receiptNumber, status: created.status, itemCount: created.items.length } });
 
     revalidatePath("/almacen/recibos");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
-    return { success: true, data: created, message: `Recibo ${receiptNumber} registrado exitosamente` };
+    return { success: true, data: created, message: `Recibo ${created.receiptNumber} registrado exitosamente` };
   } catch (error: any) {
     console.error("Error al guardar recibo de mercancía:", error);
     return {
@@ -256,16 +242,17 @@ export async function deleteGoodsReceiptAction(id: string) {
   try {
     const actor = await requirePermission("warehouse.write");
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
-    const deleted = await prisma.goodsReceipt.delete({
-      where: { id },
-    });
-    await logAudit({ userId: actor.id, action: "goods_receipt.delete", module: "almacen", entityType: "goods_receipt", entityId: deleted.id, beforeData: { receiptNumber: deleted.receiptNumber, status: deleted.status } });
+    const existing = await prisma.goodsReceipt.findUnique({ where: { id } });
+    if (!existing) return { success: false, error: "Recibo no encontrado" };
+    if (existing.status === "CANCELLED") return { success: false, error: "El recibo ya está anulado" };
+    const cancelled = await prisma.goodsReceipt.update({ where: { id }, data: { status: "CANCELLED" } });
+    await logAudit({ userId: actor.id, action: "goods_receipt.cancel", module: "almacen", entityType: "goods_receipt", entityId: cancelled.id, beforeData: { receiptNumber: existing.receiptNumber, status: existing.status }, afterData: { status: cancelled.status } });
 
     revalidatePath("/almacen/recibos");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
-    return { success: true, message: "Recibo eliminado correctamente" };
+    return { success: true, message: "Recibo anulado; su historial fue conservado" };
   } catch (error: any) {
-    return { success: false, error: "Error al eliminar el recibo" };
+    return { success: false, error: "Error al anular el recibo" };
   }
 }

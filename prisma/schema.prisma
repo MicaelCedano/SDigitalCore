@@ -285,6 +285,16 @@ model WarrantyDailySequence {
   @@map("warranty_daily_sequence")
 }
 
+model OperationalDailySequence {
+  id           String   @id @default(cuid())
+  sequenceDate DateTime @db.Date @map("sequence_date")
+  sequenceType String   @map("sequence_type")
+  lastValue    Int      @default(0) @map("last_value")
+
+  @@unique([sequenceDate, sequenceType])
+  @@map("operational_daily_sequence")
+}
+
 // ============================================================
 // MÓDULO ALMACÉN — Recibos de Mercancía
 // ============================================================
@@ -407,6 +417,7 @@ model WarehouseProduct {
   unitsPerBox Int      @default(1) @map("unidades_por_caja")
   looseUnits  Int      @default(0) @map("unidades_sueltas")
   totalUnits  Int      @default(0) @map("cantidad")
+  status      String   @default("ACTIVE") @map("status")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

@@ -55,7 +55,7 @@ export function GoodsReceiptsList() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Estás seguro de eliminar este recibo de mercancía?")) {
+    if (confirm("¿Deseas anular este recibo? Se conservará en el historial.")) {
       await deleteGoodsReceiptAction(id);
       fetchReceipts();
     }
@@ -308,13 +308,13 @@ export function GoodsReceiptsList() {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          <button
+                          {receipt.status !== "CANCELLED" ? <button
                             onClick={(e) => handleDelete(receipt.id, e)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-lg transition-colors"
-                            title="Eliminar Recibo"
+                            title="Anular recibo"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button> : null}
                         </div>
                       </td>
                     </tr>

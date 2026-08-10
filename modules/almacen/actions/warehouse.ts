@@ -14,6 +14,8 @@ import {
   WarehouseBulkMovementInput,
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
+import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import type { Prisma } from "@prisma/client";
 
 async function requireWarehouseAdmin() {
   const actor = await requirePermission("warehouse.read");
@@ -23,7 +25,7 @@ async function requireWarehouseAdmin() {
 }
 
 function resolveMovementLine(item: { unitsCount: number; measure?: "BOXES" | "UNITS"; quantity?: number }, unitsPerBox: number) {
-  const measure = item.measure === "BOXES" ? "BOXES" : "UNITS";
+  const measure: "BOXES" | "UNITS" = item.measure === "BOXES" ? "BOXES" : "UNITS";
   const quantity = Math.max(1, Number(item.quantity) || (measure === "BOXES" ? Math.ceil(item.unitsCount / Math.max(1, unitsPerBox)) : item.unitsCount));
   return {
     measure,
@@ -31,6 +33,33 @@ function resolveMovementLine(item: { unitsCount: number; measure?: "BOXES" | "UN
     unitsCount: measure === "BOXES" ? quantity * Math.max(1, unitsPerBox) : quantity,
     boxesCount: measure === "BOXES" ? quantity : 0,
   };
+}
+
+async function applyStockDelta(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  type: "ENTRY" | "EXIT",
+  line: { measure: "BOXES" | "UNITS"; quantity: number; unitsCount: number },
+) {
+  const direction = type === "ENTRY" ? 1 : -1;
+  const changed = await tx.warehouseProduct.updateMany({
+    where: {
+      id: productId,
+      status: "ACTIVE",
+      ...(type === "EXIT"
+        ? line.measure === "BOXES"
+          ? { boxes: { gte: line.quantity }, totalUnits: { gte: line.unitsCount } }
+          : { looseUnits: { gte: line.quantity }, totalUnits: { gte: line.unitsCount } }
+        : {}),
+    },
+    data: {
+      boxes: { increment: line.measure === "BOXES" ? direction * line.quantity : 0 },
+      looseUnits: { increment: line.measure === "UNITS" ? direction * line.quantity : 0 },
+      totalUnits: { increment: direction * line.unitsCount },
+    },
+  });
+  if (changed.count !== 1) throw new Error("El producto ya no está activo o su stock disponible cambió. Actualiza e intenta de nuevo.");
+  return tx.warehouseProduct.findUniqueOrThrow({ where: { id: productId } });
 }
 
 function parseRequestLine(details: string | null | undefined, productId: string, unitsCount: number) {
@@ -52,7 +81,7 @@ function parseRequestLine(details: string | null | undefined, productId: string,
 export async function getWarehouseProductsAction(query?: string) {
   try {
     await requirePermission("warehouse.read");
-    const where: any = {};
+    const where: any = { status: "ACTIVE" };
     if (query && query.trim() !== "") {
       const q = query.trim();
       where.OR = [
@@ -102,6 +131,7 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
           unitsPerBox,
           looseUnits,
           totalUnits,
+          status: "ACTIVE",
         },
       });
       await logAudit({ userId: actor.id, action: "warehouse_product.update", module: "almacen", entityType: "warehouse_product", entityId: updated.id, afterData: { code: updated.code, name: updated.name, boxes: updated.boxes, looseUnits: updated.looseUnits, totalUnits: updated.totalUnits } });
@@ -149,15 +179,13 @@ export async function deleteWarehouseProductAction(id: string) {
   try {
     const actor = await requireWarehouseAdmin();
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
-    const deleted = await prisma.warehouseProduct.delete({
-      where: { id },
-    });
-    await logAudit({ userId: actor.id, action: "warehouse_product.delete", module: "almacen", entityType: "warehouse_product", entityId: deleted.id, beforeData: { code: deleted.code, name: deleted.name } });
+    const archived = await prisma.warehouseProduct.update({ where: { id }, data: { status: "INACTIVE" } });
+    await logAudit({ userId: actor.id, action: "warehouse_product.archive", module: "almacen", entityType: "warehouse_product", entityId: archived.id, beforeData: { code: archived.code, name: archived.name }, afterData: { status: archived.status } });
 
     revalidatePath("/almacen");
-    return { success: true, message: "Producto eliminado" };
+    return { success: true, message: "Producto archivado; sus movimientos fueron conservados" };
   } catch (error: any) {
-    return { success: false, error: "Error al eliminar el producto" };
+    return { success: false, error: "Error al archivar el producto" };
   }
 }
 
@@ -169,8 +197,8 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
     const user = await requireWarehouseAdmin();
     if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseMovementSchema.parse(input);
-    const product = await prisma.warehouseProduct.findUnique({
-      where: { id: validated.productId },
+    const product = await prisma.warehouseProduct.findFirst({
+      where: { id: validated.productId, status: "ACTIVE" },
     });
 
     if (!product) {
@@ -183,20 +211,8 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
       return { success: false, error: `Stock insuficiente en ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"}. Disponible: ${available}, solicitado: ${line.quantity}` };
     }
 
-    const newTotalUnits = product.totalUnits + (validated.type === "ENTRY" ? line.unitsCount : -line.unitsCount);
-    const newBoxes = validated.type === "EXIT" && line.measure === "BOXES" ? product.boxes - line.quantity : validated.type === "ENTRY" && line.measure === "BOXES" ? product.boxes + line.quantity : product.boxes;
-    const newLooseUnits = validated.type === "EXIT" && line.measure === "UNITS" ? product.looseUnits - line.quantity : validated.type === "ENTRY" && line.measure === "UNITS" ? product.looseUnits + line.quantity : product.looseUnits;
-
     const movement = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar stock del producto
-      await tx.warehouseProduct.update({
-        where: { id: product.id },
-        data: {
-          boxes: newBoxes,
-          looseUnits: newLooseUnits,
-          totalUnits: newTotalUnits,
-        },
-      });
+      await applyStockDelta(tx, product.id, validated.type, line);
 
     // 2. Registrar movimiento en la bitácora
       return tx.warehouseMovement.create({
@@ -237,7 +253,7 @@ export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMov
     if (new Set(ids).size !== ids.length) return { success: false, error: "No repita el mismo producto en el movimiento." };
 
     const batch = await prisma.$transaction(async (tx) => {
-      const products = await tx.warehouseProduct.findMany({ where: { id: { in: ids } } });
+      const products = await tx.warehouseProduct.findMany({ where: { id: { in: ids }, status: "ACTIVE" } });
       if (products.length !== ids.length) throw new Error("Uno de los productos no existe.");
       const byId = new Map(products.map((product) => [product.id, product]));
       const items = [];
@@ -250,13 +266,7 @@ export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMov
         if (validated.type === "EXIT" && available < line.quantity) {
           throw new Error(`Stock insuficiente en ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"} para ${product.name}. Disponible: ${available}.`);
         }
-        const newTotalUnits = product.totalUnits + (validated.type === "ENTRY" ? line.unitsCount : -line.unitsCount);
-        const newBoxes = validated.type === "EXIT" && line.measure === "BOXES" ? product.boxes - line.quantity : validated.type === "ENTRY" && line.measure === "BOXES" ? product.boxes + line.quantity : product.boxes;
-        const newLooseUnits = validated.type === "EXIT" && line.measure === "UNITS" ? product.looseUnits - line.quantity : validated.type === "ENTRY" && line.measure === "UNITS" ? product.looseUnits + line.quantity : product.looseUnits;
-        await tx.warehouseProduct.update({
-          where: { id: product.id },
-          data: { boxes: newBoxes, looseUnits: newLooseUnits, totalUnits: newTotalUnits },
-        });
+        await applyStockDelta(tx, product.id, validated.type, line);
         const movement = await tx.warehouseMovement.create({
           data: {
             productId: product.id,
@@ -324,22 +334,6 @@ export async function getWarehouseMovementsAction(query?: string) {
 /**
  * Genera un código correlativo para solicitudes (Ej. SOL-20260807-001)
  */
-async function generateRequestCode(): Promise<string> {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const prefix = `SOL-${dateStr}-`;
-
-  const countToday = await prisma.warehouseRequest.count({
-    where: {
-      requestCode: {
-        startsWith: prefix,
-      },
-    },
-  });
-
-  const nextNum = (countToday + 1).toString().padStart(3, "0");
-  return `${prefix}${nextNum}`;
-}
-
 /**
  * Crea una solicitud de almacén / transferencias
  */
@@ -349,7 +343,7 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
     if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseRequestSchema.parse(input);
     if (validated.type === "EXIT") {
-      const products = await prisma.warehouseProduct.findMany({ where: { id: { in: validated.items.map((item) => item.productId) } } });
+      const products = await prisma.warehouseProduct.findMany({ where: { id: { in: validated.items.map((item) => item.productId) }, status: "ACTIVE" } });
       for (const item of validated.items) {
         const product = products.find((candidate) => candidate.id === item.productId);
         if (!product) return { success: false, error: "Uno de los productos seleccionados ya no existe." };
@@ -358,10 +352,9 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
         if (available < line.quantity) return { success: false, error: `No hay suficientes ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"} de ${product.name}. Disponible: ${available}.` };
       }
     }
-    const requestCode = await generateRequestCode();
-
-    const created = await prisma.warehouseRequest.create({
-      data: {
+    const created = await prisma.$transaction(async (tx) => {
+      const requestCode = await nextOperationalNumber(tx, "WAREHOUSE_REQUEST", "SOL");
+      return tx.warehouseRequest.create({ data: {
         requestCode,
         title: validated.title.trim(),
         branch: validated.branch,
@@ -375,13 +368,14 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
         items: { create: validated.items.map((item) => ({ productId: item.productId, unitsCount: item.unitsCount })) },
       },
       include: { items: true },
+      });
     });
     await logAudit({ userId: user.id, action: "warehouse_request.create", module: "almacen", entityType: "warehouse_request", entityId: created.id, afterData: { requestCode: created.requestCode, status: created.status } });
 
     revalidatePath("/almacen/transferencias");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
-    return { success: true, data: created, message: `Solicitud ${requestCode} registrada exitosamente` };
+    return { success: true, data: created, message: `Solicitud ${created.requestCode} registrada exitosamente` };
   } catch (error: any) {
     return { success: false, error: error.message || "Error al crear la solicitud" };
   }
@@ -431,18 +425,14 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
       if (!request) throw new Error("Solicitud no encontrada.");
       if (request.status !== "PENDING") throw new Error("Esta solicitud ya fue procesada.");
       if (status === "REJECTED") return tx.warehouseRequest.update({ where: { id }, data: { status } });
-      const products = await tx.warehouseProduct.findMany({ where: { id: { in: request.items.map((item) => item.productId) } } });
+      const products = await tx.warehouseProduct.findMany({ where: { id: { in: request.items.map((item) => item.productId) }, status: "ACTIVE" } });
       for (const item of request.items) {
         const product = products.find((candidate) => candidate.id === item.productId);
         if (!product) throw new Error("Uno de los productos de la solicitud ya no existe.");
-        if (request.type === "EXIT" && product.totalUnits < item.unitsCount) throw new Error(`Stock insuficiente para ${product.name}. Disponible: ${product.totalUnits} unidades.`);
-      }
-      for (const item of request.items) {
-        const product = products.find((candidate) => candidate.id === item.productId)!;
-        const nextTotal = request.type === "ENTRY" ? product.totalUnits + item.unitsCount : product.totalUnits - item.unitsCount;
-        const nextLoose = request.type === "ENTRY" ? product.looseUnits + item.unitsCount : Math.max(0, product.looseUnits - item.unitsCount);
-        await tx.warehouseProduct.update({ where: { id: product.id }, data: { totalUnits: nextTotal, looseUnits: nextLoose } });
-        await tx.warehouseMovement.create({ data: { productId: product.id, type: request.type, boxesCount: 0, totalUnits: item.unitsCount, reason: `Solicitud ${request.requestCode}: ${request.title}`, createdBy: actor.id } });
+        const savedLine = parseRequestLine(request.details, item.productId, item.unitsCount);
+        const line = resolveMovementLine({ unitsCount: item.unitsCount, ...savedLine }, product.unitsPerBox);
+        await applyStockDelta(tx, product.id, request.type, line);
+        await tx.warehouseMovement.create({ data: { productId: product.id, type: request.type, boxesCount: line.boxesCount, totalUnits: line.unitsCount, reason: `Solicitud ${request.requestCode}: ${request.title}`, createdBy: actor.id } });
       }
       return tx.warehouseRequest.update({ where: { id }, data: { status } });
     });

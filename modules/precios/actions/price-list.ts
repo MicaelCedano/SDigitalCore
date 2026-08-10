@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { requirePermission, requireUser } from "@/lib/auth/helpers";
+import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import {
   priceListBrandOrderSchema,
@@ -43,7 +43,7 @@ async function ensureBrands() {
 
 export async function getPriceListWorkspaceAction(query = "") {
   try {
-    await requireUser();
+    await requirePermission("precios.read");
     const brands = await ensureBrands();
     const term = query.trim();
     const inventory = await prisma.priceListItem.findMany({

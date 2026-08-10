@@ -1,35 +1,15 @@
 "use server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requirePermission, requireUser } from "@/lib/auth/helpers";
+import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { invoiceSchema, InvoiceInput } from "@/lib/validation/invoice";
+import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 
 /**
  * Genera un código correlativo para facturas / conduces (Ej: FAC-20260807-001 o CND-20260807-001)
  */
-async function generateInvoiceNumber(type: "FACTURA" | "CONDUCE"): Promise<string> {
-  const dateStr = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Santo_Domingo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date()).replace(/-/g, "");
-  const prefix = type === "FACTURA" ? `FAC-${dateStr}-` : `CND-${dateStr}-`;
-
-  const countToday = await prisma.invoice.count({
-    where: {
-      invoiceNumber: {
-        startsWith: prefix,
-      },
-    },
-  });
-
-  const nextNum = (countToday + 1).toString().padStart(3, "0");
-  return `${prefix}${nextNum}`;
-}
-
 /**
  * Crea una Factura o Conduce de Entrega en el sistema
  */
@@ -42,9 +22,12 @@ export async function createInvoiceAction(input: InvoiceInput) {
     const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
     if (!branchExists) throw new Error("La sucursal seleccionada no existe o está inactiva.");
 
-    const invoiceNumber = validated.invoiceNumber || (await generateInvoiceNumber(validated.type));
-
     const invoice = await prisma.$transaction(async (tx) => {
+      const invoiceNumber = validated.invoiceNumber?.trim() || await nextOperationalNumber(
+        tx,
+        validated.type === "FACTURA" ? "INVOICE" : "DELIVERY_NOTE",
+        validated.type === "FACTURA" ? "FAC" : "CND",
+      );
       const created = await tx.invoice.create({
         data: {
           invoiceNumber,
@@ -89,14 +72,14 @@ export async function createInvoiceAction(input: InvoiceInput) {
       module: "FACTURAS",
       entityType: validated.type,
       entityId: invoice.id,
-      afterData: { invoiceNumber, total: invoice.total, itemCount: invoice.items.length },
+      afterData: { invoiceNumber: invoice.invoiceNumber, total: invoice.total, itemCount: invoice.items.length },
     });
 
     revalidatePath("/facturas");
     return {
       success: true,
       data: invoice,
-      message: `${validated.type === "FACTURA" ? "Factura" : "Conduce"} ${invoiceNumber} emitida exitosamente`,
+      message: `${validated.type === "FACTURA" ? "Factura" : "Conduce"} ${invoice.invoiceNumber} emitida exitosamente`,
     };
   } catch (error: any) {
     return { success: false, error: error.message || "Error al emitir el documento" };
@@ -108,7 +91,7 @@ export async function createInvoiceAction(input: InvoiceInput) {
  */
 export async function getInvoicesAction(query?: string, type?: string) {
   try {
-    await requireUser();
+    await requirePermission("facturas.read");
     const where: any = {};
 
     if (type && type !== "ALL") {
@@ -144,7 +127,7 @@ export async function getInvoicesAction(query?: string, type?: string) {
  */
 export async function getInvoiceByIdAction(id: string) {
   try {
-    await requireUser();
+    await requirePermission("facturas.read");
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: { items: true },
@@ -165,22 +148,24 @@ export async function deleteInvoiceAction(id: string) {
     const user = await requirePermission("facturas.eliminar");
     const userId = user.id;
     if (!userId) throw new Error("La sesión no tiene un usuario identificable.");
-    const deleted = await prisma.invoice.delete({
-      where: { id },
-    });
+    const existing = await prisma.invoice.findUnique({ where: { id } });
+    if (!existing) return { success: false, error: "Documento no encontrado" };
+    if (existing.status === "ANULADA") return { success: false, error: "El documento ya está anulado" };
+    const cancelled = await prisma.invoice.update({ where: { id }, data: { status: "ANULADA" } });
 
     await logAudit({
       userId,
-      action: "DELETE",
+      action: "CANCEL",
       module: "FACTURAS",
-      entityType: deleted.type,
-      entityId: deleted.id,
-      beforeData: { invoiceNumber: deleted.invoiceNumber, total: deleted.total },
+      entityType: cancelled.type,
+      entityId: cancelled.id,
+      beforeData: { invoiceNumber: existing.invoiceNumber, total: existing.total, status: existing.status },
+      afterData: { status: cancelled.status },
     });
 
     revalidatePath("/facturas");
-    return { success: true, message: "Documento eliminado" };
+    return { success: true, message: "Documento anulado; su historial fue conservado" };
   } catch (error: any) {
-    return { success: false, error: "Error al eliminar el documento" };
+    return { success: false, error: "Error al anular el documento" };
   }
 }

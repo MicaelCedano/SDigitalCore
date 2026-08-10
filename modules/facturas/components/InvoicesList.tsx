@@ -54,7 +54,7 @@ export function InvoicesList() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Estás seguro de eliminar esta factura/conduce?")) {
+    if (confirm("¿Deseas anular este documento? Se conservará en el historial.")) {
       await deleteInvoiceAction(id);
       fetchInvoices();
     }
@@ -63,7 +63,7 @@ export function InvoicesList() {
   const totalInvoices = invoices.filter((i) => i.type === "FACTURA").length;
   const totalConduces = invoices.filter((i) => i.type === "CONDUCE").length;
   const totalBilled = invoices
-    .filter((i) => i.type === "FACTURA")
+    .filter((i) => i.type === "FACTURA" && i.status !== "ANULADA")
     .reduce((acc, i) => acc + (i.total || 0), 0);
 
   if (showGenerator) {
@@ -227,7 +227,7 @@ export function InvoicesList() {
                   });
 
                   return (
-                    <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={inv.id} className={`hover:bg-slate-50/80 transition-colors ${inv.status === "ANULADA" ? "opacity-60" : ""}`}>
                       <td className="px-4 py-3.5">
                         <span
                           className={`inline-flex items-center gap-1 font-extrabold text-[10px] px-2.5 py-1 rounded-full border ${
@@ -238,6 +238,7 @@ export function InvoicesList() {
                         >
                           {inv.type === "FACTURA" ? "FACTURA" : "CONDUCE"}
                         </span>
+                        {inv.status === "ANULADA" ? <span className="ml-1.5 inline-flex rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-extrabold text-red-700">ANULADA</span> : null}
                       </td>
                       <td className="px-4 py-3.5 font-mono font-bold text-slate-900">
                         <span className="block text-xs">{inv.invoiceNumber}</span>
@@ -274,13 +275,13 @@ export function InvoicesList() {
                           >
                             <Eye className="w-3.5 h-3.5" /> PDF / Ver
                           </button>
-                          <button
+                          {inv.status !== "ANULADA" ? <button
                             onClick={(e) => handleDelete(inv.id, e)}
                             className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                            title="Eliminar documento"
+                            title="Anular documento"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button> : null}
                         </div>
                       </td>
                     </tr>
