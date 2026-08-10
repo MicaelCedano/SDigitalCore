@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, FileCheck2, Plus, Truck, UserRoundCheck, Wrench, X } from "lucide-react";
 import { WarrantyFlow, type WarrantyFlowCase, type WarrantyFlowOperation } from "@/modules/garantias/components/WarrantyFlow";
 import { WarrantyIntakeForm } from "@/modules/garantias/components/WarrantyIntakeForm";
@@ -17,6 +17,7 @@ const actions: Array<{ operation: WarrantyFlowOperation; label: string; descript
 export function WarrantyQuickActions({ cases, canCreate, canTransition }: { cases: Partial<Record<WarrantyFlowOperation, WarrantyFlowCase[]>>; canCreate: boolean; canTransition: boolean }) {
   const [openOperation, setOpenOperation] = useState<WarrantyFlowOperation | null>(null);
   const [intakeOpen, setIntakeOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const active = actions.find((item) => item.operation === openOperation);
   const activeCases = openOperation ? cases[openOperation] ?? [] : [];
 
@@ -42,136 +43,151 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
       if (e.key === "Escape") {
         setOpenOperation(null);
         setIntakeOpen(false);
+        setMenuOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const totalPendingTransitions = useMemo(() => {
+    return Object.values(cases).reduce((acc, curr) => acc + (curr?.length ?? 0), 0);
+  }, [cases]);
+
   return (
     <>
-      <div className="enterprise-panel p-4 sm:p-5">
-        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-          <div>
-            <h2 className="text-base font-semibold text-[#101828]">Acciones Rápidas del Flujo</h2>
-            <p className="text-xs text-[#667085]">Gestiona ingresos y transiciones entre estados directamente en ventana modal.</p>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => setIntakeOpen(true)}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98]"
+          >
+            <Plus size={17} /> Registrar ingreso
+          </button>
+        )}
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-          {canCreate && (
+        {canTransition && (
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setIntakeOpen(true)}
-              className="group flex flex-col justify-between rounded-xl bg-indigo-600 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-md"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] shadow-xs transition hover:bg-[#f8fafc]"
             >
-              <div className="flex items-center justify-between">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white">
-                  <Plus size={18} />
+              Acciones de flujo
+              {totalPendingTransitions > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700">
+                  {totalPendingTransitions}
                 </span>
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">Nuevo</span>
-              </div>
-              <div className="mt-3">
-                <span className="block text-xs font-bold text-white">Registrar Ingreso</span>
-                <span className="mt-0.5 block text-[10px] text-indigo-100 opacity-90">Nuevo caso de garantía</span>
-              </div>
+              )}
             </button>
-          )}
 
-          {canTransition &&
-            actions.map(({ operation, label, icon: Icon, tone }) => {
-              const count = cases[operation]?.length ?? 0;
-              return (
-                <button
-                  key={operation}
-                  type="button"
-                  onClick={() => setOpenOperation(operation)}
-                  className="group flex flex-col justify-between rounded-xl border border-[#e4e7ec] bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                        tone === "violet"
-                          ? "bg-violet-50 text-violet-600 group-hover:bg-violet-100"
-                          : tone === "blue"
-                          ? "bg-blue-50 text-blue-600 group-hover:bg-blue-100"
-                          : tone === "orange"
-                          ? "bg-orange-50 text-orange-600 group-hover:bg-orange-100"
-                          : tone === "amber"
-                          ? "bg-amber-50 text-amber-600 group-hover:bg-amber-100"
-                          : tone === "emerald"
-                          ? "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"
-                          : "bg-red-50 text-red-600 group-hover:bg-red-100"
-                      }`}
-                    >
-                      <Icon size={17} />
-                    </span>
-                    {count > 0 && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                        {count}
-                      </span>
-                    )}
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl border border-[#e4e7ec] bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                  <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#98a2b3]">
+                    Procesamiento por etapas
+                  </p>
+                  <div className="space-y-1">
+                    {actions.map(({ operation, label, description, icon: Icon, tone }) => {
+                      const count = cases[operation]?.length ?? 0;
+                      return (
+                        <button
+                          key={operation}
+                          type="button"
+                          onClick={() => {
+                            setOpenOperation(operation);
+                            setMenuOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                                tone === "violet"
+                                  ? "bg-violet-50 text-violet-600"
+                                  : tone === "blue"
+                                  ? "bg-blue-50 text-blue-600"
+                                  : tone === "orange"
+                                  ? "bg-orange-50 text-orange-600"
+                                  : tone === "amber"
+                                  ? "bg-amber-50 text-amber-600"
+                                  : tone === "emerald"
+                                  ? "bg-emerald-50 text-emerald-600"
+                                  : "bg-red-50 text-red-600"
+                              }`}
+                            >
+                              <Icon size={15} />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-semibold text-[#344054]">{label}</span>
+                            </span>
+                          </div>
+                          {count > 0 && (
+                            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="mt-3">
-                    <span className="block truncate text-xs font-semibold text-[#344054] group-hover:text-indigo-600">{label}</span>
-                    <span className="mt-0.5 block truncate text-[10px] text-[#98a2b3]">En ventana modal</span>
-                  </div>
-                </button>
-              );
-            })}
-
-          {!canCreate && !canTransition && (
-            <div className="col-span-full rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
-              Tu rol actual tiene permisos de solo lectura para las operaciones de garantía.
-            </div>
-          )}
-        </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Drawer Lateral Derecho para Registrar Ingreso */}
       {intakeOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm transition-all sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Registrar ingreso"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIntakeOpen(false);
-          }}
-        >
-          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-y-auto rounded-2xl bg-[#f4f7fb] shadow-2xl transition-all">
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-5 py-4 sm:px-7">
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setIntakeOpen(false)}
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col bg-[#f4f7fb] shadow-2xl transition-transform duration-300 ease-in-out sm:max-w-3xl border-l border-slate-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Registrar ingreso"
+          >
+            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-600">Registro Rápido</p>
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-600">Garantías · Lateral</p>
                 <h2 className="mt-0.5 text-xl font-black text-[#101828]">Registrar Ingreso de Garantía</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIntakeOpen(false)}
                 className="rounded-lg p-2 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
-                aria-label="Cerrar modal"
+                aria-label="Cerrar panel lateral"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               <WarrantyIntakeForm />
             </div>
-          </div>
-        </div>
+          </aside>
+        </>
       )}
 
+      {/* Drawer Lateral Derecho para Operaciones de Flujo */}
       {active && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm transition-all sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label={active.label}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setOpenOperation(null);
-          }}
-        >
-          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-y-auto rounded-2xl bg-[#f4f7fb] shadow-2xl transition-all">
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-5 py-4 sm:px-7">
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setOpenOperation(null)}
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col bg-[#f4f7fb] shadow-2xl transition-transform duration-300 ease-in-out sm:max-w-3xl border-l border-slate-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label={active.label}
+          >
+            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-4">
               <div>
                 <p
                   className={`text-xs font-bold uppercase tracking-[0.15em] ${
@@ -188,7 +204,7 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                       : "text-red-600"
                   }`}
                 >
-                  Gestión en Lote
+                  Garantías · Panel Lateral
                 </p>
                 <h2 className="mt-0.5 text-xl font-black text-[#101828]">{active.label}</h2>
               </div>
@@ -196,16 +212,16 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                 type="button"
                 onClick={() => setOpenOperation(null)}
                 className="rounded-lg p-2 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
-                aria-label="Cerrar modal"
+                aria-label="Cerrar panel lateral"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               <WarrantyFlow operation={active.operation} cases={activeCases} />
             </div>
-          </div>
-        </div>
+          </aside>
+        </>
       )}
     </>
   );

@@ -136,7 +136,7 @@ export function WarrantyDashboard({
 
   return (
     <div className="warranty-dashboard mx-auto max-w-[1440px] space-y-6 pb-8">
-      <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><FileCheck2 size={22} /></span>
@@ -147,7 +147,7 @@ export function WarrantyDashboard({
           </div>
           <p className="mt-4 flex items-center gap-2 text-xs text-[#98a2b3]"><CalendarDays size={14} /> Datos operativos actualizados al consultar.</p>
         </div>
-        {canCreate && <Link href="/garantias/ingreso" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><Plus size={17} /> Registrar ingreso</Link>}
+        <WarrantyQuickActions cases={quickCases} canCreate={canCreate} canTransition={canTransition} />
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -159,7 +159,6 @@ export function WarrantyDashboard({
       </section>
 
       <section className="space-y-5">
-        <WarrantyQuickActions cases={quickCases} canCreate={canCreate} canTransition={canTransition} />
         <div className="enterprise-panel overflow-hidden">
           <div className="border-b border-[#e4e7ec] p-4 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
