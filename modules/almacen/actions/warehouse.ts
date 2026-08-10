@@ -81,7 +81,7 @@ function parseRequestLine(details: string | null | undefined, productId: string,
 export async function getWarehouseProductsAction(query?: string) {
   try {
     await requirePermission("warehouse.read");
-    const where: any = { status: "ACTIVE" };
+    const where: Prisma.WarehouseProductWhereInput = { status: "ACTIVE" };
     if (query && query.trim() !== "") {
       const q = query.trim();
       where.OR = [
@@ -99,7 +99,51 @@ export async function getWarehouseProductsAction(query?: string) {
     });
 
     return { success: true, data: products };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const prismaError = error as { code?: string; meta?: { column?: string } };
+    const missingStatusColumn =
+      prismaError.code === "P2022" && String(prismaError.meta?.column ?? "").toLowerCase().includes("status");
+
+    if (missingStatusColumn) {
+      const legacyWhere: Prisma.WarehouseProductWhereInput = {};
+      if (query && query.trim() !== "") {
+        const q = query.trim();
+        legacyWhere.OR = [
+          { code: { contains: q, mode: "insensitive" } },
+          { name: { contains: q, mode: "insensitive" } },
+          { brand: { contains: q, mode: "insensitive" } },
+          { color: { contains: q, mode: "insensitive" } },
+          { capacity: { contains: q, mode: "insensitive" } },
+        ];
+      }
+
+      const products = await prisma.warehouseProduct.findMany({
+        where: legacyWhere,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          brand: true,
+          color: true,
+          capacity: true,
+          description: true,
+          boxes: true,
+          unitsPerBox: true,
+          looseUnits: true,
+          totalUnits: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return {
+        success: true,
+        data: products.map((product) => ({ ...product, status: "ACTIVE" })),
+      };
+    }
+
+    console.error("Error al cargar productos de almacén", error);
     return { success: false, error: "Error al cargar productos de almacén", data: [] };
   }
 }
