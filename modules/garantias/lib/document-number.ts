@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 
 export function civilDate(value: string | Date) {
-  if (value instanceof Date) return value;
-  return new Date(`${value}T00:00:00.000Z`);
+  const civilValue = value instanceof Date ? santoDomingoDateString(value) : value;
+  return new Date(`${civilValue}T00:00:00.000Z`);
 }
 
 export function santoDomingoDateString(date = new Date()) {
@@ -16,6 +16,6 @@ export async function nextWarrantyNumber(tx: Prisma.TransactionClient, date: Dat
     create: { sequenceDate, sequenceType: type, lastValue: 1 },
     update: { lastValue: { increment: 1 } },
   });
-  const parts = santoDomingoDateString(date).split("-");
-  return `${prefix}-${parts[1]}${parts[2]}-${String(sequence.lastValue).padStart(3, "0")}`;
+  const datePart = santoDomingoDateString(date).replaceAll("-", "");
+  return `${prefix}-${datePart}-${String(sequence.lastValue).padStart(3, "0")}`;
 }

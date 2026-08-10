@@ -14,8 +14,8 @@ export default async function GarantiasPage() {
   if (!cases.success) throw new Error(cases.error);
   if (!stats.success) throw new Error(stats.error);
 
-  const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED"], receiveTech: ["IN_REPAIR"], sendSupplier: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], deliver: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], credit: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"] };
-  const quickCases = canTransition ? Object.fromEntries(await Promise.all(Object.entries(eligible).map(async ([operation, statuses]) => [operation, await prisma.warrantyCase.findMany({ where: { archivedAt: null, status: { in: statuses } }, orderBy: { entryDate: "asc" }, take: 200, select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true } })]))) : {};
+  const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], receiveTech: ["IN_REPAIR"], sendSupplier: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], deliver: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], credit: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"] };
+  const quickCases = canTransition ? Object.fromEntries(await Promise.all(Object.entries(eligible).map(async ([operation, statuses]) => [operation, await prisma.warrantyCase.findMany({ where: { archivedAt: null, status: { in: statuses } }, orderBy: { entryDate: "asc" }, take: 200, select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true, assignedTechnicianName: true, currentSupplierName: true } })]))) : {};
 
   return (
     <WarrantyDashboard
@@ -26,6 +26,7 @@ export default async function GarantiasPage() {
       stats={stats.data}
       quickCases={quickCases}
       canCreate={canCreate}
+      canTransition={canTransition}
     />
   );
 }

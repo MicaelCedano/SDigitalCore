@@ -1,100 +1,446 @@
 "use server";
 
-import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
-import { createWarrantySchema, caseCodesSchema, flowSchema, updateWarrantySchema } from "@/lib/validation/warranty";
-import { canTransition } from "@/modules/garantias/lib/status-machine";
-import { civilDate, nextWarrantyNumber } from "@/modules/garantias/lib/document-number";
+import { prisma } from "@/lib/db/prisma";
+import {
+  archiveWarrantySchema,
+  createWarrantySchema,
+  flowSchema,
+  restoreWarrantySchema,
+  updateWarrantySchema,
+} from "@/lib/validation/warranty";
+import { civilDate, nextWarrantyNumber, santoDomingoDateString } from "@/modules/garantias/lib/document-number";
 import { Prisma, WarrantyDocumentType, WarrantyEventType, WarrantyStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+type ArchiveFilter = "active" | "archived" | "all";
+type FlowOperation = "assign" | "receive-repaired" | "receive-unrepaired" | "send-supplier" | "receive-supplier" | "deliver" | "credit";
+
+export type WarrantyCaseListItem = {
+  id: string;
+  caseCode: string;
+  imei: string;
+  model: string;
+  clientName: string;
+  problem: string;
+  status: WarrantyStatus;
+  entryDate: Date;
+  archivedAt: Date | null;
+  _count: { events: number; documentItems: number };
+};
+
+export type WarrantyDocumentData = {
+  id: string;
+  documentCode: string;
+  type: WarrantyDocumentType;
+  counterpartyName: string;
+  documentDate: Date;
+  notes: string | null;
+  createdAt: Date;
+  createdBy: { name: string | null } | null;
+  items: Array<{
+    id: string;
+    sortOrder: number;
+    case: { caseCode: string; imei: string; model: string; clientName: string; problem: string };
+  }>;
+};
+
+class WarrantyActionError extends Error {}
+
 const ok = <T>(data: T): Result<T> => ({ success: true, data });
-const fail = (error: unknown): Result<never> => ({ success: false, error: error instanceof Error ? error.message : "No se pudo completar la operación." });
 
-function auditData(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
-
-async function createDocument(tx: Prisma.TransactionClient, actorId: string, type: WarrantyDocumentType, counterpartyName: string, caseIds: string[], notes?: string) {
-  const prefix = type === "TECHNICIAN_ASSIGNMENT" || type === "TECHNICIAN_RECEIPT_REPAIRED" || type === "TECHNICIAN_RECEIPT_UNREPAIRED" ? "TECN" : type === "SUPPLIER_SHIPMENT" || type === "SUPPLIER_RECEIPT" ? "SUPL" : "COND";
-  const sequenceType = prefix === "COND" ? "COND" : prefix;
-  const code = await nextWarrantyNumber(tx, new Date(), sequenceType, prefix);
-  return tx.warrantyDocument.create({ data: { documentCode: code, type, counterpartyName, documentDate: civilDate(new Date()), createdById: actorId, notes, items: { create: caseIds.map((caseId, sortOrder) => ({ caseId, sortOrder })) } }, include: { items: true } });
+function fail(error: unknown): Result<never> {
+  if (error instanceof WarrantyActionError) return { success: false, error: error.message };
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return { success: false, error: "Ya existe un caso abierto con uno de esos IMEIs. Actualiza el panel y revisa el registro existente." };
+  }
+  console.error("[garantias] Error en operación", error);
+  return { success: false, error: "No se pudo completar la operación. Inténtalo nuevamente." };
 }
 
-async function createEvent(tx: Prisma.TransactionClient, caseId: string, actor: { id: string; name?: string | null }, type: WarrantyEventType, extra: { fromStatus?: WarrantyStatus; toStatus?: WarrantyStatus; counterpartyName?: string; reason?: string; beforeData?: unknown; afterData?: unknown } = {}) {
-  return tx.warrantyEvent.create({ data: { caseId, type, actorId: actor.id, actorNameSnapshot: actor.name ?? actor.id, fromStatus: extra.fromStatus, toStatus: extra.toStatus, counterpartyName: extra.counterpartyName, reason: extra.reason, beforeData: extra.beforeData ? auditData(extra.beforeData) : undefined, afterData: extra.afterData ? auditData(extra.afterData) : undefined } });
+function auditData(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
-export async function listWarrantyCases(input?: { search?: string; status?: WarrantyStatus | "ALL"; page?: number; pageSize?: number; olderThan30?: boolean }): Promise<Result<{ cases: Array<Record<string, unknown>>; total: number; page: number; pageSize: number }>> {
+function normalizeName(value: string | undefined) {
+  return (value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function comparableName(value: string | undefined | null) {
+  return normalizeName(value ?? undefined).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
+}
+
+function revalidateWarranty(caseCodes: string[], documentCode?: string | null) {
+  revalidatePath("/garantias");
+  revalidatePath("/garantias/historial/documentos");
+  for (const caseCode of caseCodes) revalidatePath(`/garantias/${caseCode}`);
+  if (documentCode) revalidatePath(`/garantias/documentos/${documentCode}`);
+}
+
+const documentSelect = {
+  id: true,
+  documentCode: true,
+  type: true,
+  counterpartyName: true,
+  documentDate: true,
+  notes: true,
+  createdAt: true,
+  createdBy: { select: { name: true } },
+  items: {
+    orderBy: { sortOrder: "asc" as const },
+    select: {
+      id: true,
+      sortOrder: true,
+      case: { select: { caseCode: true, imei: true, model: true, clientName: true, problem: true } },
+    },
+  },
+} satisfies Prisma.WarrantyDocumentSelect;
+
+const documentPrefix: Record<WarrantyDocumentType, string> = {
+  INTAKE_RECEIPT: "REC",
+  TECHNICIAN_ASSIGNMENT: "TECN",
+  TECHNICIAN_RECEIPT_REPAIRED: "TECN",
+  TECHNICIAN_RECEIPT_UNREPAIRED: "TECN",
+  SUPPLIER_SHIPMENT: "SUPL",
+  SUPPLIER_RECEIPT: "SUPL",
+  CUSTOMER_DELIVERY: "COND",
+  CREDIT_NOTE: "NC",
+};
+
+async function createDocument(
+  tx: Prisma.TransactionClient,
+  actorId: string,
+  type: WarrantyDocumentType,
+  counterpartyName: string,
+  caseIds: string[],
+  notes?: string,
+) {
+  const prefix = documentPrefix[type];
+  const code = await nextWarrantyNumber(tx, new Date(), prefix, prefix);
+  return tx.warrantyDocument.create({
+    data: {
+      documentCode: code,
+      type,
+      counterpartyName,
+      documentDate: civilDate(new Date()),
+      createdById: actorId,
+      notes: notes || undefined,
+      items: { create: caseIds.map((caseId, sortOrder) => ({ caseId, sortOrder })) },
+    },
+    select: { id: true, documentCode: true },
+  });
+}
+
+async function createEvent(
+  tx: Prisma.TransactionClient,
+  caseId: string,
+  actor: { id: string; name?: string | null },
+  type: WarrantyEventType,
+  extra: {
+    fromStatus?: WarrantyStatus;
+    toStatus?: WarrantyStatus;
+    counterpartyName?: string;
+    reason?: string;
+    beforeData?: unknown;
+    afterData?: unknown;
+  } = {},
+) {
+  return tx.warrantyEvent.create({
+    data: {
+      caseId,
+      type,
+      actorId: actor.id,
+      actorNameSnapshot: actor.name ?? actor.id,
+      fromStatus: extra.fromStatus,
+      toStatus: extra.toStatus,
+      counterpartyName: extra.counterpartyName,
+      reason: extra.reason,
+      beforeData: extra.beforeData ? auditData(extra.beforeData) : undefined,
+      afterData: extra.afterData ? auditData(extra.afterData) : undefined,
+    },
+  });
+}
+
+export async function listWarrantyCases(input?: {
+  search?: string;
+  status?: WarrantyStatus | "ALL";
+  page?: number;
+  pageSize?: number;
+  olderThan30?: boolean;
+  archive?: ArchiveFilter;
+}): Promise<Result<{ cases: WarrantyCaseListItem[]; total: number; page: number; pageSize: number }>> {
   try {
     await requirePermission("warranties.read");
-    const page = Math.max(1, input?.page ?? 1); const pageSize = Math.min(100, Math.max(10, input?.pageSize ?? 25));
-    const search = input?.search?.trim();
+    const page = Number.isInteger(input?.page) ? Math.max(1, input?.page ?? 1) : 1;
+    const pageSize = Number.isInteger(input?.pageSize) ? Math.min(100, Math.max(10, input?.pageSize ?? 25)) : 25;
+    const search = input?.search?.trim().slice(0, 160);
     const searchDigits = search?.replace(/\D/g, "");
+    const validStatuses = new Set(Object.values(WarrantyStatus));
+    const status = input?.status && input.status !== "ALL" && validStatuses.has(input.status) ? input.status : undefined;
+    const archive = input?.archive === "archived" || input?.archive === "all" ? input.archive : "active";
+    const cutoff = civilDate(santoDomingoDateString(new Date(Date.now() - 30 * 86_400_000)));
     const where: Prisma.WarrantyCaseWhereInput = {
-      archivedAt: null,
-      ...(input?.status && input.status !== "ALL" ? { status: input.status } : {}),
-      ...(input?.olderThan30 ? { status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: new Date(Date.now() - 30 * 86400000) } } : {}),
-      ...(search ? { OR: [{ caseCode: { contains: search, mode: "insensitive" } }, { imei: { contains: search } }, ...(searchDigits && searchDigits.length >= 4 ? [{ imei: { endsWith: searchDigits } }] : []), { model: { contains: search, mode: "insensitive" } }, { clientName: { contains: search, mode: "insensitive" } }] } : {}),
+      ...(archive === "active" ? { archivedAt: null } : archive === "archived" ? { archivedAt: { not: null } } : {}),
+      ...(status ? { status } : {}),
+      ...(input?.olderThan30
+        ? { status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: cutoff } }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { caseCode: { contains: search, mode: "insensitive" } },
+              { imei: { contains: search } },
+              ...(searchDigits && searchDigits.length >= 4 ? [{ imei: { endsWith: searchDigits } } as const] : []),
+              { model: { contains: search, mode: "insensitive" } },
+              { clientName: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
     };
-    const cases = await prisma.warrantyCase.findMany({ where, orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }], skip: (page - 1) * pageSize, take: pageSize, include: { _count: { select: { events: true, documentItems: true } } } });
-    const total = await prisma.warrantyCase.count({ where });
+    const [cases, total] = await Promise.all([
+      prisma.warrantyCase.findMany({
+        where,
+        orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          caseCode: true,
+          imei: true,
+          model: true,
+          clientName: true,
+          problem: true,
+          status: true,
+          entryDate: true,
+          archivedAt: true,
+          _count: { select: { events: true, documentItems: true } },
+        },
+      }),
+      prisma.warrantyCase.count({ where }),
+    ]);
     return ok({ cases, total, page, pageSize });
-  } catch (error) { return fail(error); }
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function getWarrantyDashboardStats(): Promise<Result<Record<string, number>>> {
-  try { await requirePermission("warranties.read"); const [groups, open30] = await Promise.all([prisma.warrantyCase.groupBy({ by: ["status"], where: { archivedAt: null }, _count: { _all: true } }), prisma.warrantyCase.count({ where: { archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: new Date(Date.now() - 30 * 86400000) } } })]); return ok(Object.fromEntries([...groups.map((g) => [g.status, g._count._all]), ["OPEN_30_PLUS", open30]])); } catch (error) { return fail(error); }
+  try {
+    await requirePermission("warranties.read");
+    const cutoff = civilDate(santoDomingoDateString(new Date(Date.now() - 30 * 86_400_000)));
+    const [groups, open30, active] = await Promise.all([
+      prisma.warrantyCase.groupBy({ by: ["status"], where: { archivedAt: null }, _count: { _all: true } }),
+      prisma.warrantyCase.count({ where: { archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: cutoff } } }),
+      prisma.warrantyCase.count({ where: { archivedAt: null } }),
+    ]);
+    return ok(Object.fromEntries([...groups.map((group) => [group.status, group._count._all]), ["OPEN_30_PLUS", open30], ["ACTIVE_TOTAL", active]]));
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function getWarrantyCase(caseCode: string): Promise<Result<unknown>> {
-  try { await requirePermission("warranties.read"); const item = await prisma.warrantyCase.findUnique({ where: { caseCode }, include: { events: { orderBy: { createdAt: "asc" } }, documentItems: { include: { document: true }, orderBy: { document: { documentDate: "desc" } } } } }); return item ? ok(item) : fail("Caso no encontrado."); } catch (error) { return fail(error); }
+  try {
+    await requirePermission("warranties.read");
+    const item = await prisma.warrantyCase.findUnique({
+      where: { caseCode: caseCode.trim() },
+      select: {
+        caseCode: true,
+        imei: true,
+        model: true,
+        clientName: true,
+        problem: true,
+        status: true,
+        entryDate: true,
+        assignedTechnicianName: true,
+        currentSupplierName: true,
+        archivedAt: true,
+        createdAt: true,
+        events: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, type: true, fromStatus: true, toStatus: true, actorNameSnapshot: true, counterpartyName: true, reason: true, createdAt: true },
+        },
+        documentItems: {
+          orderBy: { document: { documentDate: "desc" } },
+          select: { document: { select: { id: true, documentCode: true, type: true, documentDate: true } } },
+        },
+      },
+    });
+    return item ? ok(item) : { success: false, error: "Caso no encontrado." };
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function createWarrantyCases(input: unknown): Promise<Result<{ caseCodes: string[]; documentCode: string }>> {
   try {
-    const actor = await requirePermission("warranties.create"); const parsed = createWarrantySchema.safeParse(input); if (!parsed.success) return { success: false, error: "Revisa los datos del ingreso.", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
+    const actor = await requirePermission("warranties.create");
+    const parsed = createWarrantySchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: "Revisa los datos del ingreso.", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
+    }
     const result = await prisma.$transaction(async (tx) => {
+      const incomingImeis = parsed.data.devices.map((device) => device.imei);
+      const existing = await tx.warrantyCase.findMany({
+        where: { imei: { in: incomingImeis }, archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } },
+        select: { imei: true, caseCode: true },
+      });
+      if (existing.length > 0) {
+        throw new WarrantyActionError(`Ya hay casos abiertos para: ${existing.map((item) => `${item.imei} (${item.caseCode})`).join(", ")}.`);
+      }
+
       const created = [];
       for (const device of parsed.data.devices) {
         const code = await nextWarrantyNumber(tx, new Date(), "CASE", "GAR");
-        const item = await tx.warrantyCase.create({ data: { caseCode: code, imei: device.imei, model: device.model, clientName: parsed.data.clientName, problem: device.problem, entryDate: civilDate(parsed.data.entryDate), createdById: actor.id, updatedById: actor.id } });
-        await createEvent(tx, item.id, actor, "CREATED", { toStatus: "RECEIVED", afterData: { caseCode: code, imei: item.imei } }); created.push(item);
+        const item = await tx.warrantyCase.create({
+          data: {
+            caseCode: code,
+            imei: device.imei,
+            model: normalizeName(device.model),
+            clientName: normalizeName(parsed.data.clientName),
+            problem: device.problem.trim(),
+            entryDate: civilDate(parsed.data.entryDate),
+            createdById: actor.id,
+            updatedById: actor.id,
+          },
+        });
+        await createEvent(tx, item.id, actor, "CREATED", { toStatus: "RECEIVED", afterData: { caseCode: code, imei: item.imei } });
+        created.push(item);
       }
-      const document = await createDocument(tx, actor.id, "INTAKE_RECEIPT", parsed.data.clientName, created.map((item) => item.id));
-      await tx.auditLog.create({ data: { userId: actor.id, action: "warranty.create_batch", module: "garantias", entityType: "WarrantyDocument", entityId: document.id, afterData: auditData({ caseCodes: created.map((item) => item.caseCode), clientName: parsed.data.clientName }) } });
+      const document = await createDocument(tx, actor.id, "INTAKE_RECEIPT", normalizeName(parsed.data.clientName), created.map((item) => item.id));
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          action: "warranty.create_batch",
+          module: "garantias",
+          entityType: "WarrantyDocument",
+          entityId: document.id,
+          afterData: auditData({ caseCodes: created.map((item) => item.caseCode), clientName: parsed.data.clientName, documentCode: document.documentCode }),
+        },
+      });
       return { caseCodes: created.map((item) => item.caseCode), documentCode: document.documentCode };
     });
-    revalidatePath("/garantias"); return ok(result);
-  } catch (error) { return fail(error); }
+    revalidateWarranty(result.caseCodes, result.documentCode);
+    return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
 }
 
-export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<unknown>> {
-  try { const actor = await requirePermission("warranties.update"); const parsed = updateWarrantySchema.safeParse(input); if (!parsed.success) return fail("Datos de caso inválidos."); const result = await prisma.$transaction(async (tx) => { const current = await tx.warrantyCase.findUnique({ where: { caseCode: parsed.data.caseCode } }); if (!current || current.archivedAt) throw new Error("Caso no encontrado."); const updated = await tx.warrantyCase.update({ where: { id: current.id }, data: { clientName: parsed.data.clientName, model: parsed.data.model, imei: parsed.data.imei, problem: parsed.data.problem, updatedById: actor.id } }); await createEvent(tx, current.id, actor, "DETAILS_UPDATED", { beforeData: current, afterData: updated }); await tx.auditLog.create({ data: { userId: actor.id, action: "warranty.details.update", module: "garantias", entityType: "WarrantyCase", entityId: current.id, beforeData: auditData(current), afterData: auditData(updated) } }); return updated; }); revalidatePath("/garantias"); return ok(result); } catch (error) { return fail(error); }
-}
-
-async function flow(input: unknown, operation: "assign" | "receive-repaired" | "receive-unrepaired" | "send-supplier" | "receive-supplier" | "deliver" | "credit"): Promise<Result<unknown>> {
+export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<{ caseCode: string }>> {
   try {
-    const actor = await requirePermission("warranties.transition"); const parsed = flowSchema.safeParse(input); if (!parsed.success) return fail("Datos del flujo inválidos.");
-    const data = parsed.data; const reasonRequired = operation === "receive-unrepaired" || operation === "credit"; if (reasonRequired && !data.reason) return fail("El motivo es obligatorio.");
+    const actor = await requirePermission("warranties.update");
+    const parsed = updateWarrantySchema.safeParse(input);
+    if (!parsed.success) return { success: false, error: "Revisa los datos del caso." };
     const result = await prisma.$transaction(async (tx) => {
-      const cases = await tx.warrantyCase.findMany({ where: { caseCode: { in: data.caseCodes }, archivedAt: null } }); if (cases.length !== data.caseCodes.length) throw new Error("Uno o más casos no existen o están archivados.");
-      let toStatus: WarrantyStatus; let documentType: WarrantyDocumentType | null = null; let eventType: WarrantyEventType = "STATUS_CHANGED"; let allowed: WarrantyStatus[];
-      if (operation === "assign") { toStatus = "IN_REPAIR"; allowed = ["RECEIVED"]; documentType = "TECHNICIAN_ASSIGNMENT"; eventType = "ASSIGNED_TO_TECHNICIAN"; }
-      else if (operation === "receive-repaired") { toStatus = "RECEIVED_FROM_TECHNICIAN"; allowed = ["IN_REPAIR"]; documentType = "TECHNICIAN_RECEIPT_REPAIRED"; eventType = "RECEIVED_REPAIRED"; }
-      else if (operation === "receive-unrepaired") { toStatus = "RECEIVED"; allowed = ["IN_REPAIR"]; documentType = "TECHNICIAN_RECEIPT_UNREPAIRED"; eventType = "RECEIVED_UNREPAIRED"; }
-      else if (operation === "send-supplier") { toStatus = "SENT_TO_SUPPLIER"; allowed = ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"]; documentType = "SUPPLIER_SHIPMENT"; eventType = "SENT_TO_SUPPLIER"; }
-      else if (operation === "receive-supplier") { toStatus = "RECEIVED_FROM_SUPPLIER"; allowed = ["SENT_TO_SUPPLIER"]; documentType = "SUPPLIER_RECEIPT"; eventType = "RECEIVED_FROM_SUPPLIER"; }
-      else if (operation === "deliver") { toStatus = "DELIVERED"; allowed = ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"]; documentType = "CUSTOMER_DELIVERY"; eventType = "DELIVERED_TO_CUSTOMER"; }
-      else { toStatus = "CREDIT_NOTE"; allowed = ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"]; eventType = "CREDIT_NOTE_MARKED"; }
-      if (cases.some((item) => !allowed.includes(item.status) || (operation === "deliver" && item.clientName.trim().toLowerCase() !== (data.counterpartyName ?? "").trim().toLowerCase()))) throw new Error("Uno o más casos no están en un estado elegible para este flujo.");
-      for (const item of cases) { const update: Prisma.WarrantyCaseUpdateInput = { status: toStatus, updatedBy: { connect: { id: actor.id } }, ...(operation === "assign" ? { assignedTechnicianName: data.counterpartyName } : {}), ...(operation === "send-supplier" ? { currentSupplierName: data.counterpartyName } : {}) }; await tx.warrantyCase.update({ where: { id: item.id }, data: update }); await createEvent(tx, item.id, actor, eventType, { fromStatus: item.status, toStatus, counterpartyName: data.counterpartyName, reason: data.reason }); }
-      const document = documentType ? await createDocument(tx, actor.id, documentType, data.counterpartyName ?? "", cases.map((item) => item.id), data.reason) : null;
-      await tx.auditLog.create({ data: { userId: actor.id, action: `warranty.${operation}`, module: "garantias", entityType: "WarrantyCase", entityId: cases[0].id, afterData: auditData({ caseCodes: data.caseCodes, toStatus, counterpartyName: data.counterpartyName, reason: data.reason, documentCode: document?.documentCode }) } });
-      return { documentCode: document?.documentCode ?? null, status: toStatus };
+      const current = await tx.warrantyCase.findUnique({ where: { caseCode: parsed.data.caseCode } });
+      if (!current || current.archivedAt) throw new WarrantyActionError("Caso no encontrado o archivado.");
+      if (current.imei !== parsed.data.imei) {
+        const duplicate = await tx.warrantyCase.findFirst({
+          where: { id: { not: current.id }, imei: parsed.data.imei, archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } },
+          select: { caseCode: true },
+        });
+        if (duplicate) throw new WarrantyActionError(`Ese IMEI ya está abierto en ${duplicate.caseCode}.`);
+      }
+      const updated = await tx.warrantyCase.update({
+        where: { id: current.id },
+        data: {
+          clientName: normalizeName(parsed.data.clientName),
+          model: normalizeName(parsed.data.model),
+          imei: parsed.data.imei,
+          problem: parsed.data.problem.trim(),
+          updatedById: actor.id,
+        },
+      });
+      await createEvent(tx, current.id, actor, "DETAILS_UPDATED", { beforeData: current, afterData: updated });
+      await tx.auditLog.create({ data: { userId: actor.id, action: "warranty.details.update", module: "garantias", entityType: "WarrantyCase", entityId: current.id, beforeData: auditData(current), afterData: auditData(updated) } });
+      return { caseCode: updated.caseCode };
     });
-    revalidatePath("/garantias"); return ok(result);
-  } catch (error) { return fail(error); }
+    revalidateWarranty([result.caseCode]);
+    return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+const flowRules: Record<FlowOperation, {
+  toStatus: WarrantyStatus;
+  allowed: WarrantyStatus[];
+  documentType: WarrantyDocumentType;
+  eventType: WarrantyEventType;
+  needsCounterparty: boolean;
+  needsReason: boolean;
+}> = {
+  assign: { toStatus: "IN_REPAIR", allowed: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], documentType: "TECHNICIAN_ASSIGNMENT", eventType: "ASSIGNED_TO_TECHNICIAN", needsCounterparty: true, needsReason: false },
+  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: true },
+  "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: true },
+  "send-supplier": { toStatus: "SENT_TO_SUPPLIER", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"], documentType: "SUPPLIER_SHIPMENT", eventType: "SENT_TO_SUPPLIER", needsCounterparty: true, needsReason: false },
+  "receive-supplier": { toStatus: "RECEIVED_FROM_SUPPLIER", allowed: ["SENT_TO_SUPPLIER"], documentType: "SUPPLIER_RECEIPT", eventType: "RECEIVED_FROM_SUPPLIER", needsCounterparty: true, needsReason: true },
+  deliver: { toStatus: "DELIVERED", allowed: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], documentType: "CUSTOMER_DELIVERY", eventType: "DELIVERED_TO_CUSTOMER", needsCounterparty: true, needsReason: true },
+  credit: { toStatus: "CREDIT_NOTE", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"], documentType: "CREDIT_NOTE", eventType: "CREDIT_NOTE_MARKED", needsCounterparty: false, needsReason: true },
+};
+
+async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode: string; status: WarrantyStatus }>> {
+  try {
+    const actor = await requirePermission("warranties.transition");
+    const parsed = flowSchema.safeParse(input);
+    if (!parsed.success) return { success: false, error: "Revisa los datos del flujo." };
+    const data = parsed.data;
+    const rule = flowRules[operation];
+    const counterpartyName = normalizeName(data.counterpartyName);
+    const reason = data.reason?.trim();
+    if (rule.needsCounterparty && !counterpartyName) return { success: false, error: "La contraparte es obligatoria." };
+    if (rule.needsReason && !reason) return { success: false, error: "La resolución u observación es obligatoria." };
+
+    const result = await prisma.$transaction(async (tx) => {
+      const cases = await tx.warrantyCase.findMany({ where: { caseCode: { in: data.caseCodes }, archivedAt: null } });
+      if (cases.length !== data.caseCodes.length) throw new WarrantyActionError("Uno o más casos no existen o están archivados.");
+      if (cases.some((item) => !rule.allowed.includes(item.status))) throw new WarrantyActionError("Uno o más casos cambiaron de estado y ya no son elegibles.");
+      if (operation === "deliver" && cases.some((item) => comparableName(item.clientName) !== comparableName(counterpartyName))) {
+        throw new WarrantyActionError("Para entregar, todos los casos deben pertenecer al cliente indicado.");
+      }
+      if (operation.startsWith("receive-") && operation !== "receive-supplier" && cases.some((item) => comparableName(item.assignedTechnicianName) !== comparableName(counterpartyName))) {
+        throw new WarrantyActionError("El técnico indicado no coincide con el técnico asignado en uno o más casos.");
+      }
+      if (operation === "receive-supplier" && cases.some((item) => comparableName(item.currentSupplierName) !== comparableName(counterpartyName))) {
+        throw new WarrantyActionError("El suplidor indicado no coincide con el envío registrado en uno o más casos.");
+      }
+
+      for (const item of cases) {
+        const update = await tx.warrantyCase.updateMany({
+          where: { id: item.id, status: item.status, archivedAt: null },
+          data: {
+            status: rule.toStatus,
+            updatedById: actor.id,
+            ...(operation === "assign" ? { assignedTechnicianName: counterpartyName, currentSupplierName: null } : {}),
+            ...(operation === "receive-repaired" || operation === "receive-unrepaired" ? { assignedTechnicianId: null, assignedTechnicianName: null } : {}),
+            ...(operation === "send-supplier" ? { currentSupplierName: counterpartyName, assignedTechnicianId: null, assignedTechnicianName: null } : {}),
+            ...(operation === "receive-supplier" ? { currentSupplierName: null } : {}),
+            ...(operation === "deliver" || operation === "credit" ? { assignedTechnicianId: null, assignedTechnicianName: null, currentSupplierName: null } : {}),
+          },
+        });
+        if (update.count !== 1) throw new WarrantyActionError(`El caso ${item.caseCode} fue actualizado por otra persona. Recarga e inténtalo nuevamente.`);
+        await createEvent(tx, item.id, actor, rule.eventType, { fromStatus: item.status, toStatus: rule.toStatus, counterpartyName: counterpartyName || item.clientName, reason });
+      }
+      const document = await createDocument(tx, actor.id, rule.documentType, counterpartyName || cases[0].clientName, cases.map((item) => item.id), reason);
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          action: `warranty.${operation}`,
+          module: "garantias",
+          entityType: "WarrantyDocument",
+          entityId: document.id,
+          afterData: auditData({ caseCodes: data.caseCodes, toStatus: rule.toStatus, counterpartyName, reason, documentCode: document.documentCode }),
+        },
+      });
+      return { documentCode: document.documentCode, status: rule.toStatus };
+    });
+    revalidateWarranty(data.caseCodes, result.documentCode);
+    return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
 }
 
 export async function assignCasesToTechnician(input: unknown) { return flow(input, "assign"); }
@@ -104,6 +450,70 @@ export async function receiveCasesFromSupplier(input: unknown) { return flow(inp
 export async function deliverCasesToCustomer(input: unknown) { return flow(input, "deliver"); }
 export async function markWarrantyCreditNote(input: unknown) { return flow(input, "credit"); }
 
-export async function listWarrantyDocuments(): Promise<Result<unknown[]>> { try { await requirePermission("warranties.documents"); return ok(await prisma.warrantyDocument.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { items: { include: { case: true }, orderBy: { sortOrder: "asc" } } } })); } catch (error) { return fail(error); } }
-export async function getWarrantyDocument(documentCode: string): Promise<Result<unknown>> { try { await requirePermission("warranties.documents"); const document = await prisma.warrantyDocument.findUnique({ where: { documentCode }, include: { items: { include: { case: true }, orderBy: { sortOrder: "asc" } } } }); return document ? ok(document) : fail("Documento no encontrado."); } catch (error) { return fail(error); } }
-export async function archiveWarrantyCase(caseCode: string, reason: string): Promise<Result<unknown>> { try { const actor = await requirePermission("warranties.archive"); if (!reason.trim()) return fail("El motivo es obligatorio."); const item = await prisma.$transaction(async (tx) => { const current = await tx.warrantyCase.findUnique({ where: { caseCode } }); if (!current) throw new Error("Caso no encontrado."); const archived = await tx.warrantyCase.update({ where: { id: current.id }, data: { archivedAt: new Date(), archivedById: actor.id, updatedById: actor.id } }); await createEvent(tx, current.id, actor, "ARCHIVED", { reason }); await tx.auditLog.create({ data: { userId: actor.id, action: "warranty.archive", module: "garantias", entityType: "WarrantyCase", entityId: current.id, beforeData: auditData(current), afterData: auditData({ archivedAt: archived.archivedAt, reason }) } }); return archived; }); revalidatePath("/garantias"); return ok(item); } catch (error) { return fail(error); } }
+export async function listWarrantyDocuments(): Promise<Result<WarrantyDocumentData[]>> {
+  try {
+    await requirePermission("warranties.documents");
+    return ok(await prisma.warrantyDocument.findMany({ orderBy: { createdAt: "desc" }, take: 100, select: documentSelect }));
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function getWarrantyDocument(documentCode: string): Promise<Result<WarrantyDocumentData>> {
+  try {
+    await requirePermission("warranties.documents");
+    const document = await prisma.warrantyDocument.findUnique({ where: { documentCode: documentCode.trim() }, select: documentSelect });
+    return document ? ok(document) : { success: false, error: "Documento no encontrado." };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function archiveWarrantyCase(caseCode: string, reason: string): Promise<Result<{ caseCode: string }>> {
+  try {
+    const actor = await requirePermission("warranties.archive");
+    const parsed = archiveWarrantySchema.safeParse({ caseCode, reason });
+    if (!parsed.success) return { success: false, error: "Indica un motivo válido para archivar." };
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.warrantyCase.findUnique({ where: { caseCode: parsed.data.caseCode } });
+      if (!current) throw new WarrantyActionError("Caso no encontrado.");
+      if (current.archivedAt) throw new WarrantyActionError("El caso ya está archivado.");
+      const archived = await tx.warrantyCase.update({ where: { id: current.id }, data: { archivedAt: new Date(), archivedById: actor.id, updatedById: actor.id } });
+      await createEvent(tx, current.id, actor, "ARCHIVED", { reason: parsed.data.reason });
+      await tx.auditLog.create({ data: { userId: actor.id, action: "warranty.archive", module: "garantias", entityType: "WarrantyCase", entityId: current.id, beforeData: auditData(current), afterData: auditData({ archivedAt: archived.archivedAt, reason: parsed.data.reason }) } });
+      return { caseCode: current.caseCode };
+    });
+    revalidateWarranty([result.caseCode]);
+    return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function restoreWarrantyCase(caseCode: string, reason?: string): Promise<Result<{ caseCode: string }>> {
+  try {
+    const actor = await requirePermission("warranties.archive");
+    const parsed = restoreWarrantySchema.safeParse({ caseCode, reason });
+    if (!parsed.success) return { success: false, error: "Los datos para restaurar no son válidos." };
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.warrantyCase.findUnique({ where: { caseCode: parsed.data.caseCode } });
+      if (!current) throw new WarrantyActionError("Caso no encontrado.");
+      if (!current.archivedAt) throw new WarrantyActionError("El caso no está archivado.");
+      if (!["DELIVERED", "CREDIT_NOTE"].includes(current.status)) {
+        const duplicate = await tx.warrantyCase.findFirst({
+          where: { id: { not: current.id }, imei: current.imei, archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } },
+          select: { caseCode: true },
+        });
+        if (duplicate) throw new WarrantyActionError(`No se puede restaurar: el IMEI ya está abierto en ${duplicate.caseCode}.`);
+      }
+      await tx.warrantyCase.update({ where: { id: current.id }, data: { archivedAt: null, archivedById: null, updatedById: actor.id } });
+      await createEvent(tx, current.id, actor, "RESTORED", { reason: parsed.data.reason || "Restaurado al panel operativo." });
+      await tx.auditLog.create({ data: { userId: actor.id, action: "warranty.restore", module: "garantias", entityType: "WarrantyCase", entityId: current.id, beforeData: auditData(current), afterData: auditData({ archivedAt: null, reason: parsed.data.reason }) } });
+      return { caseCode: current.caseCode };
+    });
+    revalidateWarranty([result.caseCode]);
+    return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
+}

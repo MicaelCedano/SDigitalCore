@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   ArrowUpRight,
+  Archive,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -34,6 +34,7 @@ type CaseRow = {
   problem: string;
   status: keyof typeof WARRANTY_STATUS_LABELS;
   entryDate: string | Date;
+  archivedAt: string | Date | null;
 };
 
 type StatCard = {
@@ -58,6 +59,7 @@ export function WarrantyDashboard({
   stats,
   quickCases,
   canCreate,
+  canTransition,
 }: {
   initialCases: CaseRow[];
   total: number;
@@ -66,6 +68,7 @@ export function WarrantyDashboard({
   stats: Record<string, number>;
   quickCases: Partial<Record<WarrantyFlowOperation, WarrantyFlowCase[]>>;
   canCreate: boolean;
+  canTransition: boolean;
 }) {
   const [rows, setRows] = useState(initialCases);
   const [totalRows, setTotalRows] = useState(total);
@@ -73,12 +76,15 @@ export function WarrantyDashboard({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [olderThan30, setOlderThan30] = useState(false);
+  const [archive, setArchive] = useState<"active" | "archived" | "all">("active");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const firstRender = useRef(true);
+  const requestSequence = useRef(0);
 
   const cards = useMemo<StatCard[]>(() => [
-    { key: "ALL", label: "Casos activos", value: total, icon: Inbox, tone: "indigo" },
+    { key: "ALL", label: "Casos activos", value: stats.ACTIVE_TOTAL ?? total, icon: Inbox, tone: "indigo" },
     { key: "RECEIVED", label: "Recibidos", value: stats.RECEIVED ?? 0, icon: FileCheck2, tone: "blue" },
     { key: "IN_REPAIR", label: "En reparación", value: stats.IN_REPAIR ?? 0, icon: Wrench, tone: "amber" },
     { key: "RECEIVED_FROM_TECHNICIAN", label: "Del técnico", value: stats.RECEIVED_FROM_TECHNICIAN ?? 0, icon: UserRoundCheck, tone: "violet" },
@@ -87,7 +93,13 @@ export function WarrantyDashboard({
   ], [stats, total]);
 
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
-  const hasFilters = Boolean(search.trim() || status !== "ALL" || olderThan30);
+  const hasFilters = Boolean(search.trim() || status !== "ALL" || olderThan30 || archive !== "active");
+
+  useEffect(() => {
+    const refresh = () => setRefreshVersion((version) => version + 1);
+    window.addEventListener("warranty-data-changed", refresh);
+    return () => window.removeEventListener("warranty-data-changed", refresh);
+  }, []);
 
   useEffect(() => {
     if (firstRender.current) {
@@ -95,10 +107,11 @@ export function WarrantyDashboard({
       return;
     }
     const timer = window.setTimeout(() => {
+      const requestId = ++requestSequence.current;
       startTransition(() => {
         void (async () => {
-          const result = await listWarrantyCases({ search, status: status as never, page: currentPage, pageSize, olderThan30 });
-          if (result.success) {
+          const result = await listWarrantyCases({ search, status: status as keyof typeof WARRANTY_STATUS_LABELS | "ALL", page: currentPage, pageSize, olderThan30, archive });
+          if (result.success && requestId === requestSequence.current) {
             setRows(result.data.cases as unknown as CaseRow[]);
             setTotalRows(result.data.total);
           }
@@ -106,7 +119,7 @@ export function WarrantyDashboard({
       });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [currentPage, olderThan30, pageSize, search, status]);
+  }, [archive, currentPage, olderThan30, pageSize, refreshVersion, search, status]);
 
   function selectStatus(nextStatus: string) {
     setStatus(nextStatus);
@@ -117,6 +130,7 @@ export function WarrantyDashboard({
     setSearch("");
     setStatus("ALL");
     setOlderThan30(false);
+    setArchive("active");
     setCurrentPage(1);
   }
 
@@ -133,7 +147,7 @@ export function WarrantyDashboard({
           </div>
           <p className="mt-4 flex items-center gap-2 text-xs text-[#98a2b3]"><CalendarDays size={14} /> Datos operativos actualizados al consultar.</p>
         </div>
-        <Link href="/garantias/ingreso" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><Plus size={17} /> Registrar ingreso</Link>
+        {canCreate && <Link href="/garantias/ingreso" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><Plus size={17} /> Registrar ingreso</Link>}
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -144,8 +158,8 @@ export function WarrantyDashboard({
         })}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
-        <WarrantyQuickActions cases={quickCases} canCreate={canCreate} />
+      <section className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <WarrantyQuickActions cases={quickCases} canCreate={canCreate} canTransition={canTransition} />
         <div className="enterprise-panel overflow-hidden">
           <div className="border-b border-[#e4e7ec] p-4 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -153,18 +167,17 @@ export function WarrantyDashboard({
               <div className="flex gap-2"><button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium ${filtersOpen || hasFilters ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-[#d0d5dd] text-[#475467] hover:bg-[#f8fafc]"}`}><SlidersHorizontal size={16} /> Filtros{hasFilters ? " activos" : ""}</button><button type="button" onClick={clearFilters} disabled={!hasFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d0d5dd] px-3 text-sm font-medium text-[#475467] disabled:cursor-not-allowed disabled:opacity-40"><RotateCcw size={15} /> Limpiar</button></div>
             </div>
             <div className="relative mt-4"><Search size={17} className="absolute left-3 top-3 text-[#98a2b3]" /><input value={search} onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Buscar por IMEI, modelo, cliente o código..." className="h-11 w-full rounded-xl border border-[#d0d5dd] pl-10 pr-3 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10" /></div>
-            {filtersOpen && <div className="mt-3 grid gap-3 border-t border-[#f0f1f3] pt-3 sm:grid-cols-2"><label className="text-xs font-semibold text-[#667085]">Estado<select value={status} onChange={(event) => selectStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-sm font-normal text-[#344054]"><option value="ALL">Todos los estados</option>{statusOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="flex items-end gap-2 rounded-lg border border-[#e4e7ec] px-3 py-2.5 text-sm text-[#344054]"><input type="checkbox" checked={olderThan30} onChange={(event) => { setOlderThan30(event.target.checked); setCurrentPage(1); }} className="h-4 w-4 rounded border-[#d0d5dd] text-indigo-600" /> Casos con más de 30 días</label></div>}
+            {filtersOpen && <div className="mt-3 grid gap-3 border-t border-[#f0f1f3] pt-3 sm:grid-cols-3"><label className="text-xs font-semibold text-[#667085]">Estado<select value={status} onChange={(event) => selectStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-sm font-normal text-[#344054]"><option value="ALL">Todos los estados</option>{statusOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="text-xs font-semibold text-[#667085]">Archivo<select value={archive} onChange={(event) => { setArchive(event.target.value as typeof archive); setCurrentPage(1); }} className="mt-1 h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-sm font-normal text-[#344054]"><option value="active">Solo activos</option><option value="archived">Solo archivados</option><option value="all">Todos</option></select></label><label className="flex items-end gap-2 rounded-lg border border-[#e4e7ec] px-3 py-2.5 text-sm text-[#344054]"><input type="checkbox" checked={olderThan30} onChange={(event) => { setOlderThan30(event.target.checked); setCurrentPage(1); }} className="h-4 w-4 rounded border-[#d0d5dd] text-indigo-600" /> Casos con más de 30 días</label></div>}
           </div>
           <div className={`overflow-x-auto transition-opacity ${isPending ? "opacity-50" : ""}`}>
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead className="bg-[#f8fafc] text-[11px] uppercase tracking-[0.08em] text-[#667085]"><tr><th className="px-5 py-3 font-semibold">Caso</th><th className="px-5 py-3 font-semibold">Cliente</th><th className="px-5 py-3 font-semibold">Equipo</th><th className="px-5 py-3 font-semibold">Falla reportada</th><th className="px-5 py-3 font-semibold">Estado</th><th className="px-5 py-3 font-semibold">Ingreso</th></tr></thead>
-              <tbody className="divide-y divide-[#f0f1f3]">{rows.map((item) => <tr key={item.id} className="group transition hover:bg-[#f8fafc]"><td className="px-5 py-4"><Link href={`/garantias/${item.caseCode}`} className="font-mono text-xs font-bold text-indigo-600 hover:underline">{item.caseCode}</Link><p className="mt-1 text-[11px] text-[#98a2b3]">Ver detalle <ArrowUpRight size={12} className="inline" /></p></td><td className="px-5 py-4 font-medium text-[#344054]">{item.clientName}</td><td className="px-5 py-4"><p className="font-medium text-[#344054]">{item.model}</p><p className="mt-1 font-mono text-[11px] text-[#667085]">IMEI {item.imei}</p></td><td className="max-w-[260px] px-5 py-4 text-[#667085]"><p className="truncate" title={item.problem}>{item.problem}</p></td><td className="px-5 py-4"><WarrantyStatusBadge status={item.status} /></td><td className="whitespace-nowrap px-5 py-4 text-xs text-[#667085]">{formatDate(item.entryDate)}</td></tr>)}{rows.length === 0 && <tr><td colSpan={6} className="px-5 py-16 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f4f7] text-[#667085]"><Search size={20} /></span><p className="mt-3 font-medium text-[#344054]">No encontramos casos</p><p className="mt-1 text-sm text-[#667085]">Prueba cambiando la búsqueda o los filtros.</p></td></tr>}</tbody>
+              <tbody className="divide-y divide-[#f0f1f3]">{rows.map((item) => <tr key={item.id} className={`group transition hover:bg-[#f8fafc] ${item.archivedAt ? "bg-slate-50/70 opacity-75" : ""}`}><td className="px-5 py-4"><Link href={`/garantias/${item.caseCode}`} className="font-mono text-xs font-bold text-indigo-600 hover:underline">{item.caseCode}</Link><p className="mt-1 text-[11px] text-[#98a2b3]">{item.archivedAt ? <><Archive size={11} className="inline" /> Archivado</> : <>Ver detalle <ArrowUpRight size={12} className="inline" /></>}</p></td><td className="px-5 py-4 font-medium text-[#344054]">{item.clientName}</td><td className="px-5 py-4"><p className="font-medium text-[#344054]">{item.model}</p><p className="mt-1 font-mono text-[11px] text-[#667085]">IMEI {item.imei}</p></td><td className="max-w-[260px] px-5 py-4 text-[#667085]"><p className="truncate" title={item.problem}>{item.problem}</p></td><td className="px-5 py-4"><WarrantyStatusBadge status={item.status} /></td><td className="whitespace-nowrap px-5 py-4 text-xs text-[#667085]">{formatDate(item.entryDate)}</td></tr>)}{rows.length === 0 && <tr><td colSpan={6} className="px-5 py-16 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f4f7] text-[#667085]"><Search size={20} /></span><p className="mt-3 font-medium text-[#344054]">No encontramos casos</p><p className="mt-1 text-sm text-[#667085]">Prueba cambiando la búsqueda o los filtros.</p></td></tr>}</tbody>
             </table>
           </div>
           <div className="flex flex-col gap-3 border-t border-[#e4e7ec] px-5 py-3 text-xs text-[#667085] sm:flex-row sm:items-center sm:justify-between"><span>Mostrando {rows.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, totalRows)} de {totalRows}</span><div className="flex items-center gap-2"><button type="button" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1 || isPending} className="rounded-lg border border-[#d0d5dd] p-1.5 disabled:opacity-40"><ChevronLeft size={16} /></button><span className="min-w-16 text-center">Página {currentPage} / {pageCount}</span><button type="button" onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))} disabled={currentPage >= pageCount || isPending} className="rounded-lg border border-[#d0d5dd] p-1.5 disabled:opacity-40"><ChevronRight size={16} /></button></div></div>
         </div>
 
-        <aside className="enterprise-panel h-fit p-4"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-[#101828]">Acciones rápidas</h2><p className="mt-1 text-xs text-[#667085]">Continúa el flujo operativo.</p></div><CheckCircle2 size={18} className="text-emerald-500" /></div><div className="mt-4 space-y-2"><Link href="/garantias/ingreso" className="flex items-center justify-between rounded-lg bg-indigo-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"><span className="flex items-center gap-2"><Plus size={16} /> Registrar ingreso</span><ArrowUpRight size={15} /></Link><Link href="/garantias/tecnicos/entrega" className="flex items-center justify-between rounded-lg border border-[#e4e7ec] px-3 py-3 text-sm font-medium text-[#344054] transition hover:bg-[#f8fafc]"><span className="flex items-center gap-2"><UserRoundCheck size={16} className="text-violet-600" /> Enviar a técnico</span><ArrowUpRight size={15} /></Link><Link href="/garantias/suplidores/envio" className="flex items-center justify-between rounded-lg border border-[#e4e7ec] px-3 py-3 text-sm font-medium text-[#344054] transition hover:bg-[#f8fafc]"><span className="flex items-center gap-2"><Truck size={16} className="text-orange-600" /> Enviar a suplidor</span><ArrowUpRight size={15} /></Link><Link href="/garantias/despacho" className="flex items-center justify-between rounded-lg border border-[#e4e7ec] px-3 py-3 text-sm font-medium text-[#344054] transition hover:bg-[#f8fafc]"><span className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-600" /> Despachar cliente</span><ArrowUpRight size={15} /></Link></div></aside>
       </section>
     </div>
   );

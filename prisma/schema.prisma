@@ -185,6 +185,7 @@ enum WarrantyDocumentType {
   SUPPLIER_SHIPMENT
   SUPPLIER_RECEIPT
   CUSTOMER_DELIVERY
+  CREDIT_NOTE
 
   @@map("warranty_document_type")
 }
