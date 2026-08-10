@@ -17,6 +17,22 @@ import {
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import type { Prisma } from "@prisma/client";
 
+const legacyWarehouseProductSelect = {
+  id: true,
+  code: true,
+  name: true,
+  brand: true,
+  color: true,
+  capacity: true,
+  description: true,
+  boxes: true,
+  unitsPerBox: true,
+  looseUnits: true,
+  totalUnits: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.WarehouseProductSelect;
+
 async function requireWarehouseAdmin() {
   const actor = await requirePermission("warehouse.read");
   const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
@@ -120,21 +136,7 @@ export async function getWarehouseProductsAction(query?: string) {
       const products = await prisma.warehouseProduct.findMany({
         where: legacyWhere,
         orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          brand: true,
-          color: true,
-          capacity: true,
-          description: true,
-          boxes: true,
-          unitsPerBox: true,
-          looseUnits: true,
-          totalUnits: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: legacyWarehouseProductSelect,
       });
 
       return {
@@ -175,18 +177,19 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
           unitsPerBox,
           looseUnits,
           totalUnits,
-          status: "ACTIVE",
         },
+        select: legacyWarehouseProductSelect,
       });
       await logAudit({ userId: actor.id, action: "warehouse_product.update", module: "almacen", entityType: "warehouse_product", entityId: updated.id, afterData: { code: updated.code, name: updated.name, boxes: updated.boxes, looseUnits: updated.looseUnits, totalUnits: updated.totalUnits } });
 
       revalidatePath("/almacen");
-      return { success: true, data: updated, message: "Producto actualizado exitosamente" };
+      return { success: true, data: { ...updated, status: "ACTIVE" }, message: "Producto actualizado exitosamente" };
     }
 
     // Verificar código duplicado
     const existing = await prisma.warehouseProduct.findUnique({
       where: { code: validated.code.toUpperCase().trim() },
+      select: { id: true },
     });
 
     if (existing) {
@@ -206,11 +209,12 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
         looseUnits,
         totalUnits,
       },
+      select: legacyWarehouseProductSelect,
     });
     await logAudit({ userId: actor.id, action: "warehouse_product.create", module: "almacen", entityType: "warehouse_product", entityId: created.id, afterData: { code: created.code, name: created.name, boxes: created.boxes, looseUnits: created.looseUnits, totalUnits: created.totalUnits } });
 
     revalidatePath("/almacen");
-      return { success: true, data: created, message: "Producto de almacén registrado exitosamente" };
+      return { success: true, data: { ...created, status: "ACTIVE" }, message: "Producto de almacén registrado exitosamente" };
   } catch (error: any) {
     return { success: false, error: error.message || "Error al registrar producto" };
   }
