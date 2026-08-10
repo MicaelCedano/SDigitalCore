@@ -1,24 +1,36 @@
 import { auth } from "@/lib/auth/config";
+import { prisma } from "@/lib/db/prisma";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 
 /**
  * Obtiene la sesión actual. Retorna null si no hay sesión.
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const session = await auth();
   return session?.user ?? null;
-}
+});
 
 /**
  * Exige sesión activa. Redirige a /login si no hay sesión.
  */
 export async function requireUser() {
-  const session = await auth();
-  if (!session?.user) {
+  const user = await getCurrentUser();
+  if (!user) {
     redirect("/login");
   }
-  return session.user;
+  return user;
 }
+
+export const getPersistedCurrentUser = cache(async () => {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  return prisma.user.findFirst({
+    where: user.id ? { id: user.id } : { email: user.email ?? "" },
+    select: { id: true, roleCode: true, allowedModules: true, image: true, status: true },
+  });
+});
 
 /**
  * Exige un permiso específico. Lanza error 403 si no lo tiene.
@@ -41,15 +53,15 @@ export async function requirePermission(permission: string) {
  * Comprueba el permiso contra el rol y los módulos persistidos del usuario.
  */
 export async function can(permission: string): Promise<boolean> {
-  const session = await auth();
-  if (!session?.user) return false;
+  const user = await getCurrentUser();
+  if (!user) return false;
 
   try {
     const { prisma } = await import("@/lib/db/prisma");
     const persistedUser = await prisma.user.findFirst({
-      where: session.user.id
-        ? { id: session.user.id }
-        : { email: { equals: session.user.email ?? "", mode: "insensitive" } },
+      where: user.id
+        ? { id: user.id }
+        : { email: { equals: user.email ?? "", mode: "insensitive" } },
       select: { roleCode: true, allowedModules: true, status: true },
     });
     if (!persistedUser || persistedUser.status !== "ACTIVE") return false;

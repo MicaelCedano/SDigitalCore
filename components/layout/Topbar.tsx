@@ -65,6 +65,9 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [loadedNotifications, setLoadedNotifications] = useState<TopbarNotification[] | null>(null);
+  const [loadedNotificationCount, setLoadedNotificationCount] = useState<number | null>(null);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +79,33 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, []);
+
+  const visibleNotifications = loadedNotifications ?? notifications;
+  const visibleNotificationCount = loadedNotificationCount ?? notificationCount;
+
+  async function openNotifications() {
+    const nextOpen = !notificationsOpen;
+    setNotificationsOpen(nextOpen);
+    setDropdownOpen(false);
+    if (!nextOpen || loadedNotifications !== null || notificationsLoading) return;
+
+    setNotificationsLoading(true);
+    try {
+      const response = await fetch("/api/dashboard/notifications", { cache: "no-store" });
+      if (!response.ok) throw new Error("No se pudieron cargar las notificaciones.");
+      const data = (await response.json()) as {
+        notifications: TopbarNotification[];
+        notificationCount: number;
+      };
+      setLoadedNotifications(data.notifications);
+      setLoadedNotificationCount(data.notificationCount);
+    } catch {
+      setLoadedNotifications([]);
+      setLoadedNotificationCount(0);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center justify-between border-b border-[#e4e7ec] bg-white px-4 sm:px-6 lg:px-8">
@@ -90,19 +120,16 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
         <div className="relative" ref={notificationsRef}>
           <button
             type="button"
-            onClick={() => {
-              setNotificationsOpen((open) => !open);
-              setDropdownOpen(false);
-            }}
+            onClick={() => void openNotifications()}
             className="focus-ring relative flex h-10 w-10 items-center justify-center rounded-[10px] text-[#475467] hover:bg-[#f2f4f7]"
-            aria-label={notificationCount > 0 ? `Notificaciones, ${notificationCount} pendientes` : "Notificaciones"}
+            aria-label={visibleNotificationCount > 0 ? `Notificaciones, ${visibleNotificationCount} pendientes` : "Notificaciones"}
             aria-expanded={notificationsOpen}
             aria-haspopup="dialog"
           >
             <Bell size={20} strokeWidth={1.75} />
-            {notificationCount > 0 ? (
+            {visibleNotificationCount > 0 ? (
               <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#d92d20] px-1 text-[10px] font-bold text-white ring-2 ring-white">
-                {notificationCount > 99 ? "99+" : notificationCount}
+                {visibleNotificationCount > 99 ? "99+" : visibleNotificationCount}
               </span>
             ) : null}
           </button>
@@ -114,10 +141,12 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
                   <p className="text-sm font-semibold text-[#101828]">Notificaciones</p>
                   <p className="mt-0.5 text-xs text-[#667085]">Actividad y acciones que requieren atención.</p>
                 </div>
-                {notificationCount > 0 ? <span className="rounded-full bg-[#fef3f2] px-2 py-1 text-xs font-semibold text-[#b42318]">{notificationCount} pendientes</span> : null}
+                {visibleNotificationCount > 0 ? <span className="rounded-full bg-[#fef3f2] px-2 py-1 text-xs font-semibold text-[#b42318]">{visibleNotificationCount} pendientes</span> : null}
               </div>
               <div className="max-h-[420px] overflow-y-auto p-2">
-                {notifications.length > 0 ? notifications.map((notification) => (
+                {notificationsLoading ? (
+                  <div className="px-4 py-9 text-center text-sm text-[#667085]">Cargando notificaciones…</div>
+                ) : visibleNotifications.length > 0 ? visibleNotifications.map((notification) => (
                   <Link
                     key={notification.id}
                     href={notification.href}

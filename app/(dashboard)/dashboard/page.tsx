@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth/helpers";
+import { getCurrentUser, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { getAdminOperationsOverview } from "@/lib/dashboard/admin-operations";
-import { prisma } from "@/lib/db/prisma";
 import {
   ArrowRight,
   BellRing,
@@ -72,13 +71,10 @@ function formatDate(value: Date) {
 }
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
-  const persistedUser = user
-    ? await prisma.user.findFirst({
-        where: user.id ? { id: user.id } : { email: user.email ?? "" },
-        select: { id: true, roleCode: true, allowedModules: true },
-      })
-    : null;
+  const [user, persistedUser] = await Promise.all([
+    getCurrentUser(),
+    getPersistedCurrentUser(),
+  ]);
   const overview = persistedUser?.roleCode === "ADMIN"
     ? await getAdminOperationsOverview(persistedUser.id)
     : null;

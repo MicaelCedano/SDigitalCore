@@ -65,3 +65,12 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
       : null,
   };
 });
+
+export const getAdminNotificationCounts = cache(async () => {
+  const [pendingWarehouseRequestCount, pendingAccessRequestCount] = await Promise.all([
+    prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
+    prisma.accessRequest.count({ where: { status: "PENDING" } }),
+  ]);
+
+  return { pendingWarehouseRequestCount, pendingAccessRequestCount };
+});
