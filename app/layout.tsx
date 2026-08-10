@@ -16,9 +16,9 @@ export const metadata: Metadata = {
   description:
     "Sistema integral de gestión para inventario, ventas, taller, RMA y más.",
   icons: {
-    icon: "/icon",
-    shortcut: "/icon",
-    apple: "/icon",
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
   robots: {
     index: false, // Sistema privado — no indexar

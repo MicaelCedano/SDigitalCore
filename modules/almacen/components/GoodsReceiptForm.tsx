@@ -383,9 +383,9 @@ export function GoodsReceiptForm({
           return sum + (imeiCount > 0 ? imeiCount : Number(v.quantity) || 1);
         }, 0) || Number(i.quantity) || 1,
         unitPrice: 0,
-        condition: i.condition || "Nuevo",
-        imeiOrSerial: (i.colorVariants || []).map((v: any) => `${v.color ? v.color + ": " : ""}${v.imeis || ""}`).join(" | "),
+        imeiOrSerial: (i.colorVariants || []).map((v: any) => v.imeis || "").filter(Boolean).join("\n"),
         notes: i.notes,
+        colorVariants: i.colorVariants,
       })),
     });
   };

@@ -208,6 +208,7 @@ export function GoodsReceiptDetailModal({
         condition: item.condition,
         imeiOrSerial: getItemImeis(item).join("\n") || item.imeiOrSerial,
         notes: item.notes,
+        colorVariants: item.colorVariants,
       })),
     });
   };
