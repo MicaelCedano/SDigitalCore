@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   FileText,
   LayoutDashboard,
   Settings,
@@ -53,6 +54,7 @@ const navItems: NavItem[] = [
     { label: "Nota de crédito", href: "/garantias/nota-credito" },
     { label: "Documentos", href: "/garantias/historial/documentos" },
   ] },
+  { label: "Recibo de mercancía", href: "/almacen/recibos", moduleKey: "almacen", icon: ClipboardList, section: "Operaciones" },
   { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings, section: "Administración", children: [
     { label: "Usuarios y permisos", href: "/configuracion" },
     { label: "Sucursales", href: "/configuracion/sucursales" },
@@ -128,7 +130,7 @@ export function Sidebar({
                 <div className="space-y-1">
                   {items.map((item) => {
                     const Icon = item.icon;
-                    const active = isActive(item.href);
+                    const active = item.href === "/almacen" && pathname.startsWith("/almacen/recibos") ? false : isActive(item.href);
                     const open = expandedMenu === item.moduleKey || (expandedMenu === null && active);
                     return (
                       <div key={item.href}>
@@ -161,7 +163,7 @@ export function Sidebar({
                         </div>
                         {!collapsed && open && item.children?.length ? (
                           <div className="ml-5 mt-1 space-y-0.5 border-l border-[#e4e7ec] pl-4">
-                            {item.children.filter((child) => !child.adminOnly || roleCode === "ADMIN").map((child) => (
+                            {item.children.filter((child) => child.href !== "/almacen/recibos" && (!child.adminOnly || roleCode === "ADMIN")).map((child) => (
                               <Link
                                 key={child.href}
                                 href={child.href}
