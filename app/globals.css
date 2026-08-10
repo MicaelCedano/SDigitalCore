@@ -110,8 +110,7 @@
     margin: 8mm;
   }
 
-  /* Ocultar navegacion, topbar, sidebar y elementos print:hidden al imprimir */
-  header,
+  /* Ocultar navegacion, sidebar y elementos print:hidden al imprimir */
   aside,
   nav,
   .print\:hidden {
@@ -151,6 +150,13 @@
     overflow: hidden !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  body.invoice-printing #invoice-print-root .print-document header,
+  body.warranty-printing #warranty-print-root .warranty-print-document header,
+  .warranty-print-document header,
+  .print-document header {
+    display: flex !important;
   }
 
   body.warranty-printing #warranty-print-root .warranty-print-document > div.overflow-hidden {
