@@ -1,21 +1,101 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { exportSingleReceiptToExcel } from "@/lib/utils/excel-export";
 import {
-  FileSpreadsheet,
-  X,
-  MapPin,
   Barcode,
+  Check,
+  Copy,
+  FileSpreadsheet,
   Layers,
-  Palette,
-  Truck,
+  MapPin,
   Pencil,
+  Truck,
+  X,
 } from "lucide-react";
 
+type ReceiptColorVariant = {
+  imeis?: string | null;
+};
+
+type ReceiptItem = {
+  id?: string;
+  code?: string | null;
+  description?: string | null;
+  quantity?: number | null;
+  unitPrice?: number | null;
+  condition?: string | null;
+  imeiOrSerial?: string | null;
+  colorVariants?: ReceiptColorVariant[] | null;
+  notes?: string | null;
+};
+
+type GoodsReceiptDetail = {
+  receiptNumber: string;
+  supplierName: string;
+  branch: string;
+  receivedBy: string;
+  status: "DRAFT" | "COMPLETED" | "CANCELLED";
+  notes?: string | null;
+  receivedAt?: string | Date | null;
+  createdAt?: string | Date | null;
+  items?: ReceiptItem[] | null;
+};
+
+type ModelSummary = {
+  key: string;
+  description: string;
+  quantity: number;
+  imeis: string[];
+};
+
 interface GoodsReceiptDetailModalProps {
-  receipt: any;
+  receipt: GoodsReceiptDetail;
   onClose: () => void;
-  onEdit?: (receipt: any) => void;
+  onEdit?: (receipt: GoodsReceiptDetail) => void;
+}
+
+function parseImeis(value?: string | null) {
+  if (!value) return [];
+
+  return value
+    .split(/[\n,;]+/)
+    .map((imei) => imei.trim())
+    .filter(Boolean);
+}
+
+function getItemImeis(item: ReceiptItem) {
+  const variantImeis = (item.colorVariants || []).flatMap((variant) =>
+    parseImeis(variant.imeis),
+  );
+
+  return variantImeis.length > 0 ? variantImeis : parseImeis(item.imeiOrSerial);
+}
+
+function summarizeModels(items: ReceiptItem[]): ModelSummary[] {
+  const grouped = new Map<string, ModelSummary>();
+
+  for (const item of items) {
+    const description = item.description?.trim() || "Modelo no especificado";
+    const key = description.toLocaleLowerCase("es-DO");
+    const current = grouped.get(key);
+    const imeis = getItemImeis(item);
+
+    if (current) {
+      current.quantity += item.quantity || 1;
+      current.imeis = [...new Set([...current.imeis, ...imeis])];
+      continue;
+    }
+
+    grouped.set(key, {
+      key,
+      description,
+      quantity: item.quantity || 1,
+      imeis: [...new Set(imeis)],
+    });
+  }
+
+  return [...grouped.values()];
 }
 
 export function GoodsReceiptDetailModal({
@@ -23,22 +103,53 @@ export function GoodsReceiptDetailModal({
   onClose,
   onEdit,
 }: GoodsReceiptDetailModalProps) {
-  if (!receipt) return null;
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const formattedDate = new Date(receipt.receivedAt || receipt.createdAt).toLocaleString("es-DO", {
+  const models = useMemo(
+    () => summarizeModels(receipt.items || []),
+    [receipt.items],
+  );
+
+  const formattedDate = new Date(
+    receipt.receivedAt || receipt.createdAt || new Date(),
+  ).toLocaleString("es-DO", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "America/Santo_Domingo",
   });
 
-  const totalQty = (receipt.items || []).reduce(
-    (sum: number, item: any) => sum + (item.quantity || 1),
-    0
-  );
+  const totalQty = models.reduce((sum, model) => sum + model.quantity, 0);
+  const allImeis = [...new Set(models.flatMap((model) => model.imeis))];
+  const receiptSummary = [
+    `Recibiendo de ${receipt.supplierName}`,
+    ...models.map((model) => `${model.description} - ${model.quantity}`),
+  ].join("\n");
 
-  const totalAmount = (receipt.items || []).reduce(
-    (sum: number, item: any) => sum + (item.quantity || 1) * (item.unitPrice || 0),
-    0
-  );
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+    };
+  }, [onClose]);
+
+  async function copyText(text: string, key: string) {
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
+      copyResetTimer.current = setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      setCopiedKey(null);
+    }
+  }
 
   const handleExportExcel = () => {
     exportSingleReceiptToExcel({
@@ -48,268 +159,233 @@ export function GoodsReceiptDetailModal({
       receivedBy: receipt.receivedBy,
       status: receipt.status,
       notes: receipt.notes,
-      receivedAt: receipt.receivedAt || receipt.createdAt,
-      items: receipt.items || [],
+      receivedAt: receipt.receivedAt || receipt.createdAt || new Date(),
+      items: (receipt.items || []).map((item) => ({
+        code: item.code,
+        description: item.description?.trim() || "Modelo no especificado",
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice,
+        condition: item.condition,
+        imeiOrSerial: getItemImeis(item).join("\n") || item.imeiOrSerial,
+        notes: item.notes,
+      })),
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
-              <Truck className="w-6 h-6" />
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs"
+        onClick={onClose}
+        aria-label="Cerrar resumen del recibo"
+      />
+      <section
+        className="fixed inset-x-3 top-1/2 z-50 mx-auto flex max-h-[92vh] w-auto max-w-4xl -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl sm:inset-x-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receipt-detail-title"
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="shrink-0 rounded-xl border border-[#5750f1]/20 bg-[#5750f1]/10 p-2.5 text-[#5750f1]">
+              <Truck className="h-6 w-6" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-800">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="receipt-detail-title" className="truncate text-lg font-bold text-slate-800">
                   Recibo {receipt.receiptNumber}
                 </h2>
                 <span
-                  className={`text-xs px-2.5 py-0.5 font-bold rounded-full border ${
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${
                     receipt.status === "COMPLETED"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : receipt.status === "DRAFT"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : "bg-red-50 text-red-700 border-red-200"
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-red-200 bg-red-50 text-red-700"
                   }`}
                 >
                   {receipt.status === "COMPLETED"
                     ? "COMPLETADO"
                     : receipt.status === "DRAFT"
-                    ? "BORRADOR"
-                    : "CANCELADO"}
+                      ? "BORRADOR"
+                      : "CANCELADO"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="truncate text-xs text-slate-500">
                 Registrado el {formattedDate} por {receipt.receivedBy}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportExcel}
-              className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Exportar Excel
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Cerrar resumen"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
-          {/* Metadata Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-[11px] text-slate-500 block mb-1 font-medium">Proveedor</span>
-              <span className="text-sm font-bold text-slate-800 block truncate">
+        <div className="flex-1 space-y-5 overflow-y-auto bg-white p-4 sm:p-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <span className="mb-1 block text-[11px] font-medium text-slate-500">Proveedor</span>
+              <span className="block truncate text-sm font-bold text-slate-800">
                 {receipt.supplierName}
               </span>
             </div>
-
-            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-[11px] text-slate-500 block mb-1 font-medium">Sucursal / Almacén</span>
-              <span className="text-sm font-bold text-slate-800 block truncate flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-[#5750f1] shrink-0" />
-                {receipt.branch}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <span className="mb-1 block text-[11px] font-medium text-slate-500">Sucursal / Almacén</span>
+              <span className="flex items-center gap-1 text-sm font-bold text-slate-800">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-[#5750f1]" />
+                <span className="truncate">{receipt.branch}</span>
               </span>
             </div>
-
-            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-[11px] text-slate-500 block mb-1 font-medium">Total Modelos / Uds</span>
-              <span className="text-sm font-bold text-[#5750f1] block">
-                {receipt.items?.length || 0} modelos ({totalQty} uds)
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <span className="mb-1 block text-[11px] font-medium text-slate-500">Modelos / Unidades</span>
+              <span className="block text-sm font-bold text-[#5750f1]">
+                {models.length} {models.length === 1 ? "modelo" : "modelos"} · {totalQty} uds
               </span>
             </div>
+          </div>
 
-            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-[11px] text-slate-500 block mb-1 font-medium">Monto Estimado</span>
-              <span className="text-sm font-bold text-emerald-600 block">
-                {totalAmount > 0
-                  ? `RD$ ${totalAmount.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
-                  : "No especificado"}
-              </span>
+          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                  Resumen para compartir
+                </p>
+                <div className="mt-3 space-y-1 text-sm text-slate-800">
+                  <p className="font-bold">Recibiendo de {receipt.supplierName}</p>
+                  {models.map((model) => (
+                    <p key={model.key}>
+                      {model.description} - <strong>{model.quantity}</strong>
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void copyText(receiptSummary, "summary")}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-100"
+              >
+                {copiedKey === "summary" ? (
+                  <><Check className="h-4 w-4 text-emerald-600" /> Copiado</>
+                ) : (
+                  <><Copy className="h-4 w-4" /> Copiar resumen</>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-800">
+                <Layers className="h-4 w-4 text-[#5750f1]" /> IMEIs por modelo
+              </h3>
+              {allImeis.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void copyText(allImeis.join("\n"), "all-imeis")}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                >
+                  {copiedKey === "all-imeis" ? (
+                    <><Check className="h-4 w-4" /> Copiados</>
+                  ) : (
+                    <><Copy className="h-4 w-4" /> Copiar todos ({allImeis.length})</>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {models.map((model) => (
+                <article key={model.key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">{model.description}</h4>
+                      <p className="mt-0.5 text-xs font-semibold text-[#5750f1]">
+                        {model.quantity} unidades · {model.imeis.length} IMEIs
+                      </p>
+                    </div>
+                    {model.imeis.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void copyText(model.imeis.join("\n"), `model-${model.key}`)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:border-[#5750f1]/30 hover:bg-[#5750f1]/5 hover:text-[#5750f1]"
+                      >
+                        {copiedKey === `model-${model.key}` ? (
+                          <><Check className="h-3.5 w-3.5 text-emerald-600" /> Copiados</>
+                        ) : (
+                          <><Copy className="h-3.5 w-3.5" /> Copiar IMEIs</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {model.imeis.length > 0 ? (
+                    <div className="mt-3 grid grid-cols-1 gap-1.5 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {model.imeis.map((imei) => (
+                        <span
+                          key={imei}
+                          className="flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 font-mono text-[11px] text-emerald-800"
+                        >
+                          <Barcode className="h-3 w-3 shrink-0" /> {imei}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                      Este modelo no tiene IMEIs registrados.
+                    </p>
+                  )}
+                </article>
+              ))}
             </div>
           </div>
 
           {receipt.notes && (
-            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl text-xs text-slate-700">
-              <span className="font-bold text-slate-800 block mb-1">Observaciones Generales:</span>
-              <p className="italic">{receipt.notes}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700">
+              <span className="mb-1 block font-bold text-slate-800">Observaciones generales</span>
+              <p>{receipt.notes}</p>
             </div>
           )}
-
-          {/* Table of Items */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-[#5750f1]" /> Detalle de Modelos y Colores Recibidos
-            </h3>
-
-            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
-                    <tr>
-                      <th className="px-3 py-2.5 text-center">#</th>
-                      <th className="px-3 py-2.5">SKU / Código</th>
-                      <th className="px-3 py-2.5">Modelo / Variantes por Color</th>
-                      <th className="px-3 py-2.5 text-center">Cant.</th>
-                      <th className="px-3 py-2.5 text-center">Condición</th>
-                      <th className="px-3 py-2.5 text-right">Precio Unit.</th>
-                      <th className="px-3 py-2.5 text-right">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {receipt.items?.map((item: any, idx: number) => {
-                      const qty = item.quantity || 1;
-                      const price = item.unitPrice || 0;
-                      const subtotal = qty * price;
-                      const variants = Array.isArray(item.colorVariants) ? item.colorVariants : [];
-
-                      return (
-                        <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-3 py-3.5 text-center text-slate-400 font-mono">
-                            {idx + 1}
-                          </td>
-                          <td className="px-3 py-3.5 font-mono text-slate-600">
-                            {item.code || "-"}
-                          </td>
-                          <td className="px-3 py-3.5">
-                            <div className="font-bold text-slate-800 text-xs">{item.description}</div>
-                            
-                            {/* Render Variants breakdown */}
-                            {variants.length > 0 ? (
-                              <div className="mt-2 space-y-2">
-                                {variants.map((v: any, vIdx: number) => {
-                                  const vImeis = v.imeis
-                                    ? v.imeis.split("\n").filter((s: string) => s.trim() !== "")
-                                    : [];
-
-                                  return (
-                                    <div
-                                      key={vIdx}
-                                      className="bg-slate-50 border border-slate-200 p-2 rounded-lg text-[11px] space-y-1"
-                                    >
-                                      <div className="flex items-center justify-between font-semibold">
-                                        <span className="text-[#5750f1] flex items-center gap-1">
-                                          <Palette className="w-3 h-3 text-[#5750f1]" /> Color:{" "}
-                                          <strong className="text-slate-800">{v.color || "General"}</strong>
-                                        </span>
-                                        <span className="text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 font-bold">
-                                          {v.quantity || 1} uds
-                                        </span>
-                                      </div>
-
-                                      {vImeis.length > 0 && (
-                                        <div className="pt-1">
-                                          <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                                            <Barcode className="w-3 h-3 text-emerald-600" /> IMEIs ({vImeis.length}):
-                                          </span>
-                                          <div className="flex flex-wrap gap-1 font-mono text-[10px] mt-0.5">
-                                            {vImeis.map((imei: string, i: number) => (
-                                              <span
-                                                key={i}
-                                                className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded"
-                                              >
-                                                {imei.trim()}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : item.imeiOrSerial ? (
-                              <div className="mt-1.5 space-y-1">
-                                <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                                  <Barcode className="w-3 h-3" /> IMEIs:
-                                </span>
-                                <div className="flex flex-wrap gap-1 font-mono text-[11px]">
-                                  {item.imeiOrSerial.split("\n").map((imei: string, i: number) => (
-                                    <span
-                                      key={i}
-                                      className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded"
-                                    >
-                                      {imei.trim()}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-
-                            {item.notes && (
-                              <div className="mt-1 text-[11px] text-slate-500 italic">
-                                Nota: {item.notes}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-3.5 text-center font-bold text-[#5750f1]">{qty}</td>
-                          <td className="px-3 py-3.5 text-center">
-                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-medium">
-                              {item.condition || "Nuevo"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3.5 text-right">
-                            {price > 0
-                              ? `RD$ ${price.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
-                              : "-"}
-                          </td>
-                          <td className="px-3 py-3.5 text-right font-semibold text-emerald-600">
-                            {subtotal > 0
-                              ? `RD$ ${subtotal.toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
-                              : "-"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <button
+            type="button"
             onClick={handleExportExcel}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
           >
-            <FileSpreadsheet className="w-4 h-4" /> Descargar Excel
+            <FileSpreadsheet className="h-4 w-4" /> Descargar Excel
           </button>
-          
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+            >
+              Cerrar
+            </button>
             {receipt.status === "DRAFT" && onEdit && (
               <button
+                type="button"
                 onClick={() => {
                   onClose();
                   onEdit(receipt);
                 }}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-amber-700"
               >
-                <Pencil className="w-4 h-4" /> Editar / Finalizar Borrador
+                <Pencil className="h-4 w-4" /> Editar / finalizar borrador
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs transition-colors"
-            >
-              Cerrar
-            </button>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </>
   );
 }

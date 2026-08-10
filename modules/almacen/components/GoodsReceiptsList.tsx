@@ -282,8 +282,18 @@ export function GoodsReceiptsList() {
                         isDraft ? "bg-amber-50/30" : ""
                       }`}
                     >
-                      <td className="px-4 py-4 font-mono font-bold text-[#5750f1] group-hover:underline">
-                        {receipt.receiptNumber}
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedReceiptForDetail(receipt);
+                          }}
+                          className="font-mono font-bold text-[#5750f1] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5750f1]/40"
+                          title="Ver resumen y copiar IMEIs"
+                        >
+                          {receipt.receiptNumber}
+                        </button>
                       </td>
                       <td className="px-4 py-4 text-slate-600">{formattedDate}</td>
                       <td className="px-4 py-4 font-bold text-slate-800">
