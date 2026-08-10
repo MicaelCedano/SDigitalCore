@@ -61,23 +61,23 @@ export function WarrantyCaseDetailDrawer({
         onClick={onClose}
       />
       <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-[#e4e7ec] bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right sm:max-w-lg"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right sm:max-w-lg"
         role="dialog"
         aria-modal="true"
         aria-label={`Detalles de ${item.caseCode}`}
       >
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-[#f8fafc] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-600">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#5750f1]">
               Terminal de Control
             </p>
             <div className="mt-1 flex items-center gap-2">
-              <h2 className="font-mono text-xl font-black text-[#101828]">{item.caseCode}</h2>
+              <h2 className="font-mono text-xl font-black text-slate-800">{item.caseCode}</h2>
               <button
                 type="button"
                 onClick={() => copyToClipboard(item.caseCode, "code")}
-                className="rounded-md p-1 text-[#98a2b3] transition hover:bg-slate-200 hover:text-[#101828]"
+                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-800"
                 title="Copiar código de caso"
               >
                 {copiedField === "code" ? (
@@ -91,7 +91,7 @@ export function WarrantyCaseDetailDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-[#667085] transition hover:bg-slate-200 hover:text-[#101828]"
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
             aria-label="Cerrar detalles"
           >
             <X size={20} />
@@ -101,8 +101,8 @@ export function WarrantyCaseDetailDrawer({
         {/* Content Body */}
         <div className="flex-1 space-y-6 overflow-y-auto p-6">
           {/* Status Box */}
-          <div className="rounded-2xl border border-[#e4e7ec] bg-[#fcfcfd] p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#98a2b3]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
               Estado de la reparación
             </p>
             <div className="mt-2 flex items-center justify-between">
@@ -116,16 +116,16 @@ export function WarrantyCaseDetailDrawer({
           </div>
 
           {/* Device details */}
-          <div className="space-y-4 rounded-2xl border border-[#e4e7ec] bg-white p-4">
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
             {/* IMEI */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#98a2b3]">IMEI</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">IMEI</p>
               <div className="mt-1 flex items-center justify-between">
-                <span className="font-mono text-base font-bold text-[#101828]">{item.imei}</span>
+                <span className="font-mono text-base font-bold text-slate-800">{item.imei}</span>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(item.imei, "imei")}
-                  className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+                  className="flex items-center gap-1 text-xs font-semibold text-[#5750f1] hover:underline"
                 >
                   {copiedField === "imei" ? (
                     <>
@@ -141,47 +141,47 @@ export function WarrantyCaseDetailDrawer({
             </div>
 
             {/* Model */}
-            <div className="border-t border-[#f0f1f3] pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#98a2b3]">
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Modelo / Equipo
               </p>
-              <p className="mt-1 text-sm font-bold text-[#101828]">{item.model}</p>
+              <p className="mt-1 text-sm font-bold text-slate-800">{item.model}</p>
             </div>
 
             {/* Client */}
-            <div className="border-t border-[#f0f1f3] pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#98a2b3]">Cliente</p>
-              <p className="mt-1 text-sm font-semibold text-[#344054]">{item.clientName}</p>
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cliente</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{item.clientName}</p>
             </div>
 
             {/* Date */}
-            <div className="border-t border-[#f0f1f3] pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#98a2b3]">
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Fecha de admisión
               </p>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-[#344054]">
-                <Calendar size={14} className="text-[#98a2b3]" />
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-700">
+                <Calendar size={14} className="text-slate-400" />
                 {formatDate(item.entryDate)}
               </p>
             </div>
           </div>
 
           {/* Problem / Diagnosis */}
-          <div className="rounded-2xl border border-[#e4e7ec] bg-[#f8fafc] p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#98a2b3]">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
               Diagnóstico / Falla reportada
             </p>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-[#344054]">
+            <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">
               {item.problem}
             </p>
           </div>
         </div>
 
         {/* Action Buttons Footer */}
-        <div className="space-y-2 border-t border-[#e4e7ec] bg-white p-4 sm:p-6">
+        <div className="space-y-2 border-t border-slate-200 bg-white p-4 sm:p-6">
           <Link
             href={`/garantias/${item.caseCode}`}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-center text-xs font-bold text-white shadow-xs transition hover:bg-indigo-700"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#5750f1] py-3 text-center text-xs font-bold text-white shadow-xs transition hover:bg-[#463ec5]"
           >
             Ver detalle completo <ArrowUpRight size={15} />
           </Link>

@@ -61,7 +61,7 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
           <button
             type="button"
             onClick={() => setIntakeOpen(true)}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#5750f1] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#463ec5] active:scale-[0.98]"
           >
             <Plus size={17} /> Registrar ingreso
           </button>
@@ -72,11 +72,11 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] shadow-xs transition hover:bg-[#f8fafc]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
             >
               Acciones de flujo
               {totalPendingTransitions > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5750f1]/10 px-1.5 text-xs font-bold text-[#5750f1]">
                   {totalPendingTransitions}
                 </span>
               )}
@@ -85,8 +85,8 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl border border-[#e4e7ec] bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150">
-                  <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#98a2b3]">
+                <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                  <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     Procesamiento por etapas
                   </p>
                   <div className="space-y-1">
@@ -121,7 +121,7 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                               <Icon size={15} />
                             </span>
                             <span className="min-w-0">
-                              <span className="block truncate text-xs font-semibold text-[#344054]">{label}</span>
+                              <span className="block truncate text-xs font-semibold text-slate-700">{label}</span>
                             </span>
                           </div>
                           {count > 0 && (
@@ -153,18 +153,18 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             aria-modal="true"
             aria-label="Registrar ingreso"
           >
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-3.5">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
               <div className="flex items-center gap-2">
-                <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                <span className="rounded-md bg-[#5750f1]/10 px-2.5 py-1 text-xs font-bold text-[#5750f1]">
                   Garantías
                 </span>
-                <span className="text-xs text-[#98a2b3]">/</span>
-                <span className="text-xs font-semibold text-[#344054]">Registrar Ingreso</span>
+                <span className="text-xs text-slate-400">/</span>
+                <span className="text-xs font-semibold text-slate-700">Registrar Ingreso</span>
               </div>
               <button
                 type="button"
                 onClick={() => setIntakeOpen(false)}
-                className="rounded-lg p-1.5 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
+                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                 aria-label="Cerrar panel lateral"
               >
                 <X size={19} />
@@ -190,18 +190,18 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             aria-modal="true"
             aria-label={active.label}
           >
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-3.5">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
               <div className="flex items-center gap-2">
-                <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                <span className="rounded-md bg-[#5750f1]/10 px-2.5 py-1 text-xs font-bold text-[#5750f1]">
                   Garantías
                 </span>
-                <span className="text-xs text-[#98a2b3]">/</span>
-                <span className="text-xs font-semibold text-[#344054]">{active.label}</span>
+                <span className="text-xs text-slate-400">/</span>
+                <span className="text-xs font-semibold text-slate-700">{active.label}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setOpenOperation(null)}
-                className="rounded-lg p-1.5 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
+                className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                 aria-label="Cerrar panel lateral"
               >
                 <X size={19} />

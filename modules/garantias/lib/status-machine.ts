@@ -11,13 +11,13 @@ export const WARRANTY_STATUS_LABELS: Record<WarrantyStatus, string> = {
 };
 
 export const WARRANTY_STATUS_TONES: Record<WarrantyStatus, string> = {
-  RECEIVED: "bg-blue-50 text-blue-700",
-  IN_REPAIR: "bg-amber-50 text-amber-700",
-  RECEIVED_FROM_TECHNICIAN: "bg-violet-50 text-violet-700",
-  SENT_TO_SUPPLIER: "bg-orange-50 text-orange-700",
-  RECEIVED_FROM_SUPPLIER: "bg-cyan-50 text-cyan-700",
-  DELIVERED: "bg-emerald-50 text-emerald-700",
-  CREDIT_NOTE: "bg-slate-100 text-slate-600",
+  RECEIVED: "border-blue-200 bg-blue-50 text-blue-700",
+  IN_REPAIR: "border-amber-200 bg-amber-50 text-amber-700",
+  RECEIVED_FROM_TECHNICIAN: "border-violet-200 bg-violet-50 text-violet-700",
+  SENT_TO_SUPPLIER: "border-orange-200 bg-orange-50 text-orange-700",
+  RECEIVED_FROM_SUPPLIER: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  DELIVERED: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  CREDIT_NOTE: "border-slate-200 bg-slate-100 text-slate-600",
 };
 
 const transitions: Record<WarrantyStatus, WarrantyStatus[]> = {

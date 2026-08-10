@@ -141,13 +141,13 @@ export function WarrantyDashboard({
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><FileCheck2 size={22} /></span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#5750f1]/10 text-[#5750f1]"><FileCheck2 size={22} /></span>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-[#101828]">Gestión de Garantías</h1>
-              <p className="mt-1 text-sm text-[#667085]">Controla cada caso desde el ingreso hasta la entrega.</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-800">Gestión de Garantías</h1>
+              <p className="mt-1 text-sm text-slate-500">Controla cada caso desde el ingreso hasta la entrega.</p>
             </div>
           </div>
-          <p className="mt-4 flex items-center gap-2 text-xs text-[#98a2b3]"><CalendarDays size={14} /> Datos operativos actualizados al consultar.</p>
+          <p className="mt-4 flex items-center gap-2 text-xs text-slate-400"><CalendarDays size={14} /> Datos operativos actualizados al consultar.</p>
         </div>
         <WarrantyQuickActions cases={quickCases} canCreate={canCreate} canTransition={canTransition} />
       </section>
@@ -156,29 +156,29 @@ export function WarrantyDashboard({
         {cards.map((card) => {
           const Icon = card.icon;
           const active = card.key === "OPEN_30_PLUS" ? olderThan30 : status === card.key;
-          return <button key={card.key} type="button" onClick={() => card.key === "OPEN_30_PLUS" ? (setOlderThan30(!olderThan30), setCurrentPage(1)) : selectStatus(card.key)} className={`enterprise-panel flex min-h-[108px] items-start justify-between p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-indigo-300 ring-2 ring-indigo-100" : ""}`}><span><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.tone === "amber" ? "bg-amber-50 text-amber-600" : card.tone === "rose" ? "bg-rose-50 text-rose-600" : card.tone === "blue" ? "bg-blue-50 text-blue-600" : card.tone === "violet" ? "bg-violet-50 text-violet-600" : card.tone === "orange" ? "bg-orange-50 text-orange-600" : "bg-indigo-50 text-indigo-600"}`}><Icon size={18} /></span><span className="mt-3 block text-xs font-medium text-[#667085]">{card.label}</span><strong className="mt-1 block text-2xl font-bold text-[#101828]">{card.value}</strong></span><ArrowUpRight size={16} className="text-[#98a2b3]" /></button>;
+          return <button key={card.key} type="button" onClick={() => card.key === "OPEN_30_PLUS" ? (setOlderThan30(!olderThan30), setCurrentPage(1)) : selectStatus(card.key)} className={`rounded-2xl border border-slate-200 bg-white shadow-2xs flex min-h-[108px] items-start justify-between p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-[#5750f1]/30 ring-2 ring-[#5750f1]/10" : ""}`}><span><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.tone === "amber" ? "bg-amber-50 text-amber-600" : card.tone === "rose" ? "bg-rose-50 text-rose-600" : card.tone === "blue" ? "bg-blue-50 text-blue-600" : card.tone === "violet" ? "bg-violet-50 text-violet-600" : card.tone === "orange" ? "bg-orange-50 text-orange-600" : "bg-[#5750f1]/10 text-[#5750f1]"}`}><Icon size={18} /></span><span className="mt-3 block text-xs font-medium text-slate-500">{card.label}</span><strong className="mt-1 block text-2xl font-bold text-slate-800">{card.value}</strong></span><ArrowUpRight size={16} className="text-slate-400" /></button>;
         })}
       </section>
 
       <section className="space-y-5">
-        <div className="enterprise-panel overflow-hidden">
-          <div className="border-b border-[#e4e7ec] p-4 sm:p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+          <div className="border-b border-slate-200 p-4 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div><h2 className="font-semibold text-[#101828]">Casos de garantía</h2><p className="mt-1 text-xs text-[#667085]">{totalRows} registros encontrados</p></div>
-              <div className="flex gap-2"><button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium ${filtersOpen || hasFilters ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-[#d0d5dd] text-[#475467] hover:bg-[#f8fafc]"}`}><SlidersHorizontal size={16} /> Filtros{hasFilters ? " activos" : ""}</button><button type="button" onClick={clearFilters} disabled={!hasFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#d0d5dd] px-3 text-sm font-medium text-[#475467] disabled:cursor-not-allowed disabled:opacity-40"><RotateCcw size={15} /> Limpiar</button></div>
+              <div><h2 className="font-semibold text-slate-800">Casos de garantía</h2><p className="mt-1 text-xs text-slate-500">{totalRows} registros encontrados</p></div>
+              <div className="flex gap-2"><button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium ${filtersOpen || hasFilters ? "border-[#5750f1]/20 bg-[#5750f1]/10 text-[#5750f1]" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}><SlidersHorizontal size={16} /> Filtros{hasFilters ? " activos" : ""}</button><button type="button" onClick={clearFilters} disabled={!hasFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"><RotateCcw size={15} /> Limpiar</button></div>
             </div>
-            <div className="relative mt-4"><Search size={17} className="absolute left-3 top-3 text-[#98a2b3]" /><input value={search} onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Buscar por IMEI, modelo, cliente o código..." className="h-11 w-full rounded-xl border border-[#d0d5dd] pl-10 pr-3 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10" /></div>
-            {filtersOpen && <div className="mt-3 grid gap-3 border-t border-[#f0f1f3] pt-3 sm:grid-cols-3"><label className="text-xs font-semibold text-[#667085]">Estado<select value={status} onChange={(event) => selectStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-sm font-normal text-[#344054]"><option value="ALL">Todos los estados</option>{statusOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="text-xs font-semibold text-[#667085]">Archivo<select value={archive} onChange={(event) => { setArchive(event.target.value as typeof archive); setCurrentPage(1); }} className="mt-1 h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-sm font-normal text-[#344054]"><option value="active">Solo activos</option><option value="archived">Solo archivados</option><option value="all">Todos</option></select></label><label className="flex items-end gap-2 rounded-lg border border-[#e4e7ec] px-3 py-2.5 text-sm text-[#344054]"><input type="checkbox" checked={olderThan30} onChange={(event) => { setOlderThan30(event.target.checked); setCurrentPage(1); }} className="h-4 w-4 rounded border-[#d0d5dd] text-indigo-600" /> Casos con más de 30 días</label></div>}
+            <div className="relative mt-4"><Search size={17} className="absolute left-3 top-3 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Buscar por IMEI, modelo, cliente o código..." className="h-11 w-full rounded-xl border border-slate-300 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></div>
+            {filtersOpen && <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3"><label className="text-xs font-semibold text-slate-500">Estado<select value={status} onChange={(event) => selectStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700"><option value="ALL">Todos los estados</option>{statusOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="text-xs font-semibold text-slate-500">Archivo<select value={archive} onChange={(event) => { setArchive(event.target.value as typeof archive); setCurrentPage(1); }} className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700"><option value="active">Solo activos</option><option value="archived">Solo archivados</option><option value="all">Todos</option></select></label><label className="flex items-end gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={olderThan30} onChange={(event) => { setOlderThan30(event.target.checked); setCurrentPage(1); }} className="h-4 w-4 rounded border-slate-300 text-[#5750f1]" /> Casos con más de 30 días</label></div>}
           </div>
           <div className={`overflow-x-auto transition-opacity ${isPending ? "opacity-50" : ""}`}>
             <table className="w-full min-w-[860px] text-left text-sm">
-              <thead className="bg-[#f8fafc] text-[11px] uppercase tracking-[0.08em] text-[#667085]"><tr><th className="px-5 py-3 font-semibold">Caso</th><th className="px-5 py-3 font-semibold">Cliente</th><th className="px-5 py-3 font-semibold">Equipo</th><th className="px-5 py-3 font-semibold">Falla reportada</th><th className="px-5 py-3 font-semibold">Estado</th><th className="px-5 py-3 font-semibold">Ingreso</th></tr></thead>
-              <tbody className="divide-y divide-[#f0f1f3]">
+              <thead className="bg-slate-50 text-[11px] uppercase tracking-[0.08em] text-slate-500"><tr><th className="px-5 py-3 font-semibold">Caso</th><th className="px-5 py-3 font-semibold">Cliente</th><th className="px-5 py-3 font-semibold">Equipo</th><th className="px-5 py-3 font-semibold">Falla reportada</th><th className="px-5 py-3 font-semibold">Estado</th><th className="px-5 py-3 font-semibold">Ingreso</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
                 {rows.map((item) => (
                   <tr
                     key={item.id}
                     onClick={() => setSelectedCase(item)}
-                    className={`group cursor-pointer transition hover:bg-[#f8fafc] ${item.archivedAt ? "bg-slate-50/70 opacity-75" : ""}`}
+                    className={`group cursor-pointer transition hover:bg-slate-50 ${item.archivedAt ? "bg-slate-50/70 opacity-75" : ""}`}
                   >
                     <td className="px-5 py-4">
                       <button
@@ -187,11 +187,11 @@ export function WarrantyDashboard({
                           e.stopPropagation();
                           setSelectedCase(item);
                         }}
-                        className="font-mono text-xs font-bold text-indigo-600 hover:underline"
+                        className="font-mono text-xs font-bold text-[#5750f1] hover:underline"
                       >
                         {item.caseCode}
                       </button>
-                      <p className="mt-1 text-[11px] text-[#98a2b3]">
+                      <p className="mt-1 text-[11px] text-slate-400">
                         {item.archivedAt ? (
                           <><Archive size={11} className="inline" /> Archivado</>
                         ) : (
@@ -201,27 +201,27 @@ export function WarrantyDashboard({
                               e.stopPropagation();
                               setSelectedCase(item);
                             }}
-                            className="hover:text-indigo-600 hover:underline"
+                            className="hover:text-[#5750f1] hover:underline"
                           >
                             Ver detalle <ArrowUpRight size={12} className="inline" />
                           </button>
                         )}
                       </p>
                     </td>
-                    <td className="px-5 py-4 font-medium text-[#344054]">{item.clientName}</td>
-                    <td className="px-5 py-4"><p className="font-medium text-[#344054]">{item.model}</p><p className="mt-1 font-mono text-[11px] text-[#667085]">IMEI {item.imei}</p></td>
-                    <td className="max-w-[260px] px-5 py-4 text-[#667085]"><p className="truncate" title={item.problem}>{item.problem}</p></td>
+                    <td className="px-5 py-4 font-medium text-slate-700">{item.clientName}</td>
+                    <td className="px-5 py-4"><p className="font-medium text-slate-700">{item.model}</p><p className="mt-1 font-mono text-[11px] text-slate-500">IMEI {item.imei}</p></td>
+                    <td className="max-w-[260px] px-5 py-4 text-slate-500"><p className="truncate" title={item.problem}>{item.problem}</p></td>
                     <td className="px-5 py-4"><WarrantyStatusBadge status={item.status} /></td>
-                    <td className="whitespace-nowrap px-5 py-4 text-xs text-[#667085]">{formatDate(item.entryDate)}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">{formatDate(item.entryDate)}</td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={6} className="px-5 py-16 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#f2f4f7] text-[#667085]"><Search size={20} /></span><p className="mt-3 font-medium text-[#344054]">No encontramos casos</p><p className="mt-1 text-sm text-[#667085]">Prueba cambiando la búsqueda o los filtros.</p></td></tr>
+                  <tr><td colSpan={6} className="px-5 py-16 text-center"><span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500"><Search size={20} /></span><p className="mt-3 font-medium text-slate-700">No encontramos casos</p><p className="mt-1 text-sm text-slate-500">Prueba cambiando la búsqueda o los filtros.</p></td></tr>
                 )}
               </tbody>
             </table>
           </div>
-          <div className="flex flex-col gap-3 border-t border-[#e4e7ec] px-5 py-3 text-xs text-[#667085] sm:flex-row sm:items-center sm:justify-between"><span>Mostrando {rows.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, totalRows)} de {totalRows}</span><div className="flex items-center gap-2"><button type="button" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1 || isPending} className="rounded-lg border border-[#d0d5dd] p-1.5 disabled:opacity-40"><ChevronLeft size={16} /></button><span className="min-w-16 text-center">Página {currentPage} / {pageCount}</span><button type="button" onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))} disabled={currentPage >= pageCount || isPending} className="rounded-lg border border-[#d0d5dd] p-1.5 disabled:opacity-40"><ChevronRight size={16} /></button></div></div>
+          <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Mostrando {rows.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, totalRows)} de {totalRows}</span><div className="flex items-center gap-2"><button type="button" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1 || isPending} className="rounded-lg border border-slate-300 p-1.5 disabled:opacity-40"><ChevronLeft size={16} /></button><span className="min-w-16 text-center">Página {currentPage} / {pageCount}</span><button type="button" onClick={() => setCurrentPage(Math.min(pageCount, currentPage + 1))} disabled={currentPage >= pageCount || isPending} className="rounded-lg border border-slate-300 p-1.5 disabled:opacity-40"><ChevronRight size={16} /></button></div></div>
         </div>
       </section>
 
