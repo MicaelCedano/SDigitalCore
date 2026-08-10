@@ -1,4 +1,5 @@
 import type { getAdminOperationsOverview } from "@/lib/dashboard/admin-operations";
+import { WARRANTY_EVENT_LABELS } from "@/modules/garantias/lib/status-machine";
 
 type AdminOverview = NonNullable<Awaited<ReturnType<typeof getAdminOperationsOverview>>>;
 
@@ -32,5 +33,13 @@ export function toAdminNotifications(overview: AdminOverview) {
           kind: "activity" as const,
         }]
       : []),
+    ...(overview.recentWarrantyEvents ?? []).slice(0, 3).map((evt) => ({
+      id: `warranty-evt-${evt.id}`,
+      title: `Garantía ${evt.case.caseCode}: ${WARRANTY_EVENT_LABELS[evt.type] ?? evt.type}`,
+      description: `${evt.case.model}${evt.actorNameSnapshot ? ` · por ${evt.actorNameSnapshot}` : ""}`,
+      href: `/garantias/${evt.case.caseCode}`,
+      createdAt: evt.createdAt.toISOString(),
+      kind: "activity" as const,
+    })),
   ];
 }

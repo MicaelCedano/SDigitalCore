@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { getAdminOperationsOverview } from "@/lib/dashboard/admin-operations";
+import { AdminWarrantyWidget } from "@/components/dashboard/AdminWarrantyWidget";
 import {
   ArrowRight,
   BellRing,
@@ -56,10 +57,10 @@ const groups = [
 ];
 
 const adminShortcuts = [
+  { label: "Nueva garantía", description: "Ingresar equipo en garantía", href: "/garantias/ingreso", icon: ShieldCheck },
   { label: "Nuevo recibo", description: "Registrar mercancía recibida", href: "/almacen/recibos", icon: Plus },
   { label: "Solicitudes", description: "Aprobar entradas y salidas", href: "/almacen/transferencias", icon: ClipboardCheck },
   { label: "Inventario", description: "Consultar existencias actuales", href: "/almacen", icon: Boxes },
-  { label: "Usuarios", description: "Accesos, roles y permisos", href: "/configuracion", icon: Users },
 ];
 
 function formatDate(value: Date) {
@@ -108,9 +109,14 @@ export default async function DashboardPage() {
           <p className="mt-2 text-[15px] text-[#667085] sm:text-base">Aquí tienes lo que requiere atención y la actividad más reciente.</p>
         </div>
         {overview ? (
-          <Link href="/almacen/recibos" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#4338ca]">
-            <Plus size={17} /> Registrar mercancía
-          </Link>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link href="/garantias/ingreso" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#4338ca]">
+              <Plus size={17} /> Nueva garantía
+            </Link>
+            <Link href="/almacen/recibos" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] shadow-xs transition-colors hover:bg-[#f8fafc]">
+              Registrar mercancía
+            </Link>
+          </div>
         ) : null}
       </section>
 
@@ -141,50 +147,58 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]" aria-label="Resumen de operaciones administrativas">
-            <div className="enterprise-panel overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e4e7ec] px-5 py-4 sm:px-6">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#fff4e5] text-[#b54708]"><ClipboardCheck size={20} /></span>
-                  <div>
-                    <h3 className="text-base font-semibold text-[#101828]">Solicitudes de almacén</h3>
-                    <p className="mt-0.5 text-xs text-[#667085]">Entradas y salidas pendientes de tu decisión.</p>
-                  </div>
-                </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${overview.pendingWarehouseRequestCount > 0 ? "bg-[#fff4e5] text-[#b54708]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
-                  {overview.pendingWarehouseRequestCount} pendiente{overview.pendingWarehouseRequestCount === 1 ? "" : "s"}
-                </span>
-              </div>
+          <section className="grid gap-5 xl:grid-cols-2" aria-label="Resumen de operaciones administrativas">
+            {/* Widget de Garantías y Movimientos */}
+            <AdminWarrantyWidget
+              cases={overview.recentWarrantyCases}
+              events={overview.recentWarrantyEvents}
+              counts={overview.warrantyCounts}
+            />
 
-              {overview.pendingWarehouseRequests.length > 0 ? (
-                <div className="divide-y divide-[#f0f1f3]">
-                  {overview.pendingWarehouseRequests.map((request) => (
-                    <Link key={request.id} href="/almacen/transferencias" className="group grid gap-3 px-5 py-4 transition-colors hover:bg-[#f8fafc] sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[#4f46e5]">{request.requestCode}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${request.type === "ENTRY" ? "bg-[#ecfdf3] text-[#027a48]" : "bg-[#fef3f2] text-[#b42318]"}`}>{request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span>
-                        </div>
-                        <p className="mt-1 truncate text-sm font-semibold text-[#344054]">{request.title}</p>
-                        <p className="mt-1 text-xs text-[#667085]">{request.requestedBy} · {request.branch} · {request._count.items} producto{request._count.items === 1 ? "" : "s"}</p>
-                      </div>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4338ca]">Revisar solicitud <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="px-6 py-10 text-center">
-                  <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#ecfdf3] text-[#027a48]"><PackageCheck size={21} /></span>
-                  <p className="mt-3 text-sm font-semibold text-[#344054]">No hay solicitudes pendientes</p>
-                  <p className="mt-1 text-xs text-[#667085]">Todas las solicitudes de almacén están atendidas.</p>
-                </div>
-              )}
-              <div className="border-t border-[#f0f1f3] bg-[#fcfcfd] px-5 py-3 text-right sm:px-6">
-                <Link href="/almacen/transferencias" className="text-xs font-semibold text-[#4338ca] hover:text-[#3730a3]">Ver todas las solicitudes</Link>
-              </div>
-            </div>
-
+            {/* Operaciones de Almacén */}
             <div className="space-y-5">
+              <div className="enterprise-panel overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e4e7ec] px-5 py-4 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#fff4e5] text-[#b54708]"><ClipboardCheck size={20} /></span>
+                    <div>
+                      <h3 className="text-base font-semibold text-[#101828]">Solicitudes de almacén</h3>
+                      <p className="mt-0.5 text-xs text-[#667085]">Entradas y salidas pendientes de tu decisión.</p>
+                    </div>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${overview.pendingWarehouseRequestCount > 0 ? "bg-[#fff4e5] text-[#b54708]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
+                    {overview.pendingWarehouseRequestCount} pendiente{overview.pendingWarehouseRequestCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                {overview.pendingWarehouseRequests.length > 0 ? (
+                  <div className="divide-y divide-[#f0f1f3]">
+                    {overview.pendingWarehouseRequests.map((request) => (
+                      <Link key={request.id} href="/almacen/transferencias" className="group grid gap-3 px-5 py-4 transition-colors hover:bg-[#f8fafc] sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-[#4f46e5]">{request.requestCode}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${request.type === "ENTRY" ? "bg-[#ecfdf3] text-[#027a48]" : "bg-[#fef3f2] text-[#b42318]"}`}>{request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span>
+                          </div>
+                          <p className="mt-1 truncate text-sm font-semibold text-[#344054]">{request.title}</p>
+                          <p className="mt-1 text-xs text-[#667085]">{request.requestedBy} · {request.branch} · {request._count.items} producto{request._count.items === 1 ? "" : "s"}</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4338ca]">Revisar solicitud <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" /></span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-6 py-8 text-center">
+                    <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#ecfdf3] text-[#027a48]"><PackageCheck size={20} /></span>
+                    <p className="mt-2 text-sm font-semibold text-[#344054]">No hay solicitudes pendientes</p>
+                    <p className="mt-0.5 text-xs text-[#667085]">Todas las solicitudes de almacén están atendidas.</p>
+                  </div>
+                )}
+                <div className="border-t border-[#f0f1f3] bg-[#fcfcfd] px-5 py-3 text-right sm:px-6">
+                  <Link href="/almacen/transferencias" className="text-xs font-semibold text-[#4338ca] hover:text-[#3730a3]">Ver todas las solicitudes</Link>
+                </div>
+              </div>
+
               <div className="enterprise-panel overflow-hidden">
                 <div className="border-b border-[#e4e7ec] px-5 py-4">
                   <div className="flex items-center gap-3">
@@ -205,15 +219,15 @@ export default async function DashboardPage() {
                       </div>
                       <span className="rounded-full bg-[#ecfdf3] px-2 py-1 text-[10px] font-bold text-[#027a48]">{overview.latestReceipt.status === "DRAFT" ? "BORRADOR" : "COMPLETADO"}</span>
                     </div>
-                    <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="mt-4 grid grid-cols-2 gap-3">
                       <div className="rounded-xl bg-[#f8fafc] p-3"><p className="text-xl font-bold text-[#101828]">{overview.latestReceipt.itemCount}</p><p className="mt-0.5 text-xs text-[#667085]">modelos / líneas</p></div>
                       <div className="rounded-xl bg-[#f8fafc] p-3"><p className="text-xl font-bold text-[#101828]">{overview.latestReceipt.unitCount}</p><p className="mt-0.5 text-xs text-[#667085]">unidades</p></div>
                     </div>
-                    <p className="mt-4 text-xs text-[#667085]">{formatDate(overview.latestReceipt.receivedAt)}</p>
-                    <Link href="/almacen/recibos" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#4338ca] hover:text-[#3730a3]">Abrir recibos <ArrowRight size={15} /></Link>
+                    <p className="mt-3 text-xs text-[#667085]">{formatDate(overview.latestReceipt.receivedAt)}</p>
+                    <Link href="/almacen/recibos" className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[#4338ca] hover:text-[#3730a3]">Abrir recibos <ArrowRight size={15} /></Link>
                   </div>
                 ) : (
-                  <div className="px-5 py-9 text-center text-sm text-[#667085]">Todavía no hay recibos de mercancía.</div>
+                  <div className="px-5 py-6 text-center text-sm text-[#667085]">Todavía no hay recibos de mercancía.</div>
                 )}
               </div>
 
