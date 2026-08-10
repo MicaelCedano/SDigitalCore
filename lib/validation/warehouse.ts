@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const warehouseProductSchema = z.object({
   id: z.string().optional(),
-  code: z.string().min(1, "El cÃ³digo del producto es requerido"),
+  code: z.string().min(1, "El código del producto es requerido"),
   name: z.string().min(1, "El nombre del producto es requerido"),
   brand: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
@@ -40,7 +40,7 @@ export const warehouseBulkMovementSchema = z.object({
 
 export const warehouseRequestSchema = z.object({
   id: z.string().optional(),
-  title: z.string().min(1, "El tÃ­tulo de la solicitud es requerido"),
+  title: z.string().min(1, "El título de la solicitud es requerido"),
   branch: z.string().trim().min(1, "La sucursal es requerida"),
   requestedBy: z.string().optional(),
   type: z.enum(["ENTRY", "EXIT"]).default("EXIT"),

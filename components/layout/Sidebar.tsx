@@ -42,15 +42,15 @@ const navItems: NavItem[] = [
   ] },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },
-  { label: "GestiÃ³n de GarantÃ­as", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck, section: "Operaciones", children: [
+  { label: "Gestión de Garantías", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck, section: "Operaciones", children: [
     { label: "Panel de casos", href: "/garantias" },
     { label: "Registrar ingreso", href: "/garantias/ingreso" },
-    { label: "Entrega a tÃ©cnico", href: "/garantias/tecnicos/entrega" },
-    { label: "RecepciÃ³n de tÃ©cnico", href: "/garantias/tecnicos/recepcion" },
-    { label: "EnvÃ­o a suplidor", href: "/garantias/suplidores/envio" },
-    { label: "RecepciÃ³n de suplidor", href: "/garantias/suplidores/recepcion" },
+    { label: "Entrega a técnico", href: "/garantias/tecnicos/entrega" },
+    { label: "Recepción de técnico", href: "/garantias/tecnicos/recepcion" },
+    { label: "Envío a suplidor", href: "/garantias/suplidores/envio" },
+    { label: "Recepción de suplidor", href: "/garantias/suplidores/recepcion" },
     { label: "Despacho al cliente", href: "/garantias/despacho" },
-    { label: "Nota de crÃ©dito", href: "/garantias/nota-credito" },
+    { label: "Nota de crédito", href: "/garantias/nota-credito" },
     { label: "Documentos", href: "/garantias/historial/documentos" },
   ] },
   { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings, section: "Administración", children: [

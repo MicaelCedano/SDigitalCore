@@ -2,6 +2,8 @@
 
 ## Reglas generales
 
+Regla obligatoria de codificacion: todo archivo de codigo, texto y contenido visible debe conservarse en UTF-8. Nunca introducir ni aceptar mojibake o caracteres de reemplazo; antes de entregar, buscar secuencias de codificacion corrupta y corregirlas.
+
 1. Leer `plan-sdigital-system-modular.md` antes de comenzar cualquier fase.
 2. Trabajar únicamente en la fase asignada. No construir módulos futuros para adelantar.
 3. No cambiar el stack sin aprobación de Micael.

@@ -10,7 +10,7 @@ datasource db {
 }
 
 // ============================================================
-// TABLAS NEXTAUTH â€” Requeridas por Auth.js / NextAuth v5
+// TABLAS NEXTAUTH — Requeridas por Auth.js / NextAuth v5
 // ============================================================
 
 model User {
@@ -285,7 +285,7 @@ model WarrantyDailySequence {
 }
 
 // ============================================================
-// MÃ“DULO ALMACÃ‰N â€” Recibos de MercancÃ­a
+// MÓDULO ALMACÉN — Recibos de Mercancía
 // ============================================================
 
 model GoodsReceipt {
@@ -353,13 +353,13 @@ enum StockCountStatus {
 }
 
 // ============================================================
-// CONTEO DE STOCK & AUDITORÃA DE INVENTARIO
+// CONTEO DE STOCK & AUDITORÍA DE INVENTARIO
 // ============================================================
 
 model StockCount {
   id          String           @id @default(cuid())
   countNumber String           @unique @map("count_number")
-  title       String           @default("Conteo FÃ­sico de Stock")
+  title       String           @default("Conteo Físico de Stock")
   branch      String
   performedBy String           @map("performed_by")
   status      StockCountStatus @default(IN_PROGRESS)
@@ -391,7 +391,7 @@ model StockCountItem {
 }
 
 // ============================================================
-// MÃ“DULO ALMACENCASITA â€” PRODUCTOS, CAJAS, MOVIMIENTOS Y SOLICITUDES
+// MÓDULO ALMACENCASITA — PRODUCTOS, CAJAS, MOVIMIENTOS Y SOLICITUDES
 // ============================================================
 
 model WarehouseProduct {
@@ -481,7 +481,7 @@ model WarehouseRequestItem {
 }
 
 // ============================================================
-// MÃ“DULO LISTA DE PRECIOS SDIGITAL
+// MÓDULO LISTA DE PRECIOS SDIGITAL
 // ============================================================
 
 model PriceListItem {
@@ -525,7 +525,7 @@ model PriceListSetting {
 }
 
 // ============================================================
-// MÃ“DULO FACTURA & CONDUCE PDF SDIGITAL
+// MÓDULO FACTURA & CONDUCE PDF SDIGITAL
 // ============================================================
 
 enum InvoiceType {

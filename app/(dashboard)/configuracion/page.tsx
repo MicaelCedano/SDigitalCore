@@ -189,7 +189,7 @@ export default function ConfiguracionPage() {
     if (directUserData.phone.trim().length < 7) errs.phone = "El teléfono debe tener al menos 7 caracteres";
 
     if (directUserData.password.length < 8) errs.password = "La contraseña debe tener al menos 8 caracteres";
-    if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseÃ±as no coinciden";
+    if (directUserData.password !== directUserData.confirmPassword) errs.confirmPassword = "Las contraseñas no coinciden";
 
     if (Object.keys(errs).length > 0) {
       setCreateErrors(errs);
@@ -724,12 +724,12 @@ export default function ConfiguracionPage() {
               {/* Password */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">ContraseÃ±a inicial</label>
+                  <label className="font-semibold text-slate-700 block">Contraseña inicial</label>
                   <div className="relative flex items-center">
                     <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
                     <Input
                       type="password"
-                      placeholder="MÃ­nimo 6 caracteres"
+                      placeholder="Mínimo 6 caracteres"
                       value={directUserData.password}
                       onChange={(e) => setDirectUserData({ ...directUserData, password: e.target.value })}
                       autoComplete="new-password"
@@ -739,12 +739,12 @@ export default function ConfiguracionPage() {
                   {createErrors.password && <p className="text-xs text-red-600 mt-0.5">{createErrors.password}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 block">Confirmar contraseÃ±a</label>
+                  <label className="font-semibold text-slate-700 block">Confirmar contraseña</label>
                   <div className="relative flex items-center">
                     <LockKeyhole className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
                     <Input
                       type="password"
-                      placeholder="Repite la contraseÃ±a"
+                      placeholder="Repite la contraseña"
                       value={directUserData.confirmPassword}
                       onChange={(e) => setDirectUserData({ ...directUserData, confirmPassword: e.target.value })}
                       autoComplete="new-password"

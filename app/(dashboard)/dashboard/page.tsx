@@ -22,7 +22,7 @@ import {
 export const metadata: Metadata = { title: "Resumen general" };
 
 const operations = [
-  { label: "GestiÃ³n de GarantÃ­as", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck },
+  { label: "Gestión de Garantías", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck },
   { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse },
 ];
 

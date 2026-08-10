@@ -47,7 +47,7 @@ function parseRequestLine(details: string | null | undefined, productId: string,
 }
 
 /**
- * Obtiene la lista de productos de almacÃ©n con sus cajas y unidades totales
+ * Obtiene la lista de productos de almacén con sus cajas y unidades totales
  */
 export async function getWarehouseProductsAction(query?: string) {
   try {
@@ -71,12 +71,12 @@ export async function getWarehouseProductsAction(query?: string) {
 
     return { success: true, data: products };
   } catch (error: any) {
-    return { success: false, error: "Error al cargar productos de almacÃ©n", data: [] };
+    return { success: false, error: "Error al cargar productos de almacén", data: [] };
   }
 }
 
 /**
- * Crea o actualiza un producto en almacÃ©n
+ * Crea o actualiza un producto en almacén
  */
 export async function createWarehouseProductAction(input: WarehouseProductInput) {
   try {
@@ -110,13 +110,13 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
       return { success: true, data: updated, message: "Producto actualizado exitosamente" };
     }
 
-    // Verificar cÃ³digo duplicado
+    // Verificar código duplicado
     const existing = await prisma.warehouseProduct.findUnique({
       where: { code: validated.code.toUpperCase().trim() },
     });
 
     if (existing) {
-      return { success: false, error: "El cÃ³digo de producto ya existe en almacÃ©n" };
+      return { success: false, error: "El código de producto ya existe en almacén" };
     }
 
     const created = await prisma.warehouseProduct.create({
@@ -136,19 +136,19 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
     await logAudit({ userId: actor.id, action: "warehouse_product.create", module: "almacen", entityType: "warehouse_product", entityId: created.id, afterData: { code: created.code, name: created.name, boxes: created.boxes, looseUnits: created.looseUnits, totalUnits: created.totalUnits } });
 
     revalidatePath("/almacen");
-    return { success: true, data: created, message: "Producto de almacÃ©n registrado exitosamente" };
+      return { success: true, data: created, message: "Producto de almacén registrado exitosamente" };
   } catch (error: any) {
     return { success: false, error: error.message || "Error al registrar producto" };
   }
 }
 
 /**
- * Elimina un producto de almacÃ©n
+ * Elimina un producto de almacén
  */
 export async function deleteWarehouseProductAction(id: string) {
   try {
     const actor = await requireWarehouseAdmin();
-    if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const deleted = await prisma.warehouseProduct.delete({
       where: { id },
     });
@@ -162,12 +162,12 @@ export async function deleteWarehouseProductAction(id: string) {
 }
 
 /**
- * Registra un movimiento de Entradas / Salidas de AlmacÃ©n y recalcula cajas/unidades
+ * Registra un movimiento de Entradas / Salidas de Almacén y recalcula cajas/unidades
  */
 export async function createWarehouseMovementAction(input: WarehouseMovementInput) {
   try {
     const user = await requireWarehouseAdmin();
-    if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseMovementSchema.parse(input);
     const product = await prisma.warehouseProduct.findUnique({
       where: { id: validated.productId },
@@ -198,7 +198,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
         },
       });
 
-      // 2. Registrar movimiento en la bitÃ¡cora
+    // 2. Registrar movimiento en la bitácora
       return tx.warehouseMovement.create({
         data: {
           productId: product.id,
@@ -227,11 +227,11 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
   }
 }
 
-/** Registra una entrada o salida con varios modelos en una sola operaciÃ³n. */
+/** Registra una entrada o salida con varios modelos en una sola operación. */
 export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMovementInput) {
   try {
     const user = await requireWarehouseAdmin();
-    if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseBulkMovementSchema.parse(input);
     const ids = validated.items.map((item) => item.productId);
     if (new Set(ids).size !== ids.length) return { success: false, error: "No repita el mismo producto en el movimiento." };
@@ -284,7 +284,7 @@ export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMov
 }
 
 /**
- * Obtiene el historial de movimientos de almacÃ©n
+ * Obtiene el historial de movimientos de almacén
  */
 export async function getWarehouseMovementsAction(query?: string) {
   try {
@@ -317,12 +317,12 @@ export async function getWarehouseMovementsAction(query?: string) {
 
     return { success: true, data: movements };
   } catch (error: any) {
-    return { success: false, error: "Error al cargar movimientos de almacÃ©n", data: [] };
+    return { success: false, error: "Error al cargar movimientos de almacén", data: [] };
   }
 }
 
 /**
- * Genera un cÃ³digo correlativo para solicitudes (Ej. SOL-20260807-001)
+ * Genera un código correlativo para solicitudes (Ej. SOL-20260807-001)
  */
 async function generateRequestCode(): Promise<string> {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -341,12 +341,12 @@ async function generateRequestCode(): Promise<string> {
 }
 
 /**
- * Crea una solicitud de almacÃ©n / transferencias
+ * Crea una solicitud de almacén / transferencias
  */
 export async function createWarehouseRequestAction(input: WarehouseRequestInput) {
   try {
     const user = await requirePermission("warehouse.write");
-    if (!user.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = warehouseRequestSchema.parse(input);
     if (validated.type === "EXIT") {
       const products = await prisma.warehouseProduct.findMany({ where: { id: { in: validated.items.map((item) => item.productId) } } });
@@ -388,7 +388,7 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
 }
 
 /**
- * Obtiene las solicitudes de almacÃ©n
+ * Obtiene las solicitudes de almacén
  */
 export async function getWarehouseRequestsAction(query?: string, status?: string) {
   try {
@@ -420,12 +420,12 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
 }
 
 /**
- * Actualiza el estado de una solicitud de almacÃ©n (Aprobar / Rechazar)
+ * Actualiza el estado de una solicitud de almacén (Aprobar / Rechazar)
  */
 export async function updateWarehouseRequestStatusAction(id: string, status: "APPROVED" | "REJECTED") {
   try {
     const actor = await requireWarehouseAdmin();
-    if (!actor.id) return { success: false, error: "La sesiÃ³n no tiene un usuario identificable." };
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const updated = await prisma.$transaction(async (tx) => {
       const request = await tx.warehouseRequest.findUnique({ where: { id }, include: { items: true } });
       if (!request) throw new Error("Solicitud no encontrada.");

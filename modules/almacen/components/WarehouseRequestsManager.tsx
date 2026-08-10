@@ -161,7 +161,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
         link.download = file.name;
         link.click();
         URL.revokeObjectURL(url);
-        setError("La imagen fue descargada. AdjÃºntala en el chat de WhatsApp.");
+        setError("La imagen fue descargada. Adjunta el archivo en el chat de WhatsApp.");
       }
     } catch (shareError) {
       if ((shareError as DOMException)?.name !== "AbortError") setError("No se pudo compartir el boucher como imagen.");

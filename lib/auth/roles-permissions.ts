@@ -56,7 +56,7 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
   { key: "almacen", label: "Almacén", permission: "warehouse.read", description: "Ubicaciones y solicitudes" },
   { key: "precios", label: "Lista de Precios", permission: "prices.read", description: "Listas de precios" },
   { key: "facturas", label: "Facturas PDF", permission: "invoices.read", description: "Comprobantes" },
-  { key: "garantias", label: "GestiÃ³n de GarantÃ­as", permission: "warranties.read", description: "Casos, flujos y documentos" },
+  { key: "garantias", label: "Gestión de Garantías", permission: "warranties.read", description: "Casos, flujos y documentos" },
   { key: "configuracion", label: "Configuración", permission: "settings.read", description: "Usuarios y roles" },
 ];
 

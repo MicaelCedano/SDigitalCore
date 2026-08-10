@@ -26,7 +26,7 @@ export async function requireUser() {
  */
 export async function requirePermission(permission: string) {
   const user = await requireUser();
-  if (!user.id) throw new Error("La sesiÃ³n no tiene un usuario persistido.");
+  if (!user.id) throw new Error("La sesión no tiene un usuario persistido.");
   const hasPermission = await can(permission);
   if (!hasPermission) {
     throw new Error(
