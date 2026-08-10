@@ -110,6 +110,19 @@
   display: none;
 }
 
+@media (min-width: 1280px) {
+  .warranty-dashboard > section > div.enterprise-panel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .warranty-dashboard > section > aside.enterprise-panel:first-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
 @media print {
   @page {
     margin: 0;

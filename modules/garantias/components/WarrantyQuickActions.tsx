@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, FileCheck2, Plus, Truck, UserRoundCheck, Wrench, X } from "lucide-react";
 import { WarrantyFlow, type WarrantyFlowCase, type WarrantyFlowOperation } from "@/modules/garantias/components/WarrantyFlow";
 import { WarrantyIntakeForm } from "@/modules/garantias/components/WarrantyIntakeForm";
@@ -19,6 +19,20 @@ export function WarrantyQuickActions({ cases, canCreate }: { cases: Partial<Reco
   const [intakeOpen, setIntakeOpen] = useState(false);
   const active = actions.find((item) => item.operation === openOperation);
   const activeCases = openOperation ? cases[openOperation] ?? [] : [];
+
+  useEffect(() => {
+    const openIntake = () => setIntakeOpen(true);
+    const interceptRegisterLink = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const link = target?.closest('a[href="/garantias/ingreso"]');
+      if (!link) return;
+      event.preventDefault();
+      setIntakeOpen(true);
+    };
+    window.addEventListener("open-warranty-intake", openIntake);
+    document.addEventListener("click", interceptRegisterLink, true);
+    return () => { window.removeEventListener("open-warranty-intake", openIntake); document.removeEventListener("click", interceptRegisterLink, true); };
+  }, []);
 
   return <>
     <aside className="enterprise-panel h-fit p-4"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-[#101828]">Acciones rápidas</h2><p className="mt-1 text-xs text-[#667085]">Gestiona el flujo sin cambiar de página.</p></div><CheckCircle2 size={18} className="text-red-500" /></div><div className="mt-4 space-y-2">{canCreate && <button type="button" onClick={() => setIntakeOpen(true)} className="flex w-full items-center justify-between rounded-lg bg-indigo-600 px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-indigo-700"><span className="flex items-center gap-2"><Plus size={16} /> Registrar ingreso</span><span className="text-xs opacity-70">Popup</span></button>}{actions.map(({ operation, label, description, icon: Icon, tone }) => <button key={operation} type="button" onClick={() => setOpenOperation(operation)} className="flex w-full items-center gap-3 rounded-lg border border-[#e4e7ec] px-3 py-3 text-left transition hover:border-red-200 hover:bg-red-50/40"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone === "violet" ? "bg-violet-50 text-violet-600" : tone === "blue" ? "bg-blue-50 text-blue-600" : tone === "orange" ? "bg-orange-50 text-orange-600" : tone === "amber" ? "bg-amber-50 text-amber-600" : tone === "emerald" ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}><Icon size={17} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#344054]">{label}</span><span className="mt-0.5 block text-[11px] text-[#98a2b3]">{description}</span></span><span className="text-xs font-bold text-red-600">Popup</span></button>)}</div></aside>
