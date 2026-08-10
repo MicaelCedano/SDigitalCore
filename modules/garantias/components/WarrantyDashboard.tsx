@@ -158,7 +158,7 @@ export function WarrantyDashboard({
         })}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <section className="space-y-5">
         <WarrantyQuickActions cases={quickCases} canCreate={canCreate} canTransition={canTransition} />
         <div className="enterprise-panel overflow-hidden">
           <div className="border-b border-[#e4e7ec] p-4 sm:p-5">

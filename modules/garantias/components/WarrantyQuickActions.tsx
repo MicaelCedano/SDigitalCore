@@ -31,12 +31,182 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
     };
     window.addEventListener("open-warranty-intake", openIntake);
     if (canCreate) document.addEventListener("click", interceptRegisterLink, true);
-    return () => { window.removeEventListener("open-warranty-intake", openIntake); document.removeEventListener("click", interceptRegisterLink, true); };
+    return () => {
+      window.removeEventListener("open-warranty-intake", openIntake);
+      document.removeEventListener("click", interceptRegisterLink, true);
+    };
   }, [canCreate]);
 
-  return <>
-    <aside className="enterprise-panel h-fit p-4"><div className="flex items-center justify-between"><div><h2 className="font-semibold text-[#101828]">Acciones rápidas</h2><p className="mt-1 text-xs text-[#667085]">Gestiona el flujo sin cambiar de página.</p></div><CheckCircle2 size={18} className="text-red-500" /></div><div className="mt-4 space-y-2">{canCreate && <button type="button" onClick={() => setIntakeOpen(true)} className="flex w-full items-center justify-between rounded-lg bg-indigo-600 px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-indigo-700"><span className="flex items-center gap-2"><Plus size={16} /> Registrar ingreso</span><span className="text-xs opacity-70">Popup</span></button>}{canTransition && actions.map(({ operation, label, description, icon: Icon, tone }) => <button key={operation} type="button" onClick={() => setOpenOperation(operation)} className="flex w-full items-center gap-3 rounded-lg border border-[#e4e7ec] px-3 py-3 text-left transition hover:border-red-200 hover:bg-red-50/40"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${tone === "violet" ? "bg-violet-50 text-violet-600" : tone === "blue" ? "bg-blue-50 text-blue-600" : tone === "orange" ? "bg-orange-50 text-orange-600" : tone === "amber" ? "bg-amber-50 text-amber-600" : tone === "emerald" ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}`}><Icon size={17} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#344054]">{label}</span><span className="mt-0.5 block text-[11px] text-[#98a2b3]">{description}</span></span><span className="text-xs font-bold text-red-600">Popup</span></button>)}{!canCreate && !canTransition && <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">Tu acceso a garantías es de consulta.</p>}</div></aside>
-    {intakeOpen && <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Registrar ingreso"><div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-y-auto rounded-2xl bg-[#f4f7fb] shadow-2xl"><div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-5 py-4 sm:px-7"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-600">Operación rápida</p><h2 className="mt-1 text-xl font-black text-[#101828]">Registrar ingreso de garantía</h2></div><button type="button" onClick={() => setIntakeOpen(false)} className="rounded-lg p-2 text-[#667085] hover:bg-[#f2f4f7]" aria-label="Cerrar popup"><X size={20} /></button></div><div className="p-3 sm:p-6"><WarrantyIntakeForm /></div></div></div>}
-    {active && <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label={active.label}><div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-y-auto rounded-2xl bg-[#f4f7fb] shadow-2xl"><div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-5 py-4 sm:px-7"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-red-600">Operación rápida</p><h2 className="mt-1 text-xl font-black text-[#101828]">{active.label}</h2></div><button type="button" onClick={() => setOpenOperation(null)} className="rounded-lg p-2 text-[#667085] hover:bg-[#f2f4f7]" aria-label="Cerrar popup"><X size={20} /></button></div><div className="p-3 sm:p-6"><WarrantyFlow operation={active.operation} cases={activeCases} /></div></div></div>}
-  </>;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenOperation(null);
+        setIntakeOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  return (
+    <>
+      <div className="enterprise-panel p-4 sm:p-5">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-base font-semibold text-[#101828]">Acciones Rápidas del Flujo</h2>
+            <p className="text-xs text-[#667085]">Gestiona ingresos y transiciones entre estados directamente en ventana modal.</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setIntakeOpen(true)}
+              className="group flex flex-col justify-between rounded-xl bg-indigo-600 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white">
+                  <Plus size={18} />
+                </span>
+                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">Nuevo</span>
+              </div>
+              <div className="mt-3">
+                <span className="block text-xs font-bold text-white">Registrar Ingreso</span>
+                <span className="mt-0.5 block text-[10px] text-indigo-100 opacity-90">Nuevo caso de garantía</span>
+              </div>
+            </button>
+          )}
+
+          {canTransition &&
+            actions.map(({ operation, label, icon: Icon, tone }) => {
+              const count = cases[operation]?.length ?? 0;
+              return (
+                <button
+                  key={operation}
+                  type="button"
+                  onClick={() => setOpenOperation(operation)}
+                  className="group flex flex-col justify-between rounded-xl border border-[#e4e7ec] bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        tone === "violet"
+                          ? "bg-violet-50 text-violet-600 group-hover:bg-violet-100"
+                          : tone === "blue"
+                          ? "bg-blue-50 text-blue-600 group-hover:bg-blue-100"
+                          : tone === "orange"
+                          ? "bg-orange-50 text-orange-600 group-hover:bg-orange-100"
+                          : tone === "amber"
+                          ? "bg-amber-50 text-amber-600 group-hover:bg-amber-100"
+                          : tone === "emerald"
+                          ? "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"
+                          : "bg-red-50 text-red-600 group-hover:bg-red-100"
+                      }`}
+                    >
+                      <Icon size={17} />
+                    </span>
+                    {count > 0 && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <span className="block truncate text-xs font-semibold text-[#344054] group-hover:text-indigo-600">{label}</span>
+                    <span className="mt-0.5 block truncate text-[10px] text-[#98a2b3]">En ventana modal</span>
+                  </div>
+                </button>
+              );
+            })}
+
+          {!canCreate && !canTransition && (
+            <div className="col-span-full rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+              Tu rol actual tiene permisos de solo lectura para las operaciones de garantía.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {intakeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm transition-all sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Registrar ingreso"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIntakeOpen(false);
+          }}
+        >
+          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-y-auto rounded-2xl bg-[#f4f7fb] shadow-2xl transition-all">
+            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-5 py-4 sm:px-7">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-600">Registro Rápido</p>
+                <h2 className="mt-0.5 text-xl font-black text-[#101828]">Registrar Ingreso de Garantía</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIntakeOpen(false)}
+                className="rounded-lg p-2 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
+                aria-label="Cerrar modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6">
+              <WarrantyIntakeForm />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {active && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm transition-all sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={active.label}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpenOperation(null);
+          }}
+        >
+          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-y-auto rounded-2xl bg-[#f4f7fb] shadow-2xl transition-all">
+            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-5 py-4 sm:px-7">
+              <div>
+                <p
+                  className={`text-xs font-bold uppercase tracking-[0.15em] ${
+                    active.tone === "violet"
+                      ? "text-violet-600"
+                      : active.tone === "blue"
+                      ? "text-blue-600"
+                      : active.tone === "orange"
+                      ? "text-orange-600"
+                      : active.tone === "amber"
+                      ? "text-amber-600"
+                      : active.tone === "emerald"
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  Gestión en Lote
+                </p>
+                <h2 className="mt-0.5 text-xl font-black text-[#101828]">{active.label}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenOperation(null)}
+                className="rounded-lg p-2 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
+                aria-label="Cerrar modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6">
+              <WarrantyFlow operation={active.operation} cases={activeCases} />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
