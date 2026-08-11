@@ -89,12 +89,18 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
         setItems(result.data.items.map((item) => ({
           description: item.description,
           sku: "",
-          imeis: "",
+          imeis: item.imeis,
           quantity: item.quantity,
           unitPrice: 0,
           applyTax: true,
         })));
-        setExtractMsg(`${result.data.items.length} ítems extraídos. Revisa los datos antes de emitir.`);
+        const extractedImeiCount = result.data.items.reduce(
+          (total, item) => total + item.imeis.split("\n").filter(Boolean).length,
+          0,
+        );
+        setExtractMsg(
+          `${result.data.items.length} ítems y ${extractedImeiCount} IMEI extraídos. Revisa los datos antes de emitir.`,
+        );
       } else {
         setExtractMsg("Se leyeron los datos generales, pero no se detectaron ítems. Agrégalos manualmente.");
       }
