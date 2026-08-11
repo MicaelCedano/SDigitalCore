@@ -517,3 +517,74 @@ export async function restoreWarrantyCase(caseCode: string, reason?: string): Pr
     return fail(error);
   }
 }
+
+export type ImeiLookupContext = {
+  found: boolean;
+  clientName?: string;
+  model?: string;
+  source?: "invoice" | "warranty" | "receipt";
+  caseCode?: string;
+};
+
+export async function lookupImeiContext(imeiInput: string): Promise<Result<ImeiLookupContext>> {
+  try {
+    await requirePermission("warranties.read");
+    const digits = imeiInput.trim().replace(/\D/g, "");
+    if (!digits || digits.length < 4) {
+      return ok({ found: false });
+    }
+
+    const invoiceItem = await prisma.invoiceItem.findFirst({
+      where: { imeis: { contains: digits } },
+      select: {
+        description: true,
+        invoice: { select: { clientName: true, createdAt: true } },
+      },
+      orderBy: { invoice: { createdAt: "desc" } },
+    });
+
+    if (invoiceItem && invoiceItem.invoice.clientName) {
+      return ok({
+        found: true,
+        clientName: invoiceItem.invoice.clientName,
+        model: invoiceItem.description,
+        source: "invoice",
+      });
+    }
+
+    const warrantyCase = await prisma.warrantyCase.findFirst({
+      where: { imei: { contains: digits } },
+      select: { clientName: true, model: true, caseCode: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (warrantyCase && warrantyCase.clientName) {
+      return ok({
+        found: true,
+        clientName: warrantyCase.clientName,
+        model: warrantyCase.model,
+        source: "warranty",
+        caseCode: warrantyCase.caseCode,
+      });
+    }
+
+    const receiptItem = await prisma.goodsReceiptItem.findFirst({
+      where: { imeiOrSerial: { contains: digits } },
+      select: { description: true, receipt: { select: { supplierName: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (receiptItem && receiptItem.description) {
+      return ok({
+        found: true,
+        model: receiptItem.description,
+        source: "receipt",
+      });
+    }
+
+    return ok({ found: false });
+  } catch (error) {
+    return fail(error);
+  }
+}
+
