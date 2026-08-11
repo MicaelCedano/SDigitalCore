@@ -190,6 +190,37 @@
     padding-bottom: 4mm !important;
   }
 
+  body.invoice-printing #invoice-print-root .invoice-issued-at {
+    padding: 2mm 2.5mm !important;
+    border: 0.3mm solid #cbd5e1 !important;
+    border-radius: 2mm !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    line-height: 1.2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-issued-icon {
+    width: 4.2mm !important;
+    height: 4.2mm !important;
+    color: #4338ca !important;
+    stroke-width: 2.5 !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-issued-date {
+    font-size: 9pt !important;
+    font-weight: 700 !important;
+    color: #334155 !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-issued-time {
+    margin-top: 0.6mm !important;
+    font-size: 11pt !important;
+    font-weight: 900 !important;
+    color: #020617 !important;
+  }
+
   body.invoice-printing #invoice-print-root .invoice-client-info,
   body.invoice-printing #invoice-print-root .invoice-delivery-terms {
     padding: 3mm !important;

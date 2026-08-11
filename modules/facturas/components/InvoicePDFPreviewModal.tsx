@@ -59,12 +59,18 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
     window.print();
   };
 
-  const formattedDate = new Date(invoice.createdAt || Date.now()).toLocaleDateString("es-DO", {
+  const issuedAt = new Date(invoice.createdAt || Date.now());
+  const formattedDate = issuedAt.toLocaleDateString("es-DO", {
     day: "2-digit",
-    month: "long",
+    month: "short",
     year: "numeric",
+    timeZone: "America/Santo_Domingo",
+  });
+  const formattedTime = issuedAt.toLocaleTimeString("es-DO", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
+    timeZone: "America/Santo_Domingo",
   });
 
   const isConduce = invoice.type === "CONDUCE";
@@ -135,9 +141,13 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 {invoice.ncf && (
                   <p className="text-xs font-mono font-bold text-slate-700">NCF: {invoice.ncf}</p>
                 )}
-                <p className="text-[11px] text-slate-500 flex items-center justify-end gap-1 pt-1">
-                  <Calendar className="w-3 h-3 text-slate-400" /> {formattedDate}
-                </p>
+                <div className="invoice-issued-at mt-2 inline-flex items-center justify-end gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left text-slate-700">
+                  <Calendar className="invoice-issued-icon h-4 w-4 shrink-0 text-[#5750f1]" />
+                  <div className="leading-tight">
+                    <span className="invoice-issued-date block text-[11px] font-bold">{formattedDate}</span>
+                    <span className="invoice-issued-time block text-xs font-black text-slate-950">Hora: {formattedTime}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
