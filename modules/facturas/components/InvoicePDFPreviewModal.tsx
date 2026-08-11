@@ -7,6 +7,23 @@ const COMPANY_ADDRESS = "Calle Duarte esquina Dr. Teofilo Ferry #54, La Romana";
 const COMPANY_WHATSAPP = "(829) 266-0404";
 const COMPANY_LABEL = "Se\u00f1al Digital";
 
+function getItemImeis(value: unknown) {
+  if (typeof value !== "string") return [];
+
+  const exactImeis = value.match(/\d{15}/g);
+  if (exactImeis?.length) return Array.from(new Set(exactImeis));
+
+  return Array.from(new Set(value.split(/[\s,;]+/).map((imei) => imei.trim()).filter(Boolean)));
+}
+
+function RedactedAmount() {
+  return (
+    <span className="invoice-redacted-amount" aria-label="Precio oculto">
+      RD$ 88,888.88
+    </span>
+  );
+}
+
 interface InvoicePDFPreviewModalProps {
   invoice: any;
   onClose: () => void;
@@ -154,18 +171,27 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                       <td className="px-4 py-3.5 space-y-1">
                         <span className="font-bold text-slate-900 block">{item.description}</span>
                         {item.sku && <span className="text-[10px] font-mono text-slate-400 block">SKU: {item.sku}</span>}
+                        {!isConduce && getItemImeis(item.imeis).length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {getItemImeis(item.imeis).map((imei) => (
+                              <span key={imei} className="inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-slate-600">
+                                IMEI: {imei}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-center font-black text-slate-800 text-sm">
                         {item.quantity}
                       </td>
                       {!isConduce && (
                         <td className="px-4 py-3.5 text-right font-medium text-slate-700">
-                          RD$ {Number(item.unitPrice || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                          <RedactedAmount />
                         </td>
                       )}
                       {!isConduce && (
                         <td className="px-4 py-3.5 text-right font-medium text-slate-500">
-                          RD$ {Number(item.tax || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                          <RedactedAmount />
                         </td>
                       )}
                       <td className="px-4 py-3.5 text-right font-extrabold text-slate-900">
@@ -174,7 +200,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                             ENTREGADO
                           </span>
                         ) : (
-                          `RD$ ${Number(item.totalPrice || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}`
+                          <RedactedAmount />
                         )}
                       </td>
                     </tr>
@@ -200,26 +226,26 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                     <div className="flex justify-between text-slate-600">
                       <span>Subtotal:</span>
                       <span className="font-semibold text-slate-800">
-                        RD$ {Number(invoice.subtotal || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                        <RedactedAmount />
                       </span>
                     </div>
                     {Number(invoice.discount) > 0 && (
                       <div className="flex justify-between text-emerald-600">
                         <span>Descuento:</span>
                         <span className="font-semibold">
-                          -RD$ {Number(invoice.discount).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                          <RedactedAmount />
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between text-slate-600">
                       <span>ITBIS (18%):</span>
                       <span className="font-semibold text-slate-800">
-                        RD$ {Number(invoice.tax || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                        <RedactedAmount />
                       </span>
                     </div>
                     <div className="flex justify-between text-sm font-black text-[#5750f1] pt-2 border-t border-slate-200">
                       <span>TOTAL GENERAL:</span>
-                      <span>RD$ {Number(invoice.total || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}</span>
+                      <RedactedAmount />
                     </div>
                   </div>
                 </div>

@@ -245,6 +245,11 @@
     padding-top: 6mm !important;
   }
 
+  body.invoice-printing #invoice-print-root .invoice-redacted-amount {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   /* Ajustes para impresion directa de paginas de documentos */
   .dashboard-shell {
     display: block !important;
@@ -262,6 +267,34 @@
     margin: 0 !important;
     overflow: visible !important;
   }
+}
+
+/* Censura irreversible: el valor real no se monta en el documento. */
+.invoice-redacted-amount {
+  position: relative;
+  display: inline-block;
+  min-width: 5.8rem;
+  overflow: hidden;
+  user-select: none;
+  color: transparent;
+  text-align: center;
+  text-shadow:
+    -3px 0 3px rgb(15 23 42 / 90%),
+    2px 1px 4px rgb(51 65 85 / 95%),
+    0 -1px 2px rgb(15 23 42 / 80%);
+  filter: blur(1.8px);
+  transform: skewX(-7deg);
+}
+
+.invoice-redacted-amount::after {
+  position: absolute;
+  inset: 38% -3px auto;
+  height: 0.24rem;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 88%);
+  box-shadow: 0.35rem -0.14rem 0 rgb(51 65 85 / 72%);
+  content: "";
+  transform: rotate(-2deg);
 }
 
 ::-webkit-scrollbar-track {
