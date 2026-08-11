@@ -42,7 +42,7 @@ export type WarrantyDocumentData = {
   items: Array<{
     id: string;
     sortOrder: number;
-    case: { caseCode: string; imei: string; model: string; clientName: string; problem: string };
+    case: { caseCode: string; imei: string; model: string; color: string | null; clientName: string; problem: string };
   }>;
 };
 
@@ -92,7 +92,7 @@ const documentSelect = {
     select: {
       id: true,
       sortOrder: true,
-      case: { select: { caseCode: true, imei: true, model: true, clientName: true, problem: true } },
+      case: { select: { caseCode: true, imei: true, model: true, color: true, clientName: true, problem: true } },
     },
   },
 } satisfies Prisma.WarrantyDocumentSelect;
@@ -298,6 +298,7 @@ export async function createWarrantyCases(input: unknown): Promise<Result<{ case
             caseCode: code,
             imei: device.imei,
             model: normalizeName(device.model),
+            color: device.color ? normalizeName(device.color) : null,
             clientName: normalizeName(parsed.data.clientName),
             problem: device.problem.trim(),
             entryDate: civilDate(parsed.data.entryDate),
@@ -588,3 +589,43 @@ export async function lookupImeiContext(imeiInput: string): Promise<Result<ImeiL
   }
 }
 
+export async function getWarrantyModelColors(modelInput: string): Promise<Result<string[]>> {
+  try {
+    await requirePermission("warranties.read");
+    const model = normalizeName(modelInput);
+    if (model.length < 2) return ok([]);
+
+    const [receiptItems, warehouseProducts] = await Promise.all([
+      prisma.goodsReceiptItem.findMany({
+        where: { description: { contains: model, mode: "insensitive" } },
+        select: { colorVariants: true },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      prisma.warehouseProduct.findMany({
+        where: { name: { contains: model, mode: "insensitive" } },
+        select: { color: true },
+        take: 50,
+      }),
+    ]);
+
+    const colors = new Map<string, string>();
+    const add = (value: unknown) => {
+      if (typeof value !== "string") return;
+      const clean = normalizeName(value);
+      if (!clean || comparableName(clean) === "general") return;
+      colors.set(comparableName(clean), clean);
+    };
+
+    for (const item of receiptItems) {
+      if (!Array.isArray(item.colorVariants)) continue;
+      for (const variant of item.colorVariants) {
+        if (variant && typeof variant === "object" && "color" in variant) add(variant.color);
+      }
+    }
+    warehouseProducts.forEach((product) => add(product.color));
+    return ok([...colors.values()].sort((a, b) => a.localeCompare(b, "es")));
+  } catch (error) {
+    return fail(error);
+  }
+}

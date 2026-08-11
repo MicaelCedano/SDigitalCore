@@ -4,19 +4,21 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, Plus, Sparkles, Trash2 } from "lucide-react";
-import { createWarrantyCases, getWarrantyDocument, lookupImeiContext } from "@/modules/garantias/actions/warranty";
+import { createWarrantyCases, getWarrantyDocument, getWarrantyModelColors, lookupImeiContext } from "@/modules/garantias/actions/warranty";
 import { WarrantyDocumentPreviewModal, type WarrantyDocument } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
 
 type Device = {
   imei: string;
   model: string;
+  color: string;
+  colorOptions?: string[];
   problem: string;
   autoSource?: string;
   detectedClient?: string;
   clientMismatch?: boolean;
 };
 
-const emptyDevice = (): Device => ({ imei: "", model: "", problem: "" });
+const emptyDevice = (): Device => ({ imei: "", model: "", color: "", problem: "" });
 
 export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
@@ -29,6 +31,23 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
   const [busy, setBusy] = useState(false);
   const [document, setDocument] = useState<WarrantyDocument | null>(null);
   const [lookupLoading, setLookupLoading] = useState<Record<number, boolean>>({});
+  const [colorLoading, setColorLoading] = useState<Record<number, boolean>>({});
+
+  async function loadModelColors(index: number, modelValue: string) {
+    const model = modelValue.trim();
+    if (model.length < 2) return;
+    setColorLoading((prev) => ({ ...prev, [index]: true }));
+    try {
+      const result = await getWarrantyModelColors(model);
+      if (result.success) {
+        setDevices((current) => current.map((device, deviceIndex) => deviceIndex === index
+          ? { ...device, colorOptions: result.data }
+          : device));
+      }
+    } finally {
+      setColorLoading((prev) => ({ ...prev, [index]: false }));
+    }
+  }
 
   async function handleImeiChange(index: number, val: string) {
     const cleanImei = val.replace(/\D/g, "");
@@ -261,8 +280,22 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
                       placeholder="Marca y modelo"
                       value={device.model}
                       onChange={(event) => updateDevice(index, "model", event.target.value)}
+                      onBlur={(event) => void loadModelColors(index, event.target.value)}
                       className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
                     />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-500">
+                    Color <span className="font-normal text-slate-400">(opcional)</span>
+                    <select
+                      value={device.color}
+                      onChange={(event) => updateDevice(index, "color", event.target.value)}
+                      onFocus={() => { if (!device.colorOptions?.length) void loadModelColors(index, device.model); }}
+                      className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
+                    >
+                      <option value="">{colorLoading[index] ? "Cargando colores..." : "Seleccionar color"}</option>
+                      {(device.colorOptions ?? []).map((color) => <option key={color} value={color}>{color}</option>)}
+                    </select>
                   </label>
 
                   <label className="text-xs font-semibold text-slate-500">

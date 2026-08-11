@@ -195,6 +195,7 @@ model WarrantyCase {
   caseCode              String   @unique @map("case_code")
   imei                  String
   model                 String
+  color                 String?
   clientName            String   @map("client_name")
   problem               String   @db.Text
   status                WarrantyStatus @default(RECEIVED)

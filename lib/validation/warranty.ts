@@ -21,6 +21,7 @@ function todayInSantoDomingo() {
 export const warrantyDeviceSchema = z.object({
   imei: imeiSchema,
   model: text("El modelo", 120),
+  color: optionalText(80),
   problem: text("El problema", 1000),
 });
 
