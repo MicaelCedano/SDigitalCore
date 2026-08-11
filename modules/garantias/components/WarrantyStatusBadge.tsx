@@ -2,5 +2,5 @@ import { getWarrantyStatusLabel, WARRANTY_STATUS_TONES } from "@/modules/garanti
 import type { WarrantyStatus } from "@prisma/client";
 
 export function WarrantyStatusBadge({ status }: { status: WarrantyStatus }) {
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${WARRANTY_STATUS_TONES[status]}`}>{getWarrantyStatusLabel(status)}</span>;
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${WARRANTY_STATUS_TONES[status]}`}>{getWarrantyStatusLabel(status)}</span>;
 }

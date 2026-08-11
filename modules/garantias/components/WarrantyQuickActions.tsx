@@ -61,7 +61,7 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
           <button
             type="button"
             onClick={() => setIntakeOpen(true)}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98]"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#5750f1] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#463ec5] active:scale-[0.98]"
           >
             <Plus size={17} /> Registrar ingreso
           </button>
@@ -72,11 +72,11 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] shadow-xs transition hover:bg-[#f8fafc]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
             >
               Acciones de flujo
               {totalPendingTransitions > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5750f1]/10 px-1.5 text-xs font-bold text-[#5750f1]">
                   {totalPendingTransitions}
                 </span>
               )}
@@ -85,8 +85,8 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl border border-[#e4e7ec] bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150">
-                  <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#98a2b3]">
+                <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                  <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     Procesamiento por etapas
                   </p>
                   <div className="space-y-1">
@@ -121,7 +121,7 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                               <Icon size={15} />
                             </span>
                             <span className="min-w-0">
-                              <span className="block truncate text-xs font-semibold text-[#344054]">{label}</span>
+                              <span className="block truncate text-xs font-semibold text-slate-700">{label}</span>
                             </span>
                           </div>
                           {count > 0 && (
@@ -140,78 +140,64 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
         )}
       </div>
 
-      {/* Drawer Lateral Derecho para Registrar Ingreso */}
+      {/* Modal Centrado para Registrar Ingreso (estilo Nuevo Recibo de Mercancía) */}
       {intakeOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs transition-opacity"
-            onClick={() => setIntakeOpen(false)}
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col bg-[#f4f7fb] shadow-2xl transition-transform duration-300 ease-in-out sm:max-w-3xl border-l border-slate-200"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Registrar ingreso"
-          >
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-3.5">
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                  Garantías
-                </span>
-                <span className="text-xs text-[#98a2b3]">/</span>
-                <span className="text-xs font-semibold text-[#344054]">Registrar Ingreso</span>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]" role="dialog" aria-modal="true" aria-label="Registrar ingreso">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
+                  <FileCheck2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Registrar Ingreso de Garantía</h2>
+                  <p className="text-xs text-slate-500">Crea uno o varios casos para el mismo cliente y genera el recibo.</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIntakeOpen(false)}
-                className="rounded-lg p-1.5 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
-                aria-label="Cerrar panel lateral"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label="Cerrar"
               >
-                <X size={19} />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <WarrantyIntakeForm />
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
+              <WarrantyIntakeForm embedded />
             </div>
-          </aside>
-        </>
+          </div>
+        </div>
       )}
 
-      {/* Drawer Lateral Derecho para Operaciones de Flujo */}
+      {/* Modal Centrado para Operaciones de Flujo (estilo Nuevo Recibo de Mercancía) */}
       {active && (
-        <>
-          <div
-            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs transition-opacity"
-            onClick={() => setOpenOperation(null)}
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col bg-[#f4f7fb] shadow-2xl transition-transform duration-300 ease-in-out sm:max-w-3xl border-l border-slate-200"
-            role="dialog"
-            aria-modal="true"
-            aria-label={active.label}
-          >
-            <div className="flex items-center justify-between border-b border-[#e4e7ec] bg-white px-6 py-3.5">
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">
-                  Garantías
-                </span>
-                <span className="text-xs text-[#98a2b3]">/</span>
-                <span className="text-xs font-semibold text-[#344054]">{active.label}</span>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]" role="dialog" aria-modal="true" aria-label={active.label}>
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
+                  <active.icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">{active.label}</h2>
+                  <p className="text-xs text-slate-500">{active.description}</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setOpenOperation(null)}
-                className="rounded-lg p-1.5 text-[#667085] transition hover:bg-[#f2f4f7] hover:text-[#101828]"
-                aria-label="Cerrar panel lateral"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label="Cerrar"
               >
-                <X size={19} />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <WarrantyFlow operation={active.operation} cases={activeCases} />
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
+              <WarrantyFlow operation={active.operation} cases={activeCases} embedded />
             </div>
-          </aside>
-        </>
+          </div>
+        </div>
       )}
     </>
   );

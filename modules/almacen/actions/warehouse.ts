@@ -451,7 +451,7 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
 
     const requests = await prisma.warehouseRequest.findMany({
       where,
-      include: { items: { include: { product: { select: { id: true, code: true, name: true, brand: true } } } } },
+      include: { items: { include: { product: { select: { id: true, code: true, name: true, brand: true, capacity: true, color: true, unitsPerBox: true } } } } },
       orderBy: { createdAt: "desc" },
     });
 
