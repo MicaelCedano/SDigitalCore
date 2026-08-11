@@ -142,7 +142,9 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                   <Calendar className="invoice-issued-icon h-4 w-4 shrink-0 text-[#5750f1]" />
                   <div className="leading-tight">
                     <span className="invoice-issued-date block text-[11px] font-bold">{formattedDate}</span>
-                    <span className="invoice-issued-time block text-xs font-black text-slate-950">Hora: {formattedTime}</span>
+                    {!isConduce && (
+                      <span className="invoice-issued-time block text-xs font-black text-slate-950">Hora: {formattedTime}</span>
+                    )}
                   </div>
                 </div>
               </div>
