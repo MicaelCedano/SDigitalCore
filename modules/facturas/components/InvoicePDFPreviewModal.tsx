@@ -63,13 +63,6 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
     year: "numeric",
     timeZone: "America/Santo_Domingo",
   });
-  const formattedTime = issuedAt.toLocaleTimeString("es-DO", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "America/Santo_Domingo",
-  });
-
   const isConduce = invoice.type === "CONDUCE";
   const displayBranch = isConduce ? COMPANY_LABEL : invoice.branch;
   const itemCount = Array.isArray(invoice.items) ? invoice.items.length : 0;
@@ -142,9 +135,6 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                   <Calendar className="invoice-issued-icon h-4 w-4 shrink-0 text-[#5750f1]" />
                   <div className="leading-tight">
                     <span className="invoice-issued-date block text-[11px] font-bold">{formattedDate}</span>
-                    {!isConduce && (
-                      <span className="invoice-issued-time block text-xs font-black text-slate-950">Hora: {formattedTime}</span>
-                    )}
                   </div>
                 </div>
               </div>
