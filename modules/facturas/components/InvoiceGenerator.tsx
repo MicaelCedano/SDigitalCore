@@ -99,7 +99,7 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
           0,
         );
         setExtractMsg(
-          `${result.data.items.length} ítems y ${extractedImeiCount} IMEI extraídos. Revisa los datos antes de emitir.`,
+          `${result.data.items.length} ítems y ${extractedImeiCount} identificadores extraídos. Revisa los datos antes de emitir.`,
         );
       } else {
         setExtractMsg("Se leyeron los datos generales, pero no se detectaron ítems. Agrégalos manualmente.");
@@ -463,13 +463,13 @@ export function InvoiceGenerator({ onSuccess, onCancel }: InvoiceGeneratorProps)
                 {type === "FACTURA" && (
                   <div>
                     <label className="mb-1 block text-[11px] font-semibold text-slate-600">
-                      IMEI de los equipos
+                      IMEI / Serial de los equipos
                     </label>
                     <textarea
                       rows={2}
                       value={item.imeis || ""}
                       onChange={(e) => handleItemChange(idx, "imeis", e.target.value)}
-                      placeholder="Pega uno o varios IMEI, separados por coma o por línea"
+                      placeholder="Pega uno o varios IMEI o seriales, separados por coma o por línea"
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-[#5750f1] focus:outline-none"
                     />
                     <p className="mt-1 text-[10px] text-slate-400">

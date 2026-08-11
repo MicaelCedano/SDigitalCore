@@ -23,6 +23,10 @@ const BLACKLIST = [
   "PAGINA",
   "RECIBIDO POR",
   "REALIZADO POR",
+  "VIGENCIA DE PAGO",
+  "FORMA DE PAGO",
+  "TERMINOS DE PAGO",
+  "TÉRMINOS DE PAGO",
 ];
 
 const COLORS = [
@@ -39,6 +43,7 @@ const COLORS = [
 ];
 
 const IMEI_PATTERN = /(?<!\d)\d(?:[\s-]?\d){14}(?!\d)/g;
+const AMAZON_SERIAL_PATTERN = /(?<![A-Z0-9])YTAMZ\d{4}(?![A-Z0-9])/gi;
 
 function cleanModelName(value: string): string {
   const model = value
@@ -55,17 +60,19 @@ function cleanModelName(value: string): string {
   return model || value.trim();
 }
 
-function extractImeis(value: string): string[] {
-  return Array.from(new Set(
-    (value.match(IMEI_PATTERN) ?? [])
-      .map((candidate) => candidate.replace(/\D/g, ""))
-      .filter((candidate) => candidate.length === 15),
-  ));
+function extractIdentifiers(value: string): string[] {
+  const imeis = (value.match(IMEI_PATTERN) ?? [])
+    .map((candidate) => candidate.replace(/\D/g, ""))
+    .filter((candidate) => candidate.length === 15);
+  const serials = (value.match(AMAZON_SERIAL_PATTERN) ?? []).map((candidate) => candidate.toUpperCase());
+
+  return Array.from(new Set([...imeis, ...serials]));
 }
 
-function stripImeis(value: string): string {
+function stripIdentifiers(value: string): string {
   return value
     .replace(IMEI_PATTERN, " ")
+    .replace(AMAZON_SERIAL_PATTERN, " ")
     .replace(/\b(?:IMEI(?:\s*[12])?|SERIE|SERIAL|S\s*\/\s*N|N\s*\/\s*S|SN)\b\s*[:#-]?/gi, " ")
     .replace(/^[\s:;,|/-]+|[\s:;,|/-]+$/g, "")
     .replace(/\s{2,}/g, " ")
@@ -131,8 +138,8 @@ function extractItems(text: string): ExtractedInvoiceItem[] {
     const line = rawLine.trim();
     if (!line) continue;
 
-    const lineImeis = extractImeis(line);
-    const content = stripImeis(line);
+    const lineImeis = extractIdentifiers(line);
+    const content = stripIdentifiers(line);
 
     if (!content && lineImeis.length > 0) {
       if (lastItemIndex === null) pendingImeis = Array.from(new Set([...pendingImeis, ...lineImeis]));

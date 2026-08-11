@@ -7,13 +7,10 @@ const COMPANY_ADDRESS = "Calle Duarte esquina Dr. Teofilo Ferry #54, La Romana";
 const COMPANY_WHATSAPP = "(829) 266-0404";
 const COMPANY_LABEL = "Se\u00f1al Digital";
 
-function getItemImeis(value: unknown) {
+function getItemIdentifiers(value: unknown) {
   if (typeof value !== "string") return [];
 
-  const exactImeis = value.match(/\d{15}/g);
-  if (exactImeis?.length) return Array.from(new Set(exactImeis));
-
-  return Array.from(new Set(value.split(/[\s,;]+/).map((imei) => imei.trim()).filter(Boolean)));
+  return Array.from(new Set(value.split(/[\s,;]+/).map((identifier) => identifier.trim()).filter(Boolean)));
 }
 
 function RedactedAmount() {
@@ -181,11 +178,11 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                       <td className="px-4 py-3.5 space-y-1">
                         <span className="font-bold text-slate-900 block">{item.description}</span>
                         {item.sku && <span className="text-[10px] font-mono text-slate-400 block">SKU: {item.sku}</span>}
-                        {!isConduce && getItemImeis(item.imeis).length > 0 && (
+                        {!isConduce && getItemIdentifiers(item.imeis).length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
-                            {getItemImeis(item.imeis).map((imei) => (
-                              <span key={imei} className="inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-slate-600">
-                                IMEI: {imei}
+                            {getItemIdentifiers(item.imeis).map((identifier) => (
+                              <span key={identifier} className="inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-wide text-slate-600">
+                                {/^\d{15}$/.test(identifier) ? "IMEI" : "SN"}: {identifier}
                               </span>
                             ))}
                           </div>
