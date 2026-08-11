@@ -164,6 +164,87 @@
     min-height: 38mm !important;
   }
 
+  /* Facturas y conduces: densidad adaptable y cierres sin firmas huerfanas. */
+  body.invoice-printing #invoice-print-root .print-document {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.invoice-printing #invoice-print-root .print-document > :not([hidden]) ~ :not([hidden]),
+  body.invoice-printing #invoice-print-root .invoice-closing > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 4mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-document-header,
+  body.invoice-printing #invoice-print-root .invoice-client-info,
+  body.invoice-printing #invoice-print-root .invoice-closing,
+  body.invoice-printing #invoice-print-root .invoice-delivery-terms,
+  body.invoice-printing #invoice-print-root .invoice-signatures {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-document-header {
+    padding-bottom: 4mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-client-info,
+  body.invoice-printing #invoice-print-root .invoice-delivery-terms {
+    padding: 3mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-items-table {
+    overflow: visible !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-items-table thead {
+    display: table-header-group !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-items-table tr {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-signatures {
+    padding-top: 9mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-signatures > div {
+    gap: 7mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-compact .invoice-items-table th {
+    padding: 2mm 3mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-compact .invoice-items-table td {
+    padding: 1.7mm 3mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-tight {
+    font-size: 9px !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-tight > :not([hidden]) ~ :not([hidden]),
+  body.invoice-printing #invoice-print-root .invoice-print-density-tight .invoice-closing > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 2.5mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-tight .invoice-items-table th {
+    padding: 1.5mm 2.5mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-tight .invoice-items-table td {
+    padding: 1.2mm 2.5mm !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-print-density-tight .invoice-signatures {
+    padding-top: 6mm !important;
+  }
+
   /* Ajustes para impresion directa de paginas de documentos */
   .dashboard-shell {
     display: block !important;

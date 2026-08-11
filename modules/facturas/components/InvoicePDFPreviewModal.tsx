@@ -52,6 +52,12 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
 
   const isConduce = invoice.type === "CONDUCE";
   const displayBranch = isConduce ? COMPANY_LABEL : invoice.branch;
+  const itemCount = Array.isArray(invoice.items) ? invoice.items.length : 0;
+  const printDensity = itemCount >= 16
+    ? "invoice-print-density-tight"
+    : itemCount >= 9
+      ? "invoice-print-density-compact"
+      : "invoice-print-density-normal";
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white print:static">
@@ -83,10 +89,10 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
 
         {/* PDF Document Printable Content Body */}
         <div className="p-8 overflow-y-auto flex-1 bg-slate-100 print:bg-white print:p-0" ref={printRef}>
-          <div className="print-document bg-white border border-slate-200 rounded-xl p-8 max-w-3xl mx-auto shadow-sm print:shadow-none print:border-none print:p-0 space-y-6">
+          <div className={`print-document ${printDensity} bg-white border border-slate-200 rounded-xl p-8 max-w-3xl mx-auto shadow-sm print:shadow-none print:border-none print:p-0 space-y-6`}>
             
             {/* Document Header */}
-            <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-6">
+            <div className="invoice-document-header flex items-start justify-between gap-6 border-b border-slate-200 pb-6">
               <div className="min-w-0 flex-1 space-y-1 pr-2">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 bg-[#5750f1] text-white font-black text-xl rounded-lg flex items-center justify-center shadow-md">
@@ -119,7 +125,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
             </div>
 
             {/* Client Info Grid */}
-            <div className="grid grid-cols-1 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+            <div className="invoice-client-info grid grid-cols-1 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">DATOS DEL CLIENTE / RECEPTOR</span>
                 <p className="font-bold text-slate-900 text-sm">{invoice.clientName}</p>
@@ -129,7 +135,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
             </div>
 
             {/* Items Table */}
-            <div className="overflow-hidden border border-slate-200 rounded-xl">
+            <div className="invoice-items-table overflow-hidden border border-slate-200 rounded-xl">
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-900 text-white font-bold text-[11px] uppercase">
                   <tr>
@@ -177,70 +183,72 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
               </table>
             </div>
 
-            {/* Totals Section */}
-            {!isConduce ? (
-              <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pt-2">
-                <div className="max-w-md space-y-1 text-xs text-slate-500">
-                  <p className="font-bold text-slate-700 flex items-center gap-1">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" /> Política de Garantía SDigital:
-                  </p>
-                  <p>
-                    Todo cambio o reclamación requiere la factura física y sellos de seguridad intactos.
-                  </p>
-                </div>
-
-                <div className="w-full sm:w-64 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal:</span>
-                    <span className="font-semibold text-slate-800">
-                      RD$ {Number(invoice.subtotal || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
-                    </span>
+            <div className="invoice-closing space-y-6">
+              {/* Totals / Delivery Terms */}
+              {!isConduce ? (
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-4 pt-2">
+                  <div className="max-w-md space-y-1 text-xs text-slate-500">
+                    <p className="font-bold text-slate-700 flex items-center gap-1">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> Política de Garantía SDigital:
+                    </p>
+                    <p>
+                      Todo cambio o reclamación requiere la factura física y sellos de seguridad intactos.
+                    </p>
                   </div>
-                  {Number(invoice.discount) > 0 && (
-                    <div className="flex justify-between text-emerald-600">
-                      <span>Descuento:</span>
-                      <span className="font-semibold">
-                        -RD$ {Number(invoice.discount).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+
+                  <div className="w-full sm:w-64 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Subtotal:</span>
+                      <span className="font-semibold text-slate-800">
+                        RD$ {Number(invoice.subtotal || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-slate-600">
-                    <span>ITBIS (18%):</span>
-                    <span className="font-semibold text-slate-800">
-                      RD$ {Number(invoice.tax || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm font-black text-[#5750f1] pt-2 border-t border-slate-200">
-                    <span>TOTAL GENERAL:</span>
-                    <span>RD$ {Number(invoice.total || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}</span>
+                    {Number(invoice.discount) > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>Descuento:</span>
+                        <span className="font-semibold">
+                          -RD$ {Number(invoice.discount).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-slate-600">
+                      <span>ITBIS (18%):</span>
+                      <span className="font-semibold text-slate-800">
+                        RD$ {Number(invoice.tax || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm font-black text-[#5750f1] pt-2 border-t border-slate-200">
+                      <span>TOTAL GENERAL:</span>
+                      <span>RD$ {Number(invoice.total || 0).toLocaleString("es-DO", { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
+              ) : (
+                <div className="invoice-delivery-terms bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
                   <p className="font-bold">Conduce de Entrega Final — {displayBranch}</p>
                   <p className="text-[11px] mt-0.5">
                     Al firmar como "Recibido Conforme", el cliente acepta las políticas de la empresa y certifica que ha recibido la mercancía detallada.
                     Cualquier reclamo debe realizarse antes de retirar la mercancía. No nos hacemos responsables tras la salida.
                   </p>
-              </div>
-            )}
-
-            {/* Signatures Section */}
-            <div className="grid grid-cols-2 gap-12 pt-12 border-t border-slate-200 text-center text-xs">
-              <div className="space-y-10">
-                <div className="border-b border-slate-400 w-3/4 mx-auto"></div>
-                <div>
-                  <p className="font-bold text-slate-800">Entregado Por (Almacén / Chofer)</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Firma & Cédula</p>
                 </div>
-              </div>
+              )}
 
-              <div className="space-y-10">
-                <div className="border-b border-slate-400 w-3/4 mx-auto"></div>
-                <div>
-                  <p className="font-bold text-slate-800">Recibido Conforme (Cliente / Receptor)</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Firma & Fecha de Recepción</p>
+              {/* Signatures Section */}
+              <div className="invoice-signatures grid grid-cols-2 gap-12 pt-12 border-t border-slate-200 text-center text-xs">
+                <div className="space-y-10">
+                  <div className="border-b border-slate-400 w-3/4 mx-auto"></div>
+                  <div>
+                    <p className="font-bold text-slate-800">Entregado Por (Almacén / Chofer)</p>
+                    <p className="text-[10px] text-slate-400 font-mono">Firma & Cédula</p>
+                  </div>
+                </div>
+
+                <div className="space-y-10">
+                  <div className="border-b border-slate-400 w-3/4 mx-auto"></div>
+                  <div>
+                    <p className="font-bold text-slate-800">Recibido Conforme (Cliente / Receptor)</p>
+                    <p className="text-[10px] text-slate-400 font-mono">Firma & Fecha de Recepción</p>
+                  </div>
                 </div>
               </div>
             </div>
