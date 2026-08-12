@@ -816,11 +816,14 @@ model UnlockRequest {
   approvedAt       DateTime?           @map("approved_at")
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
+  sourceSystem     String?             @map("source_system") @db.VarChar(80)
+  sourceRecordId   String?             @map("source_record_id") @db.VarChar(80)
 
   technician   User          @relation("UnlockRequestTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
   admin        User?         @relation("UnlockRequestAdmin", fields: [adminId], references: [id], onDelete: SetNull)
   unlockRecords UnlockRecord[]
 
+  @@unique([sourceSystem, sourceRecordId])
   @@index([technicianId, status])
   @@index([status, createdAt])
   @@map("unlock_request")
@@ -835,11 +838,14 @@ model UnlockRecord {
   adminId     String   @map("admin_id")
   createdAt   DateTime @default(now()) @map("created_at")
   paidAt      DateTime @default(now()) @map("paid_at")
+  sourceSystem     String? @map("source_system") @db.VarChar(80)
+  sourceRecordId   String? @map("source_record_id") @db.VarChar(80)
 
   request    UnlockRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
   technician User          @relation("UnlockRecordTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
   admin      User          @relation("UnlockRecordAdmin", fields: [adminId], references: [id], onDelete: Restrict)
 
+  @@unique([sourceSystem, sourceRecordId])
   @@index([technicianId])
   @@index([createdAt])
   @@map("unlock_record")
