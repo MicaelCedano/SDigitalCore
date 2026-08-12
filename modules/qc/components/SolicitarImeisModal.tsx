@@ -77,15 +77,24 @@ export function SolicitarImeisModal({ onClose, onSent }: SolicitarImeisModalProp
     setValidating(true);
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const res = await validateImeisAction({ imeis });
-      if (cancelled) return;
-      setValidating(false);
-      if (res.success && res.data) {
-        const map: Record<string, ImeiStatus> = {};
-        for (const item of res.data) map[item.imei] = item.status;
-        setValidation(map);
-      } else {
-        setError(res.error || "No se pudieron validar los IMEIs.");
+      try {
+        const res = await validateImeisAction({ imeis });
+        if (cancelled) return;
+        if (res.success && res.data) {
+          const map: Record<string, ImeiStatus> = {};
+          for (const item of res.data) map[item.imei] = item.status;
+          setValidation(map);
+        } else {
+          setError(res.error || "No se pudieron validar los IMEIs.");
+          setValidation(null);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[qc] Error al validar IMEIs:", err);
+        setError("No se pudo conectar con el servidor al validar. Intenta de nuevo.");
+        setValidation(null);
+      } finally {
+        if (!cancelled) setValidating(false);
       }
     }, 450);
     return () => {
