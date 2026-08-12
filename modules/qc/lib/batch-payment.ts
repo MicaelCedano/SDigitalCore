@@ -13,16 +13,20 @@ export const QC_REVIEW_RATE = 50; // RD$ por equipo revisado (fórmula SDigitalS
 export async function payReviewersForBatch(batchId: string, tx: Prisma.TransactionClient = prisma) {
   const batch = await tx.qcRevisionBatch.findUnique({
     where: { id: batchId },
-    select: { id: true, batchNumber: true },
+    select: { id: true, batchNumber: true, createdAt: true },
   });
   if (!batch) return 0;
 
-  // Contar la inspección MÁS RECIENTE de cada equipo del lote (igual que los
-  // contadores del lote: una re-revisión reemplaza, no suma).
+  // Contar la inspección MÁS RECIENTE DE ESTE LOTE de cada equipo (igual que
+  // los contadores del lote: una re-revisión reemplaza, no suma). Solo pagan
+  // las revisiones hechas en este lote (createdAt >= lote.createdAt) — el
+  // historial previo de un reingreso NO cuenta. El resultado no importa:
+  // funcional o no funcional, la revisión se paga igual.
   const devices = await tx.deviceUnit.findMany({
     where: { batchId: batch.id },
     select: {
       inspections: {
+        where: { createdAt: { gte: batch.createdAt } },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: { reviewerId: true, status: true },
