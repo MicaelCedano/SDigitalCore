@@ -13,6 +13,8 @@ import {
   ScanSearch,
   ClipboardCheck,
   Loader2,
+  Wallet,
+  Coins,
 } from "lucide-react";
 import { getQcDashboardAction } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
@@ -103,7 +105,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
           <span className="text-xs text-slate-500 block font-medium">IMEIs Asignados</span>
           <div className="flex items-baseline justify-between mt-1">
@@ -141,6 +143,30 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">OK</span>
             <span className="text-2xl font-bold text-red-600">{stats.rechazadosHoy}</span>
             <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-md">FALLA</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
+          <span className="text-xs text-slate-500 block font-medium">Ganado Hoy</span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-bold text-emerald-600">
+              RD$ {stats.ganadoHoy.toLocaleString("es-DO")}
+            </span>
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+              <Coins className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
+          <span className="text-xs text-slate-500 block font-medium">Saldo del Wallet</span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-bold text-[#5750f1]">
+              RD$ {stats.saldoWallet.toLocaleString("es-DO")}
+            </span>
+            <div className="p-2 bg-[#5750f1]/10 text-[#5750f1] rounded-lg">
+              <Wallet className="w-4 h-4" />
+            </div>
           </div>
         </div>
       </div>

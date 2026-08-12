@@ -5,6 +5,7 @@ import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import { payReviewersForBatch, QC_REVIEW_RATE } from "../lib/batch-payment";
 import {
   createRevisionBatchSchema,
   updateRevisionBatchStatusSchema,
@@ -306,13 +307,22 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
       return { success: false, error: "Lote de Revisión no encontrado" };
     }
 
-    const updated = await prisma.qcRevisionBatch.update({
-      where: { id: validated.id },
-      data: {
-        status: validated.status as QcBatchStatus,
-        notes: validated.notes !== undefined ? validated.notes : existing.notes,
-        completedAt: validated.status === "COMPLETED" ? new Date() : existing.completedAt,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.qcRevisionBatch.update({
+        where: { id: validated.id },
+        data: {
+          status: validated.status as QcBatchStatus,
+          notes: validated.notes !== undefined ? validated.notes : existing.notes,
+          completedAt: validated.status === "COMPLETED" ? new Date() : existing.completedAt,
+        },
+      });
+
+      // Al marcar el lote COMPLETED se paga a los revisores (RD$50 por equipo).
+      if (validated.status === "COMPLETED") {
+        await payReviewersForBatch(validated.id, tx);
+      }
+
+      return u;
     });
 
     await logAudit({
@@ -470,7 +480,7 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
             ? "COMPLETED"
             : batch.status;
 
-      return tx.qcRevisionBatch.update({
+      const updatedBatch = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
         data: {
           reviewedDevices: reviewed,
@@ -480,6 +490,14 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
           completedAt: allReviewed ? new Date() : batch.completedAt,
         },
       });
+
+      // Fórmula SDigitalSystem: al quedar el lote COMPLETED (entregado),
+      // cada revisor gana RD$50 por equipo revisado (idempotente).
+      if (nextStatus === "COMPLETED") {
+        await payReviewersForBatch(batch.id, tx);
+      }
+
+      return updatedBatch;
     });
 
     await logAudit({
@@ -550,7 +568,7 @@ export async function getQcDashboardAction() {
 
     const startOfDay = santoDomingoStartOfDay();
 
-    const [devices, hoyTotal, hoyFuncional, hoyNoFuncional, myRequests] = await Promise.all([
+    const [devices, hoyTotal, hoyFuncional, hoyNoFuncional, myRequests, wallet] = await Promise.all([
       prisma.deviceUnit.findMany({
         where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
         orderBy: { updatedAt: "desc" },
@@ -574,6 +592,10 @@ export async function getQcDashboardAction() {
         orderBy: { createdAt: "desc" },
         take: 10,
       }),
+      prisma.wallet.findUnique({
+        where: { userId: persisted.id },
+        select: { balance: true },
+      }),
     ]);
 
     let revisados = 0;
@@ -595,6 +617,8 @@ export async function getQcDashboardAction() {
           revisadosHoy: hoyTotal,
           aprobadosHoy: hoyFuncional,
           rechazadosHoy: hoyNoFuncional,
+          ganadoHoy: hoyTotal * QC_REVIEW_RATE,
+          saldoWallet: wallet ? Number(wallet.balance) : 0,
         },
         welcome:
           "Recuerda revisar cada detalle minuciosamente. ¡Tu trabajo garantiza la calidad de la mercancía!",
