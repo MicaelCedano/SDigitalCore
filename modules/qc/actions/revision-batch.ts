@@ -606,3 +606,82 @@ export async function getQcAssigneesAction() {
     return { success: false, error: "Error al obtener los usuarios de Control de Calidad", data: [] };
   }
 }
+
+/**
+ * Inicio del día en America/Santo_Domingo (UTC-4) como fecha UTC.
+ * El día local comienza a las 04:00 UTC.
+ */
+function santoDomingoStartOfDay(): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santo_Domingo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "1";
+  return new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")), 4, 0, 0));
+}
+
+/**
+ * Dashboard del Control de Calidad: lotes asignados al usuario + estadísticas.
+ * Los administradores se gestionan desde /qc/lotes y no usan este dashboard.
+ */
+export async function getQcDashboardAction() {
+  try {
+    await requirePermission("qc.read");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted) {
+      return { success: false, error: "Sesión no persistida.", data: null };
+    }
+    if (persisted.roleCode === "ADMIN") {
+      return { success: true, data: null, isAdmin: true };
+    }
+
+    const startOfDay = santoDomingoStartOfDay();
+
+    const [lotes, hoyTotal, hoyFuncional, hoyNoFuncional] = await Promise.all([
+      prisma.qcRevisionBatch.findMany({
+        where: { assignedToId: persisted.id, status: { not: "CANCELLED" } },
+        orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
+        include: {
+          assignedTo: { select: { id: true, name: true, username: true } },
+        },
+      }),
+      prisma.qcInspection.count({
+        where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED" },
+      }),
+      prisma.qcInspection.count({
+        where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED", result: "FUNCTIONAL" },
+      }),
+      prisma.qcInspection.count({
+        where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED", result: "NON_FUNCTIONAL" },
+      }),
+    ]);
+
+    let pendientesTotal = 0;
+    const lotesConPendientes = lotes.map((l) => {
+      const pending = Math.max(0, (l.totalDevices || 0) - (l.reviewedDevices || 0));
+      pendientesTotal += pending;
+      return { ...l, pendingDevices: pending };
+    });
+
+    return {
+      success: true,
+      data: {
+        lotes: lotesConPendientes,
+        stats: {
+          lotesAsignados: lotes.length,
+          pendientesTotal,
+          revisadosHoy: hoyTotal,
+          aprobadosHoy: hoyFuncional,
+          rechazadosHoy: hoyNoFuncional,
+        },
+        welcome:
+          "Recuerda revisar cada detalle minuciosamente. ¡Tu trabajo garantiza la calidad de la mercancía!",
+      },
+    };
+  } catch (error: any) {
+    console.error("Error al cargar dashboard QC:", error);
+    return { success: false, error: "Error al cargar el panel de Control de Calidad", data: null };
+  }
+}
