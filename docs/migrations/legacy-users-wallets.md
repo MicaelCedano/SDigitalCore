@@ -4,11 +4,12 @@
 
 - Importa todos los usuarios anteriores, activos e inactivos, como identidades de referencia.
 - Conserva las transacciones anteriores como historial inmutable. No copia `secure_token` y ese historial no altera el saldo de Core.
+- Conserva la cuenta Principal y todas las cuentas de ahorro creadas por el usuario, incluyendo nombre, saldo, meta, color y fecha de creación.
 - Sugiere coincidencias por correo exacto normalizado y luego por nombre de usuario exacto normalizado.
 - Nunca enlaza por nombre visible ni aprueba automáticamente una coincidencia.
 - Al confirmar un enlace, conserva rol, correo, contraseña, estado y módulos actuales de Core.
 - Wallet solo se concede, de forma individual y con confirmación administrativa, cuando la identidad anterior tiene rol `control_calidad` o `qc`. No aparece en el selector general de módulos y nunca se asigna automáticamente a todos los usuarios QC.
-- En el corte final acredita el saldo vigente de la fuente como un único asiento idempotente.
+- En el corte final crea un asiento idempotente por cada cuenta con saldo. El saldo de la wallet es la suma exacta de Principal y ahorros; una cuenta en cero también se conserva.
 
 ## Variables de entorno de servidor
 
@@ -23,14 +24,14 @@ No usar estas variables en componentes cliente ni prefijarlas con `NEXT_PUBLIC_`
 
 1. Aplicar manualmente `prisma/migrations/20260811233000_add_legacy_identity_wallet_bridge/migration.sql` en Supabase.
 2. Ejecutar `npm run migration:legacy-wallets:dry-run`. Este comando no escribe datos.
-3. Confirmar que `balancesReconcile` sea `true` y revisar candidatos/conflictos.
-4. Ejecutar `npm run migration:legacy-wallets:apply` para archivar usuarios/transacciones y poblar la pantalla administrativa.
+3. Confirmar que `balancesReconcile` sea `true`, revisar el conteo de cuentas Principal/ahorro y revisar candidatos/conflictos.
+4. Ejecutar `npm run migration:legacy-wallets:apply` para archivar usuarios, cuentas y transacciones, y poblar la pantalla administrativa.
 5. Confirmar manualmente cada enlace en `/configuracion/migracion-usuarios` o durante la aprobación de una solicitud nueva.
 6. Programar el corte. Antes de iniciarlo, bloquear todas las escrituras del wallet anterior.
 7. Con el sistema anterior congelado, configurar temporalmente `LEGACY_WALLET_WRITES_FROZEN=YES` y ejecutar `npm run migration:legacy-wallets:cutover`.
 8. Validar totales por usuario, total global, cantidad de enlazados y asientos de apertura antes de habilitar operaciones nuevas.
 
-Si se confirma un enlace después del corte, Core crea de inmediato su asiento de apertura contra el lote de corte ya completado. Repetir el comando de corte no duplica saldos: devuelve el lote previamente completado.
+Si se confirma un enlace después del corte, Core crea de inmediato las cuentas y sus asientos de apertura contra el lote de corte ya completado. Repetir el comando de corte no duplica saldos: devuelve el lote previamente completado.
 
 El script aborta si el saldo de cabecera de wallets no coincide con la suma de todas sus subcuentas. La bandera de congelación es obligatoria para impedir un corte accidental mientras el sistema anterior todavía recibe movimientos.
 
@@ -80,4 +81,16 @@ FROM wallet w
 LEFT JOIN wallet_ledger_entry e ON e.wallet_id = w.id AND e.status = 'POSTED'
 GROUP BY w.id
 HAVING w.balance <> COALESCE(SUM(e.amount), 0);
+
+SELECT w.id, w.balance, COALESCE(SUM(a.balance), 0) AS account_total
+FROM wallet w
+LEFT JOIN wallet_account a ON a.wallet_id = w.id
+GROUP BY w.id
+HAVING w.balance <> COALESCE(SUM(a.balance), 0);
+
+SELECT a.id, a.name, a.balance, COALESCE(SUM(e.amount), 0) AS ledger_total
+FROM wallet_account a
+LEFT JOIN wallet_ledger_entry e ON e.account_id = a.id AND e.status = 'POSTED'
+GROUP BY a.id
+HAVING a.balance <> COALESCE(SUM(e.amount), 0);
 ```

@@ -18,6 +18,8 @@ type Identity = {
   active: boolean;
   balance: string;
   transactionCount: number;
+  accountCount: number;
+  savingsAccountCount: number;
   status: string;
   method: string | null;
   coreUser: { id: string; name: string | null; username: string | null; email: string } | null;
@@ -29,6 +31,7 @@ type Batch = {
   mode: string;
   status: string;
   sourceUserCount: number;
+  sourceAccountCount: number;
   sourceTransactionCount: number;
   sourceBalanceTotal: string;
   transferredUserCount: number;
@@ -85,7 +88,7 @@ export function LegacyMigrationManager({ identities, users, batches }: { identit
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">Configuración</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Migración de usuarios y wallets</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Confirma qué cuenta nueva corresponde a cada usuario anterior. El enlace concede acceso a Wallet, pero el dinero solo se acredita durante el corte final.
+          Confirma qué cuenta nueva corresponde a cada usuario anterior. Para personal QC, el corte conserva por separado la cuenta Principal y cada ahorro creado.
         </p>
       </header>
 
@@ -126,7 +129,7 @@ export function LegacyMigrationManager({ identities, users, batches }: { identit
                   </div>
                   <div>
                     <p className="text-lg font-black text-slate-950">{money(identity.balance)}</p>
-                    <p className="text-xs text-slate-500">{identity.transactionCount} movimientos históricos</p>
+                    <p className="text-xs text-slate-500">{identity.accountCount} cuentas ({identity.savingsAccountCount} ahorros) · {identity.transactionCount} movimientos históricos</p>
                   </div>
                   <div>
                     {identity.coreUser ? (
@@ -179,7 +182,7 @@ export function LegacyMigrationManager({ identities, users, batches }: { identit
           {batches.length === 0 ? <p className="text-sm text-slate-500">Sin ejecuciones registradas.</p> : batches.map((batch) => (
             <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm">
               <span className="font-semibold text-slate-800">{batch.mode} · {batch.status}</span>
-              <span className="text-slate-500">{batch.sourceUserCount} usuarios · {batch.sourceTransactionCount} movimientos · {money(batch.sourceBalanceTotal)}</span>
+              <span className="text-slate-500">{batch.sourceUserCount} usuarios · {batch.sourceAccountCount} cuentas · {batch.sourceTransactionCount} movimientos · {money(batch.sourceBalanceTotal)}</span>
             </div>
           ))}
         </div>

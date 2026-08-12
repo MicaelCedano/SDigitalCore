@@ -11,7 +11,10 @@ export async function getLegacyMigrationDashboard() {
   try {
     const [identities, users, batches] = await Promise.all([
       prisma.legacyUserIdentity.findMany({
-        include: { coreUser: { select: { id: true, name: true, username: true, email: true } } },
+        include: {
+          coreUser: { select: { id: true, name: true, username: true, email: true } },
+          archivedAccounts: { select: { typeSnapshot: true } },
+        },
         orderBy: [{ matchStatus: "asc" }, { usernameSnapshot: "asc" }],
       }),
       prisma.user.findMany({
@@ -35,6 +38,8 @@ export async function getLegacyMigrationDashboard() {
         active: identity.activeSnapshot,
         balance: identity.sourceWalletBalance.toFixed(2),
         transactionCount: identity.sourceTransactionCount,
+        accountCount: identity.archivedAccounts.length,
+        savingsAccountCount: identity.archivedAccounts.filter((account) => account.typeSnapshot?.trim().toLocaleLowerCase("es") === "ahorro").length,
         status: identity.matchStatus,
         method: identity.matchMethod,
         coreUser: identity.coreUser,
@@ -45,6 +50,7 @@ export async function getLegacyMigrationDashboard() {
         mode: batch.mode,
         status: batch.status,
         sourceUserCount: batch.sourceUserCount,
+        sourceAccountCount: batch.sourceAccountCount,
         sourceTransactionCount: batch.sourceTransactionCount,
         sourceBalanceTotal: batch.sourceBalanceTotal.toFixed(2),
         transferredUserCount: batch.transferredUserCount,
@@ -70,7 +76,13 @@ export async function getCurrentWallet() {
       prisma.wallet.findUnique({
         where: { userId: sessionUser.id },
         include: {
-          entries: { where: { status: "POSTED" }, orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }], take: 100 },
+          accounts: { orderBy: [{ kind: "asc" }, { createdAt: "asc" }] },
+          entries: {
+            where: { status: "POSTED" },
+            include: { account: { select: { name: true } } },
+            orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+            take: 100,
+          },
           user: { select: { name: true, username: true } },
         },
       }),
@@ -86,11 +98,20 @@ export async function getCurrentWallet() {
         balance: wallet.balance.toFixed(2),
         status: wallet.status,
         owner: wallet.user.name ?? wallet.user.username ?? "Usuario",
+        accounts: wallet.accounts.map((account) => ({
+          id: account.id,
+          name: account.name,
+          kind: account.kind,
+          balance: account.balance.toFixed(2),
+          savingsGoal: account.savingsGoal?.toFixed(2) ?? null,
+          color: account.color,
+        })),
         entries: wallet.entries.map((entry) => ({
           id: entry.id,
           type: entry.type,
           amount: entry.amount.toFixed(2),
           description: entry.description,
+          accountName: entry.account.name,
           occurredAt: entry.occurredAt.toISOString(),
         })),
       } : null,

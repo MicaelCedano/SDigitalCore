@@ -79,6 +79,21 @@ async function readSource(source) {
     ORDER BY t.id
   `)).rows;
 
+  const accounts = (await source.query(`
+    SELECT
+      a.id::text AS "sourceAccountId",
+      w.tecnico_id::text AS "sourceUserId",
+      a.nombre AS name,
+      a.tipo AS type,
+      a.saldo::numeric(14,2)::text AS balance,
+      a.meta_ahorro::numeric(14,2)::text AS "savingsGoal",
+      a.color,
+      a.fecha_creacion AS "sourceCreatedAt"
+    FROM wallet_account a
+    INNER JOIN wallet w ON w.id = a.wallet_id
+    ORDER BY a.id
+  `)).rows;
+
   const walletCount = Number((await source.query("SELECT COUNT(*)::int AS count FROM wallet")).rows[0].count);
   const accountTotal = money((await source.query(`
     SELECT COALESCE(SUM(a.saldo), 0)::numeric(14,2)::text AS total
@@ -86,7 +101,7 @@ async function readSource(source) {
   `)).rows[0].total);
   const walletTotal = money(users.reduce((sum, user) => sum + money(user.walletBalance), 0));
 
-  return { users, transactions, walletCount, accountTotal, walletTotal };
+  return { users, transactions, accounts, walletCount, accountTotal, walletTotal };
 }
 
 async function readCoreUsers(target) {
@@ -129,29 +144,30 @@ async function insertBatch(target, snapshot, selectedMode) {
   const id = crypto.randomUUID();
   const reconciliation = {
     walletHeaderTotal: snapshot.walletTotal,
-    principalAccountTotal: snapshot.accountTotal,
+    accountTotal: snapshot.accountTotal,
     balanced: snapshot.walletTotal === snapshot.accountTotal,
   };
   await target.query(`
     INSERT INTO legacy_migration_batch (
       id, source_system, mode, source_user_count, source_wallet_count,
-      source_transaction_count, source_balance_total, checksum, reconciliation
-    ) VALUES ($1, $2, $3::legacy_migration_mode, $4, $5, $6, $7, $8, $9::jsonb)
+      source_account_count, source_transaction_count, source_balance_total, checksum, reconciliation
+    ) VALUES ($1, $2, $3::legacy_migration_mode, $4, $5, $6, $7, $8, $9, $10::jsonb)
   `, [
     id,
     SOURCE_SYSTEM,
     selectedMode,
     snapshot.users.length,
     snapshot.walletCount,
+    snapshot.accounts.length,
     snapshot.transactions.length,
     snapshot.walletTotal,
-    checksumOf({ users: snapshot.users, transactions: snapshot.transactions }),
+    checksumOf({ users: snapshot.users, accounts: snapshot.accounts, transactions: snapshot.transactions }),
     JSON.stringify(reconciliation),
   ]);
   return id;
 }
 
-async function syncSnapshot(target, batchId, matches, transactions) {
+async function syncSnapshot(target, batchId, matches, transactions, accounts) {
   const identityIds = new Map();
   for (const match of matches) {
     const legacy = match.legacy;
@@ -188,6 +204,32 @@ async function syncSnapshot(target, batchId, matches, transactions) {
       legacy.transactionCount, match.status, match.method, batchId,
     ]);
     identityIds.set(legacy.sourceUserId, result.rows[0].id);
+  }
+
+  for (const account of accounts) {
+    const identityId = identityIds.get(account.sourceUserId);
+    if (!identityId) throw new Error(`No existe identidad para la cuenta ${account.sourceAccountId}.`);
+    await target.query(`
+      INSERT INTO legacy_wallet_account (
+        id, source_system, source_account_id, legacy_identity_id, name_snapshot,
+        type_snapshot, balance_snapshot, savings_goal_snapshot, color_snapshot,
+        created_at_snapshot, batch_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (source_system, source_account_id) DO UPDATE SET
+        legacy_identity_id = EXCLUDED.legacy_identity_id,
+        name_snapshot = EXCLUDED.name_snapshot,
+        type_snapshot = EXCLUDED.type_snapshot,
+        balance_snapshot = EXCLUDED.balance_snapshot,
+        savings_goal_snapshot = EXCLUDED.savings_goal_snapshot,
+        color_snapshot = EXCLUDED.color_snapshot,
+        created_at_snapshot = EXCLUDED.created_at_snapshot,
+        batch_id = EXCLUDED.batch_id,
+        imported_at = CURRENT_TIMESTAMP
+    `, [
+      crypto.randomUUID(), SOURCE_SYSTEM, account.sourceAccountId, identityId, account.name,
+      account.type, money(account.balance), account.savingsGoal === null ? null : money(account.savingsGoal),
+      account.color, account.sourceCreatedAt, batchId,
+    ]);
   }
 
   for (const transaction of transactions) {
@@ -236,21 +278,70 @@ async function transferLinkedBalances(target, batchId) {
       RETURNING id
     `, [crypto.randomUUID(), identity.coreUserId]);
     const walletId = walletResult.rows[0].id;
-    const amount = money(identity.balance);
-    const externalKey = `${SOURCE_SYSTEM}:opening:${identity.sourceUserId}`;
+    const archivedAccounts = (await target.query(`
+      SELECT source_account_id AS "sourceAccountId", name_snapshot AS name,
+             type_snapshot AS type, balance_snapshot::text AS balance,
+             savings_goal_snapshot::text AS "savingsGoal", color_snapshot AS color,
+             created_at_snapshot AS "sourceCreatedAt"
+      FROM legacy_wallet_account
+      WHERE legacy_identity_id = $1
+      ORDER BY created_at_snapshot NULLS LAST, source_account_id
+    `, [identity.id])).rows;
+    const accounts = archivedAccounts.length ? archivedAccounts : [{
+      sourceAccountId: `principal:${identity.sourceUserId}`,
+      name: "Principal",
+      type: "corriente",
+      balance: "0",
+      savingsGoal: null,
+      color: null,
+      sourceCreatedAt: null,
+    }];
+    const accountTotal = money(accounts.reduce((sum, account) => sum + money(account.balance), 0));
+    if (accountTotal !== money(identity.balance)) {
+      throw new Error(`Las cuentas archivadas de ${identity.sourceUserId} no cuadran con su wallet.`);
+    }
 
-    if (amount !== 0) {
+    for (const account of accounts) {
+      const normalizedType = normalize(account.type);
+      const normalizedName = normalize(account.name);
+      const kind = normalizedType === "ahorro" || (normalizedType !== "corriente" && normalizedName !== "principal")
+        ? "SAVINGS"
+        : "PRIMARY";
+      const walletAccountResult = await target.query(`
+        INSERT INTO wallet_account (
+          id, wallet_id, name, kind, balance, savings_goal, color,
+          source_system, source_account_id, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4::wallet_account_kind, 0, $5, $6, $7, $8, COALESCE($9, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP)
+        ON CONFLICT (source_system, source_account_id) DO UPDATE SET
+          wallet_id = EXCLUDED.wallet_id,
+          name = EXCLUDED.name,
+          kind = EXCLUDED.kind,
+          savings_goal = EXCLUDED.savings_goal,
+          color = EXCLUDED.color,
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING id
+      `, [
+        crypto.randomUUID(), walletId, account.name, kind,
+        account.savingsGoal === null ? null : money(account.savingsGoal), account.color,
+        SOURCE_SYSTEM, account.sourceAccountId, account.sourceCreatedAt,
+      ]);
+      const walletAccountId = walletAccountResult.rows[0].id;
+      const amount = money(account.balance);
+      const externalKey = `${SOURCE_SYSTEM}:opening:${identity.sourceUserId}:account:${account.sourceAccountId}`;
+
+      if (amount === 0) continue;
       const inserted = await target.query(`
         INSERT INTO wallet_ledger_entry (
-          id, wallet_id, type, amount, description, external_key, batch_id, occurred_at
-        ) VALUES ($1, $2, 'LEGACY_OPENING_BALANCE', $3, $4, $5, $6, CURRENT_TIMESTAMP)
+          id, wallet_id, account_id, type, amount, description, external_key, batch_id, occurred_at
+        ) VALUES ($1, $2, $3, 'LEGACY_OPENING_BALANCE', $4, $5, $6, $7, CURRENT_TIMESTAMP)
         ON CONFLICT (external_key) DO NOTHING
         RETURNING id
       `, [
-        crypto.randomUUID(), walletId, amount,
-        `Saldo inicial migrado de ${SOURCE_SYSTEM}`, externalKey, batchId,
+        crypto.randomUUID(), walletId, walletAccountId, amount,
+        `Saldo inicial migrado de ${SOURCE_SYSTEM}: ${account.name}`, externalKey, batchId,
       ]);
       if (inserted.rowCount === 1) {
+        await target.query("UPDATE wallet_account SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [amount, walletAccountId]);
         await target.query("UPDATE wallet SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [amount, walletId]);
         transferredTotal += amount;
       }
@@ -281,9 +372,12 @@ async function main() {
       mode,
       sourceUsers: snapshot.users.length,
       sourceWallets: snapshot.walletCount,
+      sourceAccounts: snapshot.accounts.length,
+      sourcePrimaryAccounts: snapshot.accounts.filter((account) => normalize(account.type) === "corriente" || normalize(account.name) === "principal").length,
+      sourceSavingsAccounts: snapshot.accounts.filter((account) => normalize(account.type) === "ahorro").length,
       sourceTransactions: snapshot.transactions.length,
       walletHeaderTotal: snapshot.walletTotal,
-      principalAccountTotal: snapshot.accountTotal,
+      accountTotal: snapshot.accountTotal,
       balancesReconcile: snapshot.walletTotal === snapshot.accountTotal,
       suggested: matches.filter((item) => item.status === "SUGGESTED").length,
       conflicts: matches.filter((item) => item.status === "CONFLICT").length,
@@ -297,7 +391,7 @@ async function main() {
     console.log(JSON.stringify(report, null, 2));
 
     if (!snapshot.users.length) throw new Error("La fuente no contiene usuarios; se canceló la migración.");
-    if (!report.balancesReconcile) throw new Error("El saldo de wallet no coincide con la cuenta Principal.");
+    if (!report.balancesReconcile) throw new Error("El saldo de wallet no coincide con la suma de sus cuentas.");
     if (mode === "DRY_RUN") return;
 
     await target.query("BEGIN");
@@ -315,7 +409,7 @@ async function main() {
       }
     }
     const batchId = await insertBatch(target, snapshot, mode);
-    await syncSnapshot(target, batchId, matches, snapshot.transactions);
+    await syncSnapshot(target, batchId, matches, snapshot.transactions, snapshot.accounts);
     const transfer = mode === "CUTOVER" ? await transferLinkedBalances(target, batchId) : { count: 0, total: 0 };
     await target.query(`
       UPDATE legacy_migration_batch

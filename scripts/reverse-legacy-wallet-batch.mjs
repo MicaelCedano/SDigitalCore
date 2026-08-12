@@ -27,7 +27,8 @@ try {
   }
 
   const entries = (await client.query(`
-    SELECT e.id, e.wallet_id AS "walletId", e.amount::text, e.external_key AS "externalKey"
+    SELECT e.id, e.wallet_id AS "walletId", e.account_id AS "accountId",
+           e.amount::text, e.external_key AS "externalKey"
     FROM wallet_ledger_entry e
     WHERE e.batch_id = $1 AND e.type = 'LEGACY_OPENING_BALANCE' AND e.status = 'POSTED'
     ORDER BY e.id
@@ -38,20 +39,29 @@ try {
     const reversalKey = `${entry.externalKey}:reversal`;
     const inserted = await client.query(`
       INSERT INTO wallet_ledger_entry (
-        id, wallet_id, type, amount, description, external_key, batch_id, reversal_of_id, occurred_at
-      ) VALUES ($1, $2, 'REVERSAL', -($3::numeric), $4, $5, $6, $7, CURRENT_TIMESTAMP)
+        id, wallet_id, account_id, type, amount, description, external_key, batch_id, reversal_of_id, occurred_at
+      ) VALUES ($1, $2, $3, 'REVERSAL', -($4::numeric), $5, $6, $7, $8, CURRENT_TIMESTAMP)
       ON CONFLICT (external_key) DO NOTHING
       RETURNING id
-    `, [crypto.randomUUID(), entry.walletId, entry.amount, "Reversión auditada de saldo inicial legacy", reversalKey, batchId, entry.id]);
+    `, [crypto.randomUUID(), entry.walletId, entry.accountId, entry.amount, "Reversión auditada de saldo inicial legacy", reversalKey, batchId, entry.id]);
     if (inserted.rowCount === 1) {
+      await client.query("UPDATE wallet_account SET balance = balance - ($1::numeric), updated_at = CURRENT_TIMESTAMP WHERE id = $2", [entry.amount, entry.accountId]);
       await client.query("UPDATE wallet SET balance = balance - ($1::numeric), updated_at = CURRENT_TIMESTAMP WHERE id = $2", [entry.amount, entry.walletId]);
     }
   }
 
   await client.query(`
-    UPDATE legacy_user_identity
+    UPDATE legacy_user_identity i
     SET match_status = 'LINKED_PENDING_CUTOVER', transferred_at = NULL
-    WHERE batch_id = $1 AND match_status = 'TRANSFERRED'
+    WHERE i.match_status = 'TRANSFERRED'
+      AND EXISTS (
+        SELECT 1
+        FROM wallet w
+        INNER JOIN wallet_ledger_entry e ON e.wallet_id = w.id
+        WHERE w.user_id = i.core_user_id
+          AND e.batch_id = $1
+          AND e.type = 'LEGACY_OPENING_BALANCE'
+      )
   `, [batchId]);
   await client.query("UPDATE legacy_migration_batch SET status = 'REVERSED' WHERE id = $1", [batchId]);
   await client.query("COMMIT");

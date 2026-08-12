@@ -3,6 +3,14 @@ import type { Prisma } from "@prisma/client";
 export const LEGACY_SOURCE_SYSTEM = "SDIGITALSYSTEM";
 export const WALLET_MODULE_KEY = "wallet";
 
+function accountKind(type: string | null, name: string) {
+  const normalizedType = type?.trim().toLocaleLowerCase("es");
+  const normalizedName = name.trim().toLocaleLowerCase("es");
+  return normalizedType === "ahorro" || (normalizedType !== "corriente" && normalizedName !== "principal")
+    ? "SAVINGS" as const
+    : "PRIMARY" as const;
+}
+
 function isQcLegacyRole(role: string | null) {
   const normalized = role?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_");
   return normalized === "qc" || normalized === "control_calidad";
@@ -12,7 +20,10 @@ export async function linkLegacyIdentity(
   tx: Prisma.TransactionClient,
   input: { legacyIdentityId: string; coreUserId: string; actorId: string; method: string },
 ) {
-  const identity = await tx.legacyUserIdentity.findUnique({ where: { id: input.legacyIdentityId } });
+  const identity = await tx.legacyUserIdentity.findUnique({
+    where: { id: input.legacyIdentityId },
+    include: { archivedAccounts: { orderBy: [{ createdAtSnapshot: "asc" }, { sourceAccountId: "asc" }] } },
+  });
   if (!identity) throw new Error("La identidad anterior no existe.");
   if (identity.sourceSystem !== LEGACY_SOURCE_SYSTEM) throw new Error("La fuente de identidad no es válida.");
   if (identity.matchStatus === "TRANSFERRED") throw new Error("Ese saldo ya fue transferido y no puede reenlazarse.");
@@ -50,22 +61,76 @@ export async function linkLegacyIdentity(
     orderBy: { completedAt: "desc" },
     select: { id: true },
   }) : null;
-  if (wallet && completedCutover && !identity.sourceWalletBalance.isZero()) {
-    await tx.walletLedgerEntry.create({
-      data: {
-        walletId: wallet.id,
-        type: "LEGACY_OPENING_BALANCE",
-        amount: identity.sourceWalletBalance,
-        description: `Saldo inicial migrado de ${identity.sourceSystem}`,
-        externalKey: `${identity.sourceSystem}:opening:${identity.sourceUserId}`,
-        actorId: input.actorId,
-        batchId: completedCutover.id,
-      },
-    });
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balance: { increment: identity.sourceWalletBalance } },
-    });
+  const archivedAccounts = identity.archivedAccounts.length ? identity.archivedAccounts : [{
+    sourceSystem: identity.sourceSystem,
+    sourceAccountId: `principal:${identity.sourceUserId}`,
+    nameSnapshot: "Principal",
+    typeSnapshot: "corriente",
+    balanceSnapshot: identity.sourceWalletBalance,
+    savingsGoalSnapshot: null,
+    colorSnapshot: null,
+    createdAtSnapshot: null,
+  }];
+  const archivedTotal = archivedAccounts.reduce(
+    (total, account) => total.add(account.balanceSnapshot),
+    identity.sourceWalletBalance.mul(0),
+  );
+  if (walletAccessGranted && !archivedTotal.equals(identity.sourceWalletBalance)) {
+    throw new Error("La suma de las cuentas anteriores no coincide con el saldo de la wallet.");
+  }
+  if (wallet) {
+    for (const archived of archivedAccounts) {
+      const account = await tx.walletAccount.upsert({
+        where: {
+          sourceSystem_sourceAccountId: {
+            sourceSystem: archived.sourceSystem,
+            sourceAccountId: archived.sourceAccountId,
+          },
+        },
+        create: {
+          walletId: wallet.id,
+          name: archived.nameSnapshot,
+          kind: accountKind(archived.typeSnapshot, archived.nameSnapshot),
+          balance: 0,
+          savingsGoal: archived.savingsGoalSnapshot,
+          color: archived.colorSnapshot,
+          sourceSystem: archived.sourceSystem,
+          sourceAccountId: archived.sourceAccountId,
+          createdAt: archived.createdAtSnapshot ?? undefined,
+        },
+        update: {
+          walletId: wallet.id,
+          name: archived.nameSnapshot,
+          kind: accountKind(archived.typeSnapshot, archived.nameSnapshot),
+          savingsGoal: archived.savingsGoalSnapshot,
+          color: archived.colorSnapshot,
+        },
+      });
+      if (!completedCutover || archived.balanceSnapshot.isZero()) continue;
+      const inserted = await tx.walletLedgerEntry.createMany({
+        data: [{
+          walletId: wallet.id,
+          accountId: account.id,
+          type: "LEGACY_OPENING_BALANCE",
+          amount: archived.balanceSnapshot,
+          description: `Saldo inicial migrado de ${identity.sourceSystem}: ${archived.nameSnapshot}`,
+          externalKey: `${identity.sourceSystem}:opening:${identity.sourceUserId}:account:${archived.sourceAccountId}`,
+          actorId: input.actorId,
+          batchId: completedCutover.id,
+        }],
+        skipDuplicates: true,
+      });
+      if (inserted.count === 1) {
+        await tx.walletAccount.update({
+          where: { id: account.id },
+          data: { balance: { increment: archived.balanceSnapshot } },
+        });
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { balance: { increment: archived.balanceSnapshot } },
+        });
+      }
+    }
   }
   const linked = await tx.legacyUserIdentity.update({
     where: { id: identity.id },

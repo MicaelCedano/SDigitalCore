@@ -10,6 +10,7 @@ CREATE TYPE "legacy_identity_match_status" AS ENUM (
 CREATE TYPE "legacy_migration_mode" AS ENUM ('DRY_RUN', 'APPLY', 'CUTOVER');
 CREATE TYPE "legacy_migration_status" AS ENUM ('RUNNING', 'COMPLETED', 'FAILED', 'REVERSED');
 CREATE TYPE "wallet_status" AS ENUM ('ACTIVE', 'FROZEN');
+CREATE TYPE "wallet_account_kind" AS ENUM ('PRIMARY', 'SAVINGS');
 CREATE TYPE "wallet_ledger_entry_type" AS ENUM (
     'LEGACY_OPENING_BALANCE',
     'CREDIT',
@@ -27,6 +28,7 @@ CREATE TABLE "legacy_migration_batch" (
     "cutoff_at" TIMESTAMP(3),
     "source_user_count" INTEGER NOT NULL DEFAULT 0,
     "source_wallet_count" INTEGER NOT NULL DEFAULT 0,
+    "source_account_count" INTEGER NOT NULL DEFAULT 0,
     "source_transaction_count" INTEGER NOT NULL DEFAULT 0,
     "source_balance_total" DECIMAL(14,2) NOT NULL DEFAULT 0,
     "transferred_user_count" INTEGER NOT NULL DEFAULT 0,
@@ -78,6 +80,22 @@ CREATE TABLE "legacy_wallet_transaction" (
     CONSTRAINT "legacy_wallet_transaction_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "legacy_wallet_account" (
+    "id" TEXT NOT NULL,
+    "source_system" VARCHAR(80) NOT NULL,
+    "source_account_id" VARCHAR(80) NOT NULL,
+    "legacy_identity_id" TEXT NOT NULL,
+    "name_snapshot" VARCHAR(160) NOT NULL,
+    "type_snapshot" VARCHAR(80),
+    "balance_snapshot" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "savings_goal_snapshot" DECIMAL(14,2),
+    "color_snapshot" VARCHAR(40),
+    "created_at_snapshot" TIMESTAMP(3),
+    "batch_id" TEXT,
+    "imported_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "legacy_wallet_account_pkey" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "wallet" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -89,14 +107,30 @@ CREATE TABLE "wallet" (
     CONSTRAINT "wallet_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "wallet_account" (
+    "id" TEXT NOT NULL,
+    "wallet_id" TEXT NOT NULL,
+    "name" VARCHAR(160) NOT NULL,
+    "kind" "wallet_account_kind" NOT NULL,
+    "balance" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "savings_goal" DECIMAL(14,2),
+    "color" VARCHAR(40),
+    "source_system" VARCHAR(80),
+    "source_account_id" VARCHAR(80),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "wallet_account_pkey" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "wallet_ledger_entry" (
     "id" TEXT NOT NULL,
     "wallet_id" TEXT NOT NULL,
+    "account_id" TEXT NOT NULL,
     "type" "wallet_ledger_entry_type" NOT NULL,
     "status" "wallet_ledger_entry_status" NOT NULL DEFAULT 'POSTED',
     "amount" DECIMAL(14,2) NOT NULL,
     "description" TEXT,
-    "external_key" VARCHAR(180) NOT NULL,
+    "external_key" VARCHAR(255) NOT NULL,
     "actor_id" TEXT,
     "batch_id" TEXT,
     "reversal_of_id" TEXT,
@@ -119,12 +153,19 @@ CREATE UNIQUE INDEX "legacy_wallet_transaction_source_system_source_transaction_
     ON "legacy_wallet_transaction"("source_system", "source_transaction_id");
 CREATE INDEX "legacy_wallet_transaction_legacy_identity_id_occurred_at_idx"
     ON "legacy_wallet_transaction"("legacy_identity_id", "occurred_at");
+CREATE UNIQUE INDEX "legacy_wallet_account_source_system_source_account_id_key"
+    ON "legacy_wallet_account"("source_system", "source_account_id");
+CREATE INDEX "legacy_wallet_account_legacy_identity_id_idx" ON "legacy_wallet_account"("legacy_identity_id");
 
 CREATE UNIQUE INDEX "wallet_user_id_key" ON "wallet"("user_id");
 CREATE INDEX "wallet_status_updated_at_idx" ON "wallet"("status", "updated_at");
+CREATE UNIQUE INDEX "wallet_account_source_system_source_account_id_key"
+    ON "wallet_account"("source_system", "source_account_id");
+CREATE INDEX "wallet_account_wallet_id_kind_idx" ON "wallet_account"("wallet_id", "kind");
 CREATE UNIQUE INDEX "wallet_ledger_entry_external_key_key" ON "wallet_ledger_entry"("external_key");
 CREATE UNIQUE INDEX "wallet_ledger_entry_reversal_of_id_key" ON "wallet_ledger_entry"("reversal_of_id");
 CREATE INDEX "wallet_ledger_entry_wallet_id_occurred_at_idx" ON "wallet_ledger_entry"("wallet_id", "occurred_at");
+CREATE INDEX "wallet_ledger_entry_account_id_occurred_at_idx" ON "wallet_ledger_entry"("account_id", "occurred_at");
 CREATE INDEX "wallet_ledger_entry_batch_id_idx" ON "wallet_ledger_entry"("batch_id");
 CREATE INDEX "legacy_migration_batch_source_system_created_at_idx"
     ON "legacy_migration_batch"("source_system", "created_at");
@@ -145,13 +186,25 @@ ALTER TABLE "legacy_wallet_transaction"
     ADD CONSTRAINT "legacy_wallet_transaction_batch_id_fkey"
     FOREIGN KEY ("batch_id") REFERENCES "legacy_migration_batch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+ALTER TABLE "legacy_wallet_account"
+    ADD CONSTRAINT "legacy_wallet_account_legacy_identity_id_fkey"
+    FOREIGN KEY ("legacy_identity_id") REFERENCES "legacy_user_identity"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    ADD CONSTRAINT "legacy_wallet_account_batch_id_fkey"
+    FOREIGN KEY ("batch_id") REFERENCES "legacy_migration_batch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
 ALTER TABLE "wallet"
     ADD CONSTRAINT "wallet_user_id_fkey"
     FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+ALTER TABLE "wallet_account"
+    ADD CONSTRAINT "wallet_account_wallet_id_fkey"
+    FOREIGN KEY ("wallet_id") REFERENCES "wallet"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
 ALTER TABLE "wallet_ledger_entry"
     ADD CONSTRAINT "wallet_ledger_entry_wallet_id_fkey"
     FOREIGN KEY ("wallet_id") REFERENCES "wallet"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    ADD CONSTRAINT "wallet_ledger_entry_account_id_fkey"
+    FOREIGN KEY ("account_id") REFERENCES "wallet_account"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     ADD CONSTRAINT "wallet_ledger_entry_actor_id_fkey"
     FOREIGN KEY ("actor_id") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE,
     ADD CONSTRAINT "wallet_ledger_entry_batch_id_fkey"
@@ -162,5 +215,7 @@ ALTER TABLE "wallet_ledger_entry"
 ALTER TABLE "legacy_migration_batch" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "legacy_user_identity" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "legacy_wallet_transaction" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "legacy_wallet_account" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "wallet" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "wallet_account" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "wallet_ledger_entry" ENABLE ROW LEVEL SECURITY;
