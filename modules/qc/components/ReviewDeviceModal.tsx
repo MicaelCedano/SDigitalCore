@@ -133,14 +133,20 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
 
   const checklistComplete = CHECKLIST_ITEMS.every((item) => checklist[item.id] === true);
 
-  const submit = async (result: "FUNCTIONAL" | "NON_FUNCTIONAL") => {
+  const submit = async () => {
     setError(null);
 
+    // El resultado lo define el QC en Funcionalidad: sea bueno o malo, se
+    // guarda tal cual (FUNCTIONAL o NON_FUNCTIONAL). Un solo botón.
+    if (!funcionalidad) {
+      setError("Selecciona si el equipo está Funcional o No Funcional.");
+      return;
+    }
     if (!grado) {
       setError("Completa el grado estético antes de guardar la revisión.");
       return;
     }
-    if (result === "FUNCTIONAL" && !checklistComplete) {
+    if (funcionalidad === "FUNCTIONAL" && !checklistComplete) {
       setError("Debes completar todos los puntos del checklist para aprobar el equipo como funcional.");
       return;
     }
@@ -171,7 +177,7 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
 
     const res = await reviewDeviceAction({
       deviceId: device.id,
-      result,
+      result: funcionalidad,
       grade: grado,
       notes: observacion.trim() || null,
       batteryHealth: batteryHealth ? Number(batteryHealth) : undefined,
@@ -396,21 +402,23 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
           </button>
           <button
             type="button"
-            onClick={() => submit("NON_FUNCTIONAL")}
-            disabled={isLoading}
-            className="px-4 py-2.5 text-xs font-bold rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-600 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-50"
+            onClick={submit}
+            disabled={isLoading || !funcionalidad}
+            className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={funcionalidad ? `Guardar como ${funcionalidad === "FUNCTIONAL" ? "Funcional" : "No Funcional"}` : "Selecciona Funcionalidad primero"}
           >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-            Rechazar Equipo
-          </button>
-          <button
-            type="button"
-            onClick={() => submit("FUNCTIONAL")}
-            disabled={isLoading}
-            className="px-4 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Aprobar Equipo
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : funcionalidad === "NON_FUNCTIONAL" ? (
+              <XCircle className="w-4 h-4" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4" />
+            )}
+            {isLoading
+              ? "Guardando..."
+              : funcionalidad === "NON_FUNCTIONAL"
+              ? "Guardar como No Funcional"
+              : "Guardar Revisión"}
           </button>
         </div>
       </div>
