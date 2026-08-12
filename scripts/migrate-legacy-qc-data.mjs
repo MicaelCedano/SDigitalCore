@@ -28,11 +28,15 @@ function chunks(items, size) {
 }
 
 function normalizeResult(value) {
-  return value.trim().toLocaleLowerCase("es") === "funcional" ? "FUNCTIONAL" : "NON_FUNCTIONAL";
+  const normalized = clean(value)?.toLocaleLowerCase("es");
+  if (normalized === "funcional") return "FUNCTIONAL";
+  if (normalized === "no funcional") return "NON_FUNCTIONAL";
+  return "UNSPECIFIED";
 }
 
 function deviceStatus(sourceStatus, result) {
   if (sourceStatus.trim().toLocaleLowerCase("es") === "entregado") return "ARCHIVED";
+  if (result === "UNSPECIFIED") return "QUARANTINED";
   return result === "FUNCTIONAL" ? "AVAILABLE" : "QUARANTINED";
 }
 
@@ -81,8 +85,7 @@ async function readSource(source) {
     JOIN equipo e ON e.id = latest_review.equipo_id
     LEFT JOIN latest_identified_reviewer ON latest_identified_reviewer.equipo_id = latest_review.equipo_id
     LEFT JOIN users u ON u.id = COALESCE(latest_review.user_id, latest_identified_reviewer.user_id)
-    WHERE LOWER(BTRIM(e.funcionalidad)) IN ('funcional', 'no funcional')
-      AND e.modelo IS NOT NULL
+    WHERE e.modelo IS NOT NULL
       AND BTRIM(e.modelo) <> ''
       AND latest_review.fecha IS NOT NULL
     ORDER BY e.id
@@ -99,7 +102,7 @@ async function readSource(source) {
       COUNT(*)::int AS total,
       COUNT(*) FILTER (
         WHERE LOWER(BTRIM(COALESCE(e.funcionalidad, ''))) NOT IN ('funcional', 'no funcional')
-      )::int AS "skippedInvalidResult"
+      )::int AS "sourceUnclassified"
     FROM latest_review
     JOIN equipo e ON e.id = latest_review.equipo_id
   `)).rows[0];
@@ -318,9 +321,10 @@ async function main() {
       sourceSuppliers: snapshot.suppliers.length,
       sourceReviewedDevices: sourceData.counts.total,
       importableInspections: snapshot.inspections.length,
-      skippedInvalidResult: sourceData.counts.skippedInvalidResult,
+      sourceUnclassified: sourceData.counts.sourceUnclassified,
       functional: snapshot.inspections.filter((item) => item.inspection.result === "FUNCTIONAL").length,
       nonFunctional: snapshot.inspections.filter((item) => item.inspection.result === "NON_FUNCTIONAL").length,
+      unspecified: snapshot.inspections.filter((item) => item.inspection.result === "UNSPECIFIED").length,
       linkedReviewerInspections: snapshot.inspections.filter((item) => item.inspection.reviewerId !== null).length,
       snapshotOnlyReviewerInspections: snapshot.inspections.filter((item) => item.inspection.reviewerId === null).length,
     };

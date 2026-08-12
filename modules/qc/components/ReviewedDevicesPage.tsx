@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { BatteryMedium, CheckCircle2, ClipboardCheck, Search, ShieldAlert, Smartphone } from "lucide-react";
+import { BatteryMedium, CheckCircle2, CircleHelp, ClipboardCheck, Search, ShieldAlert, Smartphone } from "lucide-react";
 import { formatDateTimeRD } from "@/lib/utils/format";
 
 type ReviewedInspection = {
   id: string;
-  result: "FUNCTIONAL" | "NON_FUNCTIONAL" | null;
+  result: "FUNCTIONAL" | "NON_FUNCTIONAL" | "UNSPECIFIED" | null;
   grade: string | null;
   batteryHealth: number | null;
   reviewedAt: Date | null;
@@ -23,15 +23,21 @@ type ReviewedInspection = {
 
 interface ReviewedDevicesPageProps {
   inspections: ReviewedInspection[];
-  stats: { total: number; functional: number; nonFunctional: number; reviewedToday: number };
-  filters: { query: string; result: "ALL" | "FUNCTIONAL" | "NON_FUNCTIONAL" };
+  stats: { total: number; functional: number; nonFunctional: number; unspecified: number; reviewedToday: number };
+  filters: { query: string; result: "ALL" | "FUNCTIONAL" | "NON_FUNCTIONAL" | "UNSPECIFIED" };
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 }
 
 function resultLabel(result: ReviewedInspection["result"]) {
   if (result === "FUNCTIONAL") return "Funcional";
   if (result === "NON_FUNCTIONAL") return "No funcional";
-  return "Sin resultado";
+  return "Sin clasificación";
+}
+
+function resultTone(result: ReviewedInspection["result"]) {
+  if (result === "FUNCTIONAL") return "border-[#abefc6] bg-[#ecfdf3] text-[#067647]";
+  if (result === "NON_FUNCTIONAL") return "border-[#fecdca] bg-[#fef3f2] text-[#b42318]";
+  return "border-[#fedf89] bg-[#fffaeb] text-[#b54708]";
 }
 
 function pageHref(page: number, filters: ReviewedDevicesPageProps["filters"]) {
@@ -66,11 +72,12 @@ export function ReviewedDevicesPage({ inspections, stats, filters, pagination }:
           </span>
         </div>
 
-        <div className="grid gap-px bg-[#eaecf0] sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-px bg-[#eaecf0] sm:grid-cols-2 xl:grid-cols-5">
           {[
             { label: "Total revisados", value: stats.total, icon: ClipboardCheck, tone: "text-[#4f46e5] bg-[#eef2ff]" },
             { label: "Funcionales", value: stats.functional, icon: CheckCircle2, tone: "text-[#079455] bg-[#ecfdf3]" },
             { label: "No funcionales", value: stats.nonFunctional, icon: ShieldAlert, tone: "text-[#d92d20] bg-[#fef3f2]" },
+            { label: "Sin clasificación", value: stats.unspecified, icon: CircleHelp, tone: "text-[#b54708] bg-[#fffaeb]" },
             { label: "Revisados hoy", value: stats.reviewedToday, icon: BatteryMedium, tone: "text-[#b54708] bg-[#fffaeb]" },
           ].map((stat) => (
             <div key={stat.label} className="flex items-center gap-3 bg-white px-5 py-4 sm:px-6">
@@ -93,6 +100,7 @@ export function ReviewedDevicesPage({ inspections, stats, filters, pagination }:
               <option value="ALL">Todos los resultados</option>
               <option value="FUNCTIONAL">Funcionales</option>
               <option value="NON_FUNCTIONAL">No funcionales</option>
+              <option value="UNSPECIFIED">Sin clasificación</option>
             </select>
             <button type="submit" className="focus-ring h-10 rounded-lg bg-[#4f46e5] px-4 text-sm font-semibold text-white hover:bg-[#4338ca]">Filtrar</button>
           </div>
@@ -120,7 +128,7 @@ export function ReviewedDevicesPage({ inspections, stats, filters, pagination }:
                   <tr key={inspection.id} className="hover:bg-[#fcfcfd]">
                     <td className="px-6 py-4"><p className="font-semibold text-[#101828]">{[inspection.device.brand, inspection.device.model].filter(Boolean).join(" ")}</p><p className="mt-0.5 text-xs text-[#667085]">{[inspection.device.storageGb ? `${inspection.device.storageGb} GB` : null, inspection.device.color].filter(Boolean).join(" · ") || "Sin detalles adicionales"}</p></td>
                     <td className="px-4 py-4 font-mono text-xs font-semibold text-[#344054]">{inspection.device.imei ?? inspection.device.serialNumber ?? "—"}</td>
-                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${inspection.result === "FUNCTIONAL" ? "border-[#abefc6] bg-[#ecfdf3] text-[#067647]" : "border-[#fecdca] bg-[#fef3f2] text-[#b42318]"}`}>{resultLabel(inspection.result)}</span></td>
+                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${resultTone(inspection.result)}`}>{resultLabel(inspection.result)}</span></td>
                     <td className="px-4 py-4 text-[#475467]"><span className="font-semibold text-[#344054]">{inspection.grade ? `Grado ${inspection.grade}` : "Sin grado"}</span>{inspection.batteryHealth !== null ? <span className="ml-2 text-xs">· {inspection.batteryHealth}% batería</span> : null}</td>
                     <td className="px-4 py-4 font-medium text-[#344054]">{inspection.reviewerNameSnapshot}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-right text-xs text-[#667085]">{inspection.reviewedAt ? formatDateTimeRD(inspection.reviewedAt) : "—"}</td>

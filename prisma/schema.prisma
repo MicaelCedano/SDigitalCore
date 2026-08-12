@@ -407,6 +407,7 @@ enum QcInspectionStatus {
 enum QcInspectionResult {
   FUNCTIONAL
   NON_FUNCTIONAL
+  UNSPECIFIED
 }
 
 // ============================================================

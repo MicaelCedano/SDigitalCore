@@ -29,7 +29,7 @@ export default async function EquiposRevisadosPage({
 
   const params = await searchParams;
   const query = (params.q ?? "").trim().slice(0, 120);
-  const result = params.result === "FUNCTIONAL" || params.result === "NON_FUNCTIONAL"
+  const result = params.result === "FUNCTIONAL" || params.result === "NON_FUNCTIONAL" || params.result === "UNSPECIFIED"
     ? params.result as QcInspectionResult
     : undefined;
   const requestedPage = Number.parseInt(params.page ?? "1", 10);
@@ -53,7 +53,7 @@ export default async function EquiposRevisadosPage({
       : {}),
   };
 
-  const [total, inspections, functional, nonFunctional, reviewedToday] = await Promise.all([
+  const [total, inspections, functional, nonFunctional, unspecified, reviewedToday] = await Promise.all([
     prisma.qcInspection.count({ where }),
     prisma.qcInspection.findMany({
       where,
@@ -74,13 +74,14 @@ export default async function EquiposRevisadosPage({
     }),
     prisma.qcInspection.count({ where: { status: "COMPLETED", result: "FUNCTIONAL" } }),
     prisma.qcInspection.count({ where: { status: "COMPLETED", result: "NON_FUNCTIONAL" } }),
+    prisma.qcInspection.count({ where: { status: "COMPLETED", result: "UNSPECIFIED" } }),
     prisma.qcInspection.count({ where: { status: "COMPLETED", reviewedAt: { gte: today.start, lt: today.end } } }),
   ]);
 
   return (
     <ReviewedDevicesPage
       inspections={inspections}
-      stats={{ total: functional + nonFunctional, functional, nonFunctional, reviewedToday }}
+      stats={{ total: functional + nonFunctional + unspecified, functional, nonFunctional, unspecified, reviewedToday }}
       filters={{ query, result: result ?? "ALL" }}
       pagination={{ page, pageSize: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) }}
     />

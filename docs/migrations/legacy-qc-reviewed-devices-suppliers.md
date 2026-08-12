@@ -8,7 +8,7 @@
 - Conserva IMEI, marca, modelo, almacenamiento, color, grado, observación, resultado y fecha.
 - Recupera el último revisor identificado cuando el evento final no tiene `user_id`.
 - Enlaza `reviewer_id` solo cuando la identidad legacy fue confirmada en Core; siempre conserva `reviewer_name_snapshot`.
-- Omite registros cuya funcionalidad histórica no sea `Funcional` o `No funcional` en vez de inventar un resultado.
+- Conserva como `UNSPECIFIED` los equipos revisados cuya funcionalidad histórica esté vacía, sin inventar un resultado.
 - Usa `source_system + source_record_id` para permitir reejecuciones idempotentes.
 
 ## Orden operativo
@@ -31,6 +31,7 @@ El importador procesa bloques de 500 dentro de transacciones cortas. Si un bloqu
 | último `equipo_historial.estado = 'Revisado'` | `qc_inspection` completada |
 | `Funcional` | `FUNCTIONAL` |
 | `No funcional` / `No Funcional` | `NON_FUNCTIONAL` |
+| funcionalidad vacía | `UNSPECIFIED` |
 | equipo funcional activo | `AVAILABLE` |
 | equipo no funcional activo | `QUARANTINED` |
 | equipo ya entregado | `ARCHIVED` |
