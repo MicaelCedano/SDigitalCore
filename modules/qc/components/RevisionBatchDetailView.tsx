@@ -8,6 +8,8 @@ import {
 } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { AssignDeviceModal } from "./AssignDeviceModal";
+import { FisicoVerifierModal } from "./FisicoVerifierModal";
+import { NoFuncionalesModal } from "./NoFuncionalesModal";
 import {
   ArrowLeft,
   Package,
@@ -26,6 +28,7 @@ import {
   CheckCheck,
   ClipboardCheck,
   UserCheck,
+  Fingerprint,
 } from "lucide-react";
 
 interface RevisionBatchDetailViewProps {
@@ -38,6 +41,8 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [assignDevice, setAssignDevice] = useState<any>(null);
+  const [showVerifier, setShowVerifier] = useState(false);
+  const [showNoFuncionales, setShowNoFuncionales] = useState(false);
 
   const refreshBatch = async () => {
     const res = await getRevisionBatchDetailAction(batch.id);
@@ -143,7 +148,22 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
         </div>
 
         {/* Acciones de Estado */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+          <button
+            onClick={() => setShowVerifier(true)}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
+          >
+            <Fingerprint className="w-4 h-4" /> Verificador Físico
+          </button>
+          <button
+            onClick={() => setShowNoFuncionales(true)}
+            className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-100 flex items-center gap-2"
+          >
+            <AlertTriangle className="w-4 h-4" /> No Funcionales
+            {batch.nonFunctionalCount > 0 ? (
+              <span className="rounded-full bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-[18px] text-center">{batch.nonFunctionalCount}</span>
+            ) : null}
+          </button>
           {batch.status !== "COMPLETED" && (
             <button
               onClick={() => handleStatusChange("COMPLETED")}
@@ -360,6 +380,49 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
             setAssignDevice(null);
             refreshBatch();
           }}
+        />
+      )}
+
+      {/* Verificador Físico (pistola de IMEIs) */}
+      {showVerifier && (
+        <FisicoVerifierModal
+          batchNumber={batch.batchNumber}
+          devices={(batch.devices || []).map((dev: any) => ({
+            id: dev.id,
+            imei: dev.imei ?? null,
+            serialNumber: dev.serialNumber ?? null,
+            brand: dev.brand ?? null,
+            model: dev.model,
+            color: dev.color ?? null,
+            storageGb: dev.storageGb ?? null,
+            status: dev.status,
+            result: dev.inspections?.[0]?.status === "COMPLETED" ? dev.inspections[0].result : null,
+          }))}
+          onClose={() => setShowVerifier(false)}
+        />
+      )}
+
+      {/* No Funcionales — recuperación (marcar funcional) */}
+      {showNoFuncionales && (
+        <NoFuncionalesModal
+          batchNumber={batch.batchNumber}
+          devices={(batch.devices || []).map((dev: any) => ({
+            id: dev.id,
+            imei: dev.imei ?? null,
+            serialNumber: dev.serialNumber ?? null,
+            brand: dev.brand ?? null,
+            model: dev.model,
+            color: dev.color ?? null,
+            storageGb: dev.storageGb ?? null,
+            status: dev.status,
+            result: dev.inspections?.[0]?.status === "COMPLETED" ? dev.inspections[0].result : null,
+            grade: dev.inspections?.[0]?.grade ?? null,
+            batteryHealth: dev.inspections?.[0]?.batteryHealth ?? null,
+            functionalityNotes: dev.inspections?.[0]?.functionalityNotes ?? null,
+            reviewedAt: dev.inspections?.[0]?.reviewedAt ?? null,
+          }))}
+          onClose={() => setShowNoFuncionales(false)}
+          onChanged={() => refreshBatch()}
         />
       )}
     </div>

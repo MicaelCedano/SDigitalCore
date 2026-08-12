@@ -15,6 +15,9 @@ import {
   ReviewDeviceInput,
 } from "@/lib/validation/revision-batch";
 import type { QcBatchStatus } from "@prisma/client";
+import { z } from "zod";
+
+type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
 /**
  * Función auxiliar para procesar texto libre de IMEIs / Números de Serie
@@ -583,6 +586,129 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       success: false,
       error: error.message || "Error al registrar la revisión del equipo",
     };
+  }
+}
+
+/**
+ * Recuperación de equipos no funcionales (port de System `/compras/[id]/no-funcionales`):
+ * el admin marca un equipo defectuoso como FUNCIONAL tras verificación física.
+ * Crea una inspección FUNCTIONAL nueva (supersede a la anterior, historial intacto),
+ * pasa el equipo a AVAILABLE y recalcula los contadores del lote.
+ */
+export async function markDeviceFunctionalAction(input: { deviceId: string }): Promise<Result<{ batchId: string; batchNumber: string; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const parsed = z.object({ deviceId: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Equipo inválido." };
+    const { deviceId } = parsed.data;
+
+    const device = await prisma.deviceUnit.findUnique({
+      where: { id: deviceId },
+      include: { batch: true },
+    });
+    if (!device) return { success: false, error: "El equipo no existe." };
+    if (!device.batch) return { success: false, error: "El equipo no pertenece a ningún Lote de Revisión." };
+
+    const batch = device.batch;
+    const reviewerName = actor.name || actor.email || "Administración";
+
+    const updatedBatch = await prisma.$transaction(async (tx) => {
+      // Inspección nueva que reemplaza a la última completada (cadena de correcciones)
+      const lastCompleted = await tx.qcInspection.findFirst({
+        where: { deviceId: device.id, status: "COMPLETED" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+      await tx.qcInspection.create({
+        data: {
+          deviceId: device.id,
+          reviewerId: actor.id,
+          reviewerNameSnapshot: reviewerName.slice(0, 160),
+          status: "COMPLETED",
+          result: "FUNCTIONAL",
+          grade: "A",
+          functionalityNotes: "Marcado funcional por administración (verificación física)",
+          reviewedAt: new Date(),
+          supersedesId: lastCompleted?.id ?? null,
+        },
+      });
+
+      await tx.deviceUnit.update({
+        where: { id: device.id },
+        data: { status: "AVAILABLE" },
+      });
+
+      // Recalcular contadores del lote (idempotente)
+      const batchDevices = await tx.deviceUnit.findMany({
+        where: { batchId: batch.id },
+        include: { inspections: { orderBy: { createdAt: "desc" }, take: 1 } },
+      });
+      let reviewed = 0;
+      let functional = 0;
+      let nonFunctional = 0;
+      for (const d of batchDevices) {
+        const last = d.inspections[0];
+        if (last && last.status === "COMPLETED") {
+          reviewed++;
+          if (last.result === "FUNCTIONAL") functional++;
+          else if (last.result === "NON_FUNCTIONAL") nonFunctional++;
+        }
+      }
+      const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
+      const nextStatus =
+        allReviewed
+          ? "COMPLETED"
+          : batch.status === "COMPLETED"
+            ? "COMPLETED"
+            : batch.status;
+
+      const updated = await tx.qcRevisionBatch.update({
+        where: { id: batch.id },
+        data: {
+          reviewedDevices: reviewed,
+          functionalCount: functional,
+          nonFunctionalCount: nonFunctional,
+          status: nextStatus,
+          completedAt: allReviewed ? new Date() : batch.completedAt,
+        },
+      });
+
+      if (nextStatus === "COMPLETED") {
+        await payReviewersForBatch(batch.id, tx);
+      }
+
+      return updated;
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "qc_batch.device_mark_functional",
+      module: "qc",
+      entityType: "qc_inspection",
+      entityId: device.id,
+      afterData: { batchId: batch.id, batchNumber: batch.batchNumber, deviceId: device.id },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${batch.id}`);
+    revalidatePath("/qc/equipos-revisados");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      message: `Equipo marcado como funcional. Lote ${batch.batchNumber} actualizado.`,
+      data: {
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        reviewedDevices: updatedBatch.reviewedDevices,
+        functionalCount: updatedBatch.functionalCount,
+        nonFunctionalCount: updatedBatch.nonFunctionalCount,
+      },
+    };
+  } catch (error: any) {
+    console.error("Error al marcar equipo funcional:", error);
+    return { success: false, error: error.message || "Error al marcar el equipo como funcional" };
   }
 }
 
