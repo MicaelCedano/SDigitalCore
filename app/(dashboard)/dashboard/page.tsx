@@ -5,7 +5,6 @@ import { getAdminOperationsOverview } from "@/lib/dashboard/admin-operations";
 import { AdminWarrantyWidget } from "@/components/dashboard/AdminWarrantyWidget";
 import {
   ArrowRight,
-  BellRing,
   ClipboardCheck,
   FileText,
   PackageCheck,
@@ -57,13 +56,6 @@ const groups = [
     icon: Settings,
     items: administration,
   },
-];
-
-const adminShortcuts = [
-  { label: "Aprobar pagos reparaciones", description: "Trabajos de técnicos por pagar", href: "/reparaciones/pagos", icon: Wrench },
-  { label: "Aprobar desbloqueos", description: "Solicitudes pendientes de aprobar", href: "/desbloqueos/pagos", icon: Lock },
-  { label: "Compra de lotes", description: "Registrar compras para revisión QC", href: "/qc/lotes", icon: ScanSearch },
-  { label: "Validador de bauchers", description: "Canjear retiros pendientes", href: "/wallet", icon: Banknote },
 ];
 
 function formatDate(value: Date) {
@@ -125,31 +117,6 @@ export default async function DashboardPage() {
 
       {overview ? (
         <>
-          <section aria-labelledby="admin-actions-title">
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <div>
-                <h3 id="admin-actions-title" className="text-lg font-semibold tracking-[-0.02em] text-[#101828]">Acciones rápidas</h3>
-                <p className="mt-1 text-sm text-[#667085]">Atajos para las tareas administrativas más frecuentes.</p>
-              </div>
-              <span className="hidden items-center gap-1.5 rounded-full bg-[#eef2ff] px-3 py-1.5 text-xs font-semibold text-[#4338ca] sm:inline-flex"><BellRing size={14} /> Panel admin</span>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {adminShortcuts.map((shortcut) => {
-                const Icon = shortcut.icon;
-                return (
-                  <Link key={shortcut.label} href={shortcut.href} className="enterprise-panel group flex items-center gap-3.5 p-4 transition-all hover:-translate-y-0.5 hover:border-[#c7d2fe] hover:shadow-md">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#eef2ff] text-[#4f46e5]"><Icon size={19} /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[#101828]">{shortcut.label}</span>
-                      <span className="mt-0.5 block truncate text-xs text-[#667085]">{shortcut.description}</span>
-                    </span>
-                    <ArrowRight size={16} className="shrink-0 text-[#98a2b3] transition-transform group-hover:translate-x-0.5 group-hover:text-[#4f46e5]" />
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-
           {/* Resumen de módulos activos */}
           <section aria-label="Resumen de módulos">
             <div className="mb-3">
