@@ -1209,3 +1209,124 @@ export async function getQcDashboardAction() {
     return { success: false, error: "Error al cargar el panel de Control de Calidad", data: null };
   }
 }
+
+/**
+ * Gestión de pagos QC (solo ADMIN): lotes SUBMITTED (por aceptar y pagar)
+ * y lotes COMPLETED recientes (historial de pagos acreditados).
+ * Cada lote trae su monto estimado: revisados × QC_REVIEW_RATE.
+ */
+export async function getQcPaymentsAction(): Promise<
+  Result<{
+    pending: Array<{
+      id: string;
+      batchNumber: string;
+      supplierName: string;
+      totalDevices: number;
+      reviewedDevices: number;
+      functionalCount: number;
+      nonFunctionalCount: number;
+      estimatedAmount: number;
+      submittedBy: string | null;
+      submittedAt: Date;
+    }>;
+    history: Array<{
+      id: string;
+      batchNumber: string;
+      supplierName: string;
+      totalDevices: number;
+      reviewedDevices: number;
+      functionalCount: number;
+      nonFunctionalCount: number;
+      estimatedAmount: number;
+      completedAt: Date | null;
+    }>;
+  }>
+> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede gestionar los pagos de QC." };
+    }
+
+    const [pending, history, audits] = await Promise.all([
+      // Lotes enviados esperando aceptación
+      prisma.qcRevisionBatch.findMany({
+        where: { status: "SUBMITTED" },
+        orderBy: { updatedAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          batchNumber: true,
+          supplierName: true,
+          totalDevices: true,
+          reviewedDevices: true,
+          functionalCount: true,
+          nonFunctionalCount: true,
+          updatedAt: true,
+        },
+      }),
+      // Historial de completados (pagos acreditados)
+      prisma.qcRevisionBatch.findMany({
+        where: { status: "COMPLETED" },
+        orderBy: { completedAt: "desc" },
+        take: 30,
+        select: {
+          id: true,
+          batchNumber: true,
+          supplierName: true,
+          totalDevices: true,
+          reviewedDevices: true,
+          functionalCount: true,
+          nonFunctionalCount: true,
+          completedAt: true,
+        },
+      }),
+      // Quién envió cada lote (audit log de qc_batch.submit)
+      prisma.auditLog.findMany({
+        where: { action: "qc_batch.submit" },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: {
+          entityId: true,
+          userId: true,
+          createdAt: true,
+          user: { select: { name: true, username: true } },
+        },
+      }),
+    ]);
+
+    const submitterByBatch = new Map<string, { name: string | null; submittedAt: Date }>();
+    for (const a of audits) {
+      if (a.entityId && !submitterByBatch.has(a.entityId)) {
+        submitterByBatch.set(a.entityId, {
+          name: a.user?.name ?? a.user?.username ?? "QC",
+          submittedAt: a.createdAt,
+        });
+      }
+    }
+
+    const RATE = QC_REVIEW_RATE;
+    const mapPending = pending.map((b) => {
+      const s = submitterByBatch.get(b.id);
+      return {
+        ...b,
+        submittedBy: s?.name ?? null,
+        submittedAt: s?.submittedAt ?? b.updatedAt,
+        estimatedAmount: b.reviewedDevices * RATE,
+      };
+    });
+    const mapHistory = history.map((b) => ({
+      ...b,
+      estimatedAmount: b.reviewedDevices * RATE,
+    }));
+
+    return {
+      success: true,
+      data: { pending: mapPending, history: mapHistory },
+    };
+  } catch (error: any) {
+    console.error("Error al cargar pagos QC:", error);
+    return { success: false, error: error.message || "Error al cargar los pagos de QC" };
+  }
+}
