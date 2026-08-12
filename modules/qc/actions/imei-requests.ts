@@ -14,9 +14,10 @@ import {
 /**
  * El QC solicita IMEIs que quiere revisar (fórmula SDigitalSystem).
  * Solo se aceptan equipos existentes, en lotes no cancelados, libres
- * (no asignados a otro QC) y que AÚN NO hayan sido revisados
- * (sin inspección COMPLETADA) — los del historial/inventario ya revisado
- * no se pueden volver a solicitar.
+ * (no asignados a otro QC) y que AÚN NO hayan sido revisados EN ESTE LOTE.
+ * Un REINGRESO con historial de lotes anteriores SÍ es solicitable:
+ * el historial (inspecciones previas al lote actual) no bloquea; solo
+ * bloquea una inspección COMPLETED vigente (posterior a la creación del lote).
  */
 export async function createImeiRequestAction(input: CreateImeiRequestInput) {
   try {
@@ -35,10 +36,22 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
         imei: true,
         model: true,
         assignedToId: true,
-        _count: { select: { inspections: { where: { status: "COMPLETED" } } } },
+        batch: { select: { createdAt: true } },
+        // Última inspección completada para decidir si es historial o vigente
+        inspections: {
+          where: { status: "COMPLETED" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
     });
     const deviceByImei = new Map(devices.map((d) => [d.imei, d]));
+
+    const isReviewedInCurrentBatch = (d: (typeof devices)[number]) => {
+      const batchStart = d.batch?.createdAt ?? new Date(0);
+      return (d.inspections[0]?.createdAt ?? new Date(0)) >= batchStart;
+    };
 
     const notFound = imeis.filter((i) => !deviceByImei.has(i));
     const alreadyAssigned = imeis.filter((i) => {
@@ -47,11 +60,11 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
     });
     const alreadyReviewed = imeis.filter((i) => {
       const d = deviceByImei.get(i);
-      return d && d._count.inspections > 0;
+      return d && isReviewedInCurrentBatch(d);
     });
     const validImeis = imeis.filter((i) => {
       const d = deviceByImei.get(i);
-      return d && d._count.inspections === 0 && (!d.assignedToId || d.assignedToId === user.id);
+      return d && !isReviewedInCurrentBatch(d) && (!d.assignedToId || d.assignedToId === user.id);
     });
 
     if (validImeis.length === 0) {
@@ -110,8 +123,9 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
 
 /**
  * Validación en vivo para el modal del QC: clasifica cada IMEI pegado como
- * disponible, inexistente, asignado a otro QC o ya revisado (misma regla que
- * createImeiRequestAction). No muta nada — solo informa al QC antes de enviar.
+ * disponible, inexistente, asignado a otro QC o ya revisado EN ESTE LOTE
+ * (misma regla que createImeiRequestAction). Los REINGRESOS con historial
+ * previo son solicitable — el historial no bloquea. No muta nada.
  */
 export async function validateImeisAction(input: { imeis: string[] }) {
   try {
@@ -131,7 +145,13 @@ export async function validateImeisAction(input: { imeis: string[] }) {
       select: {
         imei: true,
         assignedToId: true,
-        _count: { select: { inspections: { where: { status: "COMPLETED" } } } },
+        batch: { select: { createdAt: true } },
+        inspections: {
+          where: { status: "COMPLETED" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
     });
     const deviceByImei = new Map(devices.map((d) => [d.imei, d]));
@@ -139,8 +159,11 @@ export async function validateImeisAction(input: { imeis: string[] }) {
     const data = imeis.map((imei) => {
       const device = deviceByImei.get(imei);
       if (!device) return { imei, status: "not_found" as const };
-      // Un equipo ya revisado (historial/inventario) no se puede volver a solicitar.
-      if (device._count.inspections > 0) return { imei, status: "reviewed" as const };
+      // Solo una inspección vigente (posterior al lote actual) bloquea.
+      // El historial de un reingreso (inspección anterior al lote) NO bloquea.
+      const batchStart = device.batch?.createdAt ?? new Date(0);
+      const hasVigente = (device.inspections[0]?.createdAt ?? new Date(0)) >= batchStart;
+      if (hasVigente) return { imei, status: "reviewed" as const };
       if (device.assignedToId && device.assignedToId !== user.id) {
         return { imei, status: "assigned" as const };
       }
@@ -247,12 +270,28 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
       const devices = await prisma.deviceUnit.findMany({
         where: {
           imei: { in: imeis.map((i) => i.imei) },
-          // Defensa: nunca asignar a revisión un equipo que ya fue revisado.
-          inspections: { none: { status: "COMPLETED" } },
+          // Defensa: nunca asignar a revisión un equipo ya revisado EN ESTE
+          // LOTE (inspección vigente). El historial de reingresos no bloquea.
+          batch: { status: { not: "CANCELLED" } },
         },
-        select: { id: true, imei: true, assignedToId: true },
+        select: {
+          id: true,
+          imei: true,
+          assignedToId: true,
+          batch: { select: { createdAt: true } },
+          inspections: {
+            where: { status: "COMPLETED" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
       });
-      const free = devices.filter((d) => !d.assignedToId || d.assignedToId === request.requesterId);
+      const free = devices.filter((d) => {
+        const batchStart = d.batch?.createdAt ?? new Date(0);
+        const hasVigente = (d.inspections[0]?.createdAt ?? new Date(0)) >= batchStart;
+        return !hasVigente && (!d.assignedToId || d.assignedToId === request.requesterId);
+      });
       if (free.length > 0) {
         const res = await prisma.deviceUnit.updateMany({
           where: { id: { in: free.map((d) => d.id) } },
