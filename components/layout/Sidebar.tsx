@@ -17,6 +17,7 @@ import {
   Tag,
   Warehouse,
   WalletCards,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -48,6 +49,10 @@ const navItems: NavItem[] = [
     { label: "Compra de lotes", href: "/qc/lotes", adminOnly: true },
     { label: "Solicitudes de IMEIs", href: "/qc/solicitudes", adminOnly: true },
     { label: "Equipos revisados", href: "/qc/equipos-revisados", adminOnly: true },
+  ] },
+  { label: "Reparaciones", href: "/reparaciones", moduleKey: "reparaciones", icon: Wrench, section: "Operaciones", children: [
+    { label: "Panel de reparaciones", href: "/reparaciones" },
+    { label: "Aprobar pagos", href: "/reparaciones/pagos", adminOnly: true },
   ] },
   { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards, section: "Comercial" },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },

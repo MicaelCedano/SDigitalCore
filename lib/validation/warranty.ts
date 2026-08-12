@@ -45,7 +45,7 @@ export const caseCodesSchema = z.object({ caseCodes: z.array(text("Código", 40)
 });
 
 export const updateWarrantySchema = z.object({ caseCode: text("El código", 40), clientName: text("El cliente", 160), model: text("El modelo", 120), imei: imeiSchema, problem: text("El problema", 1000) });
-export const flowSchema = caseCodesSchema.extend({ counterpartyName: optionalText(160), reason: optionalText(1000) });
+export const flowSchema = caseCodesSchema.extend({ counterpartyName: optionalText(160), reason: optionalText(1000), technicianId: z.string().optional() });
 export const archiveWarrantySchema = z.object({ caseCode: text("El código", 40), reason: text("El motivo", 1000) });
 export const restoreWarrantySchema = z.object({ caseCode: text("El código", 40), reason: optionalText(1000) });
 

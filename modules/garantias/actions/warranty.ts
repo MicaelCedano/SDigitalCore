@@ -108,7 +108,7 @@ const documentPrefix: Record<WarrantyDocumentType, string> = {
   CREDIT_NOTE: "NC",
 };
 
-async function createDocument(
+export async function createDocument(
   tx: Prisma.TransactionClient,
   actorId: string,
   type: WarrantyDocumentType,
@@ -132,7 +132,7 @@ async function createDocument(
   });
 }
 
-async function createEvent(
+export async function createEvent(
   tx: Prisma.TransactionClient,
   caseId: string,
   actor: { id: string; name?: string | null },
@@ -389,8 +389,22 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
     if (!parsed.success) return { success: false, error: "Revisa los datos del flujo." };
     const data = parsed.data;
     const rule = flowRules[operation];
-    const counterpartyName = normalizeName(data.counterpartyName);
+    let counterpartyName = normalizeName(data.counterpartyName);
     const reason = data.reason?.trim();
+
+    // "Enviar a Reparaciones": si viene technicianId real, resolver el usuario y
+    // usar su nombre como contraparte (assignedTechnicianName snapshot) + enlazar ID.
+    let technicianId: string | null = null;
+    if (data.technicianId) {
+      const technician = await prisma.user.findFirst({
+        where: { id: data.technicianId, status: "ACTIVE" },
+        select: { id: true, name: true, username: true },
+      });
+      if (!technician) return { success: false, error: "El técnico indicado no existe o no está activo." };
+      technicianId = technician.id;
+      counterpartyName = normalizeName(counterpartyName || technician.name || technician.username || "");
+    }
+
     if (rule.needsCounterparty && !counterpartyName) return { success: false, error: "La contraparte es obligatoria." };
     if (rule.needsReason && !reason) return { success: false, error: "La resolución u observación es obligatoria." };
 
@@ -414,7 +428,7 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
           data: {
             status: rule.toStatus,
             updatedById: actor.id,
-            ...(operation === "assign" ? { assignedTechnicianName: counterpartyName, currentSupplierName: null } : {}),
+            ...(operation === "assign" ? { assignedTechnicianName: counterpartyName, assignedTechnicianId: technicianId ?? undefined, currentSupplierName: null } : {}),
             ...(operation === "receive-repaired" || operation === "receive-unrepaired" ? { assignedTechnicianId: null, assignedTechnicianName: null } : {}),
             ...(operation === "send-supplier" ? { currentSupplierName: counterpartyName, assignedTechnicianId: null, assignedTechnicianName: null } : {}),
             ...(operation === "receive-supplier" ? { currentSupplierName: null } : {}),

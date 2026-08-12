@@ -16,6 +16,7 @@ import {
 import { WarrantyArchiveButton } from "@/modules/garantias/components/WarrantyArchiveButton";
 import { WarrantyCaseEditButton } from "@/modules/garantias/components/WarrantyCaseEditButton";
 import { WarrantyStatusBadge } from "@/modules/garantias/components/WarrantyStatusBadge";
+import { SendToRepairsButton } from "@/modules/reparaciones/components/SendToRepairsButton";
 import { WARRANTY_STATUS_LABELS } from "@/modules/garantias/lib/status-machine";
 
 export type DetailCaseRow = {
@@ -215,6 +216,9 @@ export function WarrantyCaseDetailDrawer({
           <div className="flex flex-wrap items-center gap-2">
             <WarrantyCaseEditButton item={item} />
             <WarrantyArchiveButton caseCode={item.caseCode} archived={Boolean(item.archivedAt)} />
+            {(item.status === "RECEIVED" || item.status === "RECEIVED_FROM_SUPPLIER") && (
+              <SendToRepairsButton caseCode={item.caseCode} />
+            )}
           </div>
           <Link
             href={`/garantias/${item.caseCode}`}

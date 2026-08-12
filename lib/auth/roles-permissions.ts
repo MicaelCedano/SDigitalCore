@@ -68,14 +68,15 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
   { key: "precios", label: "Lista de Precios", permission: "prices.read", description: "Listas de precios" },
   { key: "facturas", label: "Facturas PDF", permission: "invoices.read", description: "Comprobantes" },
   { key: "garantias", label: "Gestión de Garantías", permission: "warranties.read", description: "Casos, flujos y documentos" },
+  { key: "reparaciones", label: "Reparaciones", permission: "reparaciones.read", description: "Cola de reparaciones y pago a técnicos" },
   { key: "configuracion", label: "Configuración", permission: "settings.read", description: "Usuarios y roles" },
 ];
 
 export const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
-  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "configuracion"],
+  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "reparaciones", "configuracion"],
   ALMACEN: ["almacen"],
   VENTAS: ["precios", "facturas"],
-  TECNICO: [],
+  TECNICO: ["reparaciones", "wallet"],
   QC: ["qc"],
   SUPERVISOR: ["almacen", "precios", "facturas", "garantias"],
   PERSONALIZADO: [],

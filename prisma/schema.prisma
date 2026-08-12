@@ -48,6 +48,10 @@ model User {
   qcAssignedDevices DeviceUnit[] @relation("QcDeviceAssignee")
   qcImeiRequests QcImeiRequest[] @relation("QcImeiRequestRequester")
   qcImeiRequestsAccepted QcImeiRequest[] @relation("QcImeiRequestAcceptor")
+  repairJobsCreated RepairJob[] @relation("RepairJobTechnician")
+  repairJobsApproved RepairJob[] @relation("RepairJobApprovedBy")
+  repairRates TechnicianRepairRate[] @relation("TechnicianRepairRateTechnician")
+  repairRatesManaged TechnicianRepairRate[] @relation("TechnicianRepairRateAdmin")
 
   @@map("user")
 }
@@ -630,6 +634,7 @@ model WarrantyCase {
   archivedBy User? @relation("WarrantyArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
   events WarrantyEvent[]
   documentItems WarrantyDocumentItem[]
+  repairItems RepairJobItem[]
 
   @@index([imei, createdAt])
   @@index([status, entryDate])
@@ -708,6 +713,74 @@ model OperationalDailySequence {
 
   @@unique([sequenceDate, sequenceType])
   @@map("operational_daily_sequence")
+}
+
+// ============================================================
+// MÓDULO REPARACIONES — Trabajos de reparación y pago a técnicos
+// ============================================================
+
+enum RepairJobStatus {
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+
+  @@map("repair_job_status")
+}
+
+model RepairJob {
+  id             String          @id @default(cuid())
+  jobCode        String          @unique @map("job_code")
+  technicianId   String          @map("technician_id")
+  status         RepairJobStatus @default(PENDING_PAYMENT)
+  observaciones  String?         @db.Text
+  totalEquipos   Int             @default(0) @map("total_equipos")
+  montoPorEquipo Decimal         @default(50) @db.Decimal(10, 2) @map("monto_por_equipo")
+  montoTotal     Decimal         @default(0) @db.Decimal(10, 2) @map("monto_total")
+  approvedById   String?         @map("approved_by_id")
+  approvedAt     DateTime?       @map("approved_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  technician User  @relation("RepairJobTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
+  approvedBy User? @relation("RepairJobApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  items      RepairJobItem[]
+
+  @@index([technicianId, status])
+  @@index([status, createdAt])
+  @@map("repair_job")
+}
+
+model RepairJobItem {
+  id             String   @id @default(cuid())
+  jobId          String   @map("job_id")
+  imei           String
+  marca          String?
+  modelo         String?
+  problema       String   @db.Text
+  cliente        String
+  warrantyCaseId String?  @map("warranty_case_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  job          RepairJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  warrantyCase WarrantyCase? @relation(fields: [warrantyCaseId], references: [id], onDelete: SetNull)
+
+  @@index([imei])
+  @@index([jobId])
+  @@map("repair_job_item")
+}
+
+model TechnicianRepairRate {
+  id                 String   @id @default(cuid())
+  technicianId       String   @unique @map("technician_id")
+  montoPorReparacion Decimal  @default(50) @db.Decimal(10, 2) @map("monto_por_reparacion")
+  activo             Boolean  @default(true)
+  adminId            String?  @map("admin_id")
+  fechaConfiguracion DateTime @default(now()) @map("fecha_configuracion")
+
+  technician User @relation("TechnicianRepairRateTechnician", fields: [technicianId], references: [id], onDelete: Cascade)
+  admin      User? @relation("TechnicianRepairRateAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@map("technician_repair_rate")
 }
 
 // ============================================================
