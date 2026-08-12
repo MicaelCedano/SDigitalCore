@@ -34,7 +34,7 @@ export async function getLegacyMigrationDashboard() {
         name: identity.nameSnapshot,
         email: identity.emailSnapshot,
         role: identity.roleSnapshot,
-        walletEligible: ["qc", "control_calidad"].includes(identity.roleSnapshot?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_") ?? ""),
+        walletEligible: ["qc", "control_calidad", "tecnico", "tecnico_garantias"].includes(identity.roleSnapshot?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_") ?? ""),
         active: identity.activeSnapshot,
         balance: identity.sourceWalletBalance.toFixed(2),
         transactionCount: identity.sourceTransactionCount,

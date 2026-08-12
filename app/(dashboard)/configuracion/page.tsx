@@ -933,7 +933,7 @@ export default function ConfiguracionPage() {
                     </span>
                     <span className="mt-1 block text-[11px] font-semibold">La coincidencia por {selectedReq.legacyCandidate.matchMethod === "exact_email" ? "correo" : "usuario"} es solo una sugerencia; debes confirmarla.</span>
                     <span className="mt-1 block text-[11px] font-bold">
-                      {selectedReq.legacyCandidate.walletEligible ? "Es personal QC: se habilitará Wallet." : "No es personal QC: se enlazará la identidad sin habilitar Wallet."}
+                      {selectedReq.legacyCandidate.walletEligible ? "Se habilitará Wallet y se migrará el saldo anterior." : "Sin Wallet: se enlazará la identidad (rol no elegible para migración de saldo)."}
                     </span>
                   </span>
                 </label>

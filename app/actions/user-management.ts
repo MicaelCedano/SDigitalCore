@@ -127,7 +127,7 @@ export async function getUserManagementDataAction() {
           balance: candidate.sourceWalletBalance.toFixed(2),
           transactionCount: candidate.sourceTransactionCount,
           matchMethod,
-          walletEligible: ["qc", "control_calidad"].includes(candidate.roleSnapshot?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_") ?? ""),
+          walletEligible: ["qc", "control_calidad", "tecnico", "tecnico_garantias"].includes(candidate.roleSnapshot?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_") ?? ""),
         } : undefined,
       };
     });

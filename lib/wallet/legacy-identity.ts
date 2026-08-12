@@ -11,9 +11,9 @@ function accountKind(type: string | null, name: string) {
     : "PRIMARY" as const;
 }
 
-function isQcLegacyRole(role: string | null) {
+function isWalletEligibleLegacyRole(role: string | null) {
   const normalized = role?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_");
-  return normalized === "qc" || normalized === "control_calidad";
+  return ["qc", "control_calidad", "tecnico", "tecnico_garantias"].includes(normalized ?? "");
 }
 
 export async function linkLegacyIdentity(
@@ -43,7 +43,7 @@ export async function linkLegacyIdentity(
   });
   if (occupied) throw new Error("Ese usuario nuevo ya está enlazado con otra identidad anterior.");
 
-  const walletAccessGranted = isQcLegacyRole(identity.roleSnapshot);
+  const walletAccessGranted = isWalletEligibleLegacyRole(identity.roleSnapshot);
   const allowedModules = walletAccessGranted && !user.allowedModules.includes(WALLET_MODULE_KEY)
     ? [...user.allowedModules, WALLET_MODULE_KEY]
     : user.allowedModules;
