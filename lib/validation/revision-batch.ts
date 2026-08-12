@@ -30,6 +30,11 @@ export const updateRevisionBatchStatusSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+export const assignRevisionBatchSchema = z.object({
+  id: z.string().min(1, "ID del lote requerido"),
+  assignedToId: z.string().nullable(),
+});
+
 export const reviewDeviceSchema = z.object({
   deviceId: z.string().min(1, "El equipo es requerido"),
   result: z.enum(["FUNCTIONAL", "NON_FUNCTIONAL"]),
@@ -45,3 +50,4 @@ export type RevisionBatchDeviceInput = z.infer<typeof revisionBatchDeviceSchema>
 export type CreateRevisionBatchInput = z.infer<typeof createRevisionBatchSchema>;
 export type UpdateRevisionBatchStatusInput = z.infer<typeof updateRevisionBatchStatusSchema>;
 export type ReviewDeviceInput = z.infer<typeof reviewDeviceSchema>;
+export type AssignRevisionBatchInput = z.infer<typeof assignRevisionBatchSchema>;

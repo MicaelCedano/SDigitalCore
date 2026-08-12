@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getRevisionBatchesAction } from "../actions/revision-batch";
 import { NuevoLoteModal } from "./NuevoLoteModal";
+import { AssignBatchModal } from "./AssignBatchModal";
 import {
   Plus,
   Search,
@@ -20,14 +21,17 @@ import {
   ScanSearch,
   ArrowRight,
   Sparkles,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 
-export function RevisionBatchesList() {
+export function RevisionBatchesList({ isAdmin = false }: { isAdmin?: boolean }) {
   const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showModal, setShowModal] = useState(false);
+  const [assignBatch, setAssignBatch] = useState<any>(null);
 
   const fetchBatches = async () => {
     setLoading(true);
@@ -69,12 +73,14 @@ export function RevisionBatchesList() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> Nuevo Lote de Revisión
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Lote de Revisión
+          </button>
+        )}
       </div>
 
       {/* Tarjetas de Métricas */}
@@ -168,16 +174,22 @@ export function RevisionBatchesList() {
         ) : batches.length === 0 ? (
           <div className="p-16 text-center text-slate-500 space-y-3">
             <Inbox className="w-12 h-12 mx-auto text-slate-300" />
-            <h3 className="text-sm font-bold text-slate-800">No se encontraron Lotes de Revisión</h3>
+            <h3 className="text-sm font-bold text-slate-800">
+              {isAdmin ? "No se encontraron Lotes de Revisión" : "No tienes lotes asignados"}
+            </h3>
             <p className="text-xs max-w-sm mx-auto text-slate-500">
-              Aún no hay compras o lotes de revisión registrados, o la búsqueda no arrojó resultados.
+              {isAdmin
+                ? "Aún no hay compras o lotes de revisión registrados, o la búsqueda no arrojó resultados."
+                : "El administrador asigna los lotes de compra; los que te asignen aparecerán aquí para que los revises."}
             </p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="mt-2 px-4 py-2 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 shadow-md shadow-[#5750f1]/20"
-            >
-              <Plus className="w-4 h-4" /> Crear Primer Lote
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowModal(true)}
+                className="mt-2 px-4 py-2 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 shadow-md shadow-[#5750f1]/20"
+              >
+                <Plus className="w-4 h-4" /> Crear Primer Lote
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -191,6 +203,7 @@ export function RevisionBatchesList() {
                   <th className="px-4 py-3.5 text-center">Avance QC</th>
                   <th className="px-4 py-3.5 text-center">Estado</th>
                   <th className="px-4 py-3.5">Registrado Por</th>
+                  <th className="px-4 py-3.5">Asignado a</th>
                   <th className="px-4 py-3.5 text-right">Acción</th>
                 </tr>
               </thead>
@@ -263,13 +276,39 @@ export function RevisionBatchesList() {
                         </span>
                       </td>
                       <td className="px-4 py-4 text-slate-600">{batch.receivedBy}</td>
+                      <td className="px-4 py-4">
+                        {batch.assignedTo ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#5750f1]/10 text-[#5750f1] border border-[#5750f1]/20 text-[10px] font-bold">
+                            <UserCheck className="w-3 h-3" />
+                            {batch.assignedTo.name || batch.assignedTo.username || "QC"}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400">Sin asignar</span>
+                        )}
+                      </td>
                       <td className="px-4 py-4 text-right">
-                        <Link
-                          href={`/qc/lotes/${batch.id}`}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-[#5750f1] hover:text-white text-slate-700 font-bold rounded-xl text-xs transition-all inline-flex items-center gap-1"
-                        >
-                          Ver Detalle <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => setAssignBatch(batch)}
+                              title={batch.assignedTo ? "Cambiar asignación" : "Asignar a QC"}
+                              className={`p-1.5 rounded-lg text-xs transition-colors inline-flex items-center gap-1 ${
+                                batch.assignedTo
+                                  ? "bg-[#5750f1]/10 text-[#5750f1] hover:bg-[#5750f1] hover:text-white"
+                                  : "bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white border border-amber-200"
+                              }`}
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <Link
+                            href={`/qc/lotes/${batch.id}`}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-[#5750f1] hover:text-white text-slate-700 font-bold rounded-xl text-xs transition-all inline-flex items-center gap-1"
+                          >
+                            Ver Detalle <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -286,6 +325,18 @@ export function RevisionBatchesList() {
           onClose={() => setShowModal(false)}
           onSuccess={() => {
             setShowModal(false);
+            fetchBatches();
+          }}
+        />
+      )}
+
+      {/* Modal para asignar lote a QC */}
+      {assignBatch && (
+        <AssignBatchModal
+          batch={assignBatch}
+          onClose={() => setAssignBatch(null)}
+          onAssigned={() => {
+            setAssignBatch(null);
             fetchBatches();
           }}
         />

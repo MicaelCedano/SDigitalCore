@@ -130,6 +130,11 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
               <span>Fecha: {formattedDate}</span>
               <span>•</span>
               <span>Registrado por: {batch.receivedBy}</span>
+              <span>•</span>
+              <span className={batch.assignedTo ? "font-semibold text-slate-700" : "text-amber-600 font-semibold"}>
+                Asignado a:{" "}
+                {batch.assignedTo?.name || batch.assignedTo?.username || "Sin asignar"}
+              </span>
             </p>
             {batch.notes && (
               <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl mt-2 border border-slate-200">

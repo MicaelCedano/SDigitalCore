@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requirePermission } from "@/lib/auth/helpers";
+import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
@@ -9,9 +9,11 @@ import {
   createRevisionBatchSchema,
   updateRevisionBatchStatusSchema,
   reviewDeviceSchema,
+  assignRevisionBatchSchema,
   CreateRevisionBatchInput,
   UpdateRevisionBatchStatusInput,
   ReviewDeviceInput,
+  AssignRevisionBatchInput,
 } from "@/lib/validation/revision-batch";
 import type { QcBatchStatus } from "@prisma/client";
 
@@ -37,6 +39,10 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
     const user = await requirePermission("qc.write");
     if (!user.id) {
       return { success: false, error: "La sesión no tiene un usuario identificable." };
+    }
+    const creator = await getPersistedCurrentUser();
+    if (!creator || creator.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede ingresar lotes de compra." };
     }
 
     const validated = createRevisionBatchSchema.parse(input);
@@ -179,7 +185,11 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
 export async function getRevisionBatchesAction(query?: string, status?: string) {
   try {
     await requirePermission("qc.read");
+    const viewer = await getPersistedCurrentUser();
     const where: any = {};
+    if (viewer && viewer.roleCode !== "ADMIN") {
+      where.assignedToId = viewer.id;
+    }
 
     if (status && status !== "ALL") {
       where.status = status as QcBatchStatus;
@@ -211,6 +221,7 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
       where,
       orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
       include: {
+        assignedTo: { select: { id: true, name: true, username: true } },
         _count: {
           select: { devices: true },
         },
@@ -235,6 +246,7 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
         OR: [{ id: idOrNumber }, { batchNumber: idOrNumber }],
       },
       include: {
+        assignedTo: { select: { id: true, name: true, username: true } },
         devices: {
           include: {
             inspections: {
@@ -249,6 +261,10 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
 
     if (!batch) {
       return { success: false, error: "Lote de Revisión no encontrado" };
+    }
+    const viewer = await getPersistedCurrentUser();
+    if (viewer && viewer.roleCode !== "ADMIN" && batch.assignedToId !== viewer.id) {
+      return { success: false, error: "Este lote no está asignado a tu usuario." };
     }
 
     // Calcular estadísticas dinámicas de los equipos
@@ -400,6 +416,10 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
     if (device.batch.status === "CANCELLED") {
       return { success: false, error: "No se puede revisar un equipo de un lote cancelado." };
     }
+    const reviewer = await getPersistedCurrentUser();
+    if (reviewer && reviewer.roleCode !== "ADMIN" && device.batch.assignedToId !== reviewer.id) {
+      return { success: false, error: "Este lote no está asignado a tu usuario." };
+    }
 
     const batch = device.batch;
     const reviewerName = actor.name || actor.email || "Control de Calidad";
@@ -506,5 +526,83 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       success: false,
       error: error.message || "Error al registrar la revisión del equipo",
     };
+  }
+}
+
+/**
+ * Asigna un Lote de Revisión a un usuario de Control de Calidad (admin only).
+ * assignedToId = null quita la asignación.
+ */
+export async function assignRevisionBatchAction(input: AssignRevisionBatchInput) {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede asignar lotes de revisión." };
+    }
+
+    const validated = assignRevisionBatchSchema.parse(input);
+    const existing = await prisma.qcRevisionBatch.findUnique({
+      where: { id: validated.id },
+      select: { id: true, batchNumber: true, assignedToId: true },
+    });
+    if (!existing) {
+      return { success: false, error: "Lote de Revisión no encontrado" };
+    }
+
+    const updated = await prisma.qcRevisionBatch.update({
+      where: { id: validated.id },
+      data: { assignedToId: validated.assignedToId },
+    });
+
+    await logAudit({
+      userId: persisted.id,
+      action: "qc_batch.assign",
+      module: "qc",
+      entityType: "qc_revision_batch",
+      entityId: updated.id,
+      beforeData: { assignedToId: existing.assignedToId },
+      afterData: { assignedToId: updated.assignedToId },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${updated.id}`);
+
+    return {
+      success: true,
+      data: updated,
+      message: validated.assignedToId
+        ? `Lote ${existing.batchNumber} asignado correctamente.`
+        : `Asignación del lote ${existing.batchNumber} eliminada.`,
+    };
+  } catch (error: any) {
+    console.error("Error al asignar lote:", error);
+    return {
+      success: false,
+      error: error.message || "Error al asignar el Lote de Revisión",
+    };
+  }
+}
+
+/**
+ * Lista los usuarios asignables a lotes (tienen el módulo qc) — admin only.
+ */
+export async function getQcAssigneesAction() {
+  try {
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede ver asignaciones.", data: [] };
+    }
+
+    const users = await prisma.user.findMany({
+      where: { status: "ACTIVE", allowedModules: { has: "qc" } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, username: true, email: true, roleCode: true },
+    });
+
+    return { success: true, data: users };
+  } catch (error: any) {
+    console.error("Error al obtener usuarios asignables:", error);
+    return { success: false, error: "Error al obtener los usuarios de Control de Calidad", data: [] };
   }
 }

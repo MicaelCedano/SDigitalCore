@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requirePermission } from "@/lib/auth/helpers";
+import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { RevisionBatchesList } from "@/modules/qc/components/RevisionBatchesList";
 
 export const metadata: Metadata = {
@@ -9,5 +9,6 @@ export const metadata: Metadata = {
 
 export default async function RevisionBatchesPage() {
   await requirePermission("qc.read");
-  return <RevisionBatchesList />;
+  const persisted = await getPersistedCurrentUser();
+  return <RevisionBatchesList isAdmin={persisted?.roleCode === "ADMIN"} />;
 }
