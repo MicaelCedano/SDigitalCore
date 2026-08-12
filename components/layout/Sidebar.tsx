@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
+  ScanSearch,
   Tag,
   Warehouse,
   X,
@@ -40,6 +41,9 @@ const navItems: NavItem[] = [
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
     { label: "Movimientos", href: "/almacen/movimientos", adminOnly: true },
     { label: "Solicitudes de almacén", href: "/almacen/transferencias" },
+  ] },
+  { label: "Control de Calidad", href: "/qc/equipos-revisados", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
+    { label: "Equipos revisados", href: "/qc/equipos-revisados" },
   ] },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },

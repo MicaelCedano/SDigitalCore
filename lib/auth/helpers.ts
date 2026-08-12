@@ -80,6 +80,7 @@ export async function can(permission: string): Promise<boolean> {
       reports: "reportes",
       settings: "configuracion",
       warranties: "garantias",
+      qc: "qc",
     };
     const moduleKey = moduleAliases[permissionModule] ?? permissionModule;
     return persistedUser.allowedModules.includes(moduleKey);

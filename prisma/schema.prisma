@@ -35,10 +35,11 @@ model User {
 
   warrantiesCreated WarrantyCase[] @relation("WarrantyCreatedBy")
   warrantiesUpdated WarrantyCase[] @relation("WarrantyUpdatedBy")
-  warrantiesAssigned WarrantyCase[] @relation("WarrantyAssignedTechnician")
-  warrantiesArchived WarrantyCase[] @relation("WarrantyArchivedBy")
+  warrantiesAssigned WarrantyCase[]     @relation("WarrantyAssignedTechnician")
+  warrantiesArchived WarrantyCase[]     @relation("WarrantyArchivedBy")
   warrantyEvents WarrantyEvent[]
   warrantyDocuments WarrantyDocument[]
+  qcInspections QcInspection[] @relation("QcInspectionReviewer")
 
   @@map("user")
 }
@@ -148,6 +149,76 @@ enum GoodsReceiptStatus {
   @@map("goods_receipt_status")
 }
 
+enum DeviceOperationalStatus {
+  PENDING_QC
+  IN_QC
+  AVAILABLE
+  QUARANTINED
+  ARCHIVED
+}
+
+enum QcInspectionStatus {
+  DRAFT
+  COMPLETED
+  SUPERSEDED
+}
+
+enum QcInspectionResult {
+  FUNCTIONAL
+  NON_FUNCTIONAL
+}
+
+// ============================================================
+// CONTROL DE CALIDAD — Equipos individualizados e inspecciones
+// ============================================================
+
+model DeviceUnit {
+  id           String                  @id @default(cuid())
+  imei         String?                 @unique @db.VarChar(20)
+  serialNumber String?                 @unique @map("serial_number") @db.VarChar(120)
+  brand        String?                 @db.VarChar(100)
+  model        String                  @db.VarChar(150)
+  storageGb    Int?                    @map("storage_gb")
+  color        String?                 @db.VarChar(80)
+  status       DeviceOperationalStatus @default(PENDING_QC)
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+
+  inspections QcInspection[]
+
+  @@index([status, updatedAt])
+  @@index([brand, model])
+  @@map("device_unit")
+}
+
+model QcInspection {
+  id                   String              @id @default(cuid())
+  deviceId             String              @map("device_id")
+  reviewerId           String              @map("reviewer_id")
+  reviewerNameSnapshot String              @map("reviewer_name_snapshot") @db.VarChar(160)
+  status               QcInspectionStatus  @default(DRAFT)
+  result               QcInspectionResult?
+  grade                String?             @db.VarChar(16)
+  batteryHealth        Int?                @map("battery_health")
+  functionalityNotes   String?             @map("functionality_notes") @db.Text
+  physicalNotes        String?             @map("physical_notes") @db.Text
+  reviewedAt           DateTime?           @map("reviewed_at")
+  supersedesId         String?             @unique @map("supersedes_id")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  device      DeviceUnit     @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  reviewer    User           @relation("QcInspectionReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  supersedes  QcInspection?  @relation("QcInspectionCorrections", fields: [supersedesId], references: [id], onDelete: Restrict)
+  corrections QcInspection[] @relation("QcInspectionCorrections")
+
+  @@index([deviceId, reviewedAt])
+  @@index([reviewerId, reviewedAt])
+  @@index([status, reviewedAt])
+  @@index([result, reviewedAt])
+  @@map("qc_inspection")
+}
+
 enum WarrantyStatus {
   RECEIVED
   IN_REPAIR
@@ -203,7 +274,7 @@ model WarrantyCase {
   createdById           String?  @map("created_by_id")
   updatedById           String?  @map("updated_by_id")
   assignedTechnicianId  String?  @map("assigned_technician_id")
-  assignedTechnicianName String? @map("assigned_technician_name")
+  assignedTechnicianName String?        @map("assigned_technician_name")
   currentSupplierName   String?  @map("current_supplier_name")
   archivedAt            DateTime? @map("archived_at")
   archivedById          String?  @map("archived_by_id")
@@ -588,4 +659,3 @@ model InvoiceItem {
 
   @@map("invoice_item")
 }
-
