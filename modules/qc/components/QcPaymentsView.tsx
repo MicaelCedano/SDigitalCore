@@ -14,11 +14,13 @@ import {
   Search,
   Send,
   Sparkles,
+  XCircle,
 } from "lucide-react";
 import {
   getQcPaymentsAction,
   approveRevisionBatchAction,
 } from "../actions/revision-batch";
+import { ConfirmBatchModal } from "./ConfirmBatchModal";
 
 const RATE = 50; // RD$ por equipo revisado
 
@@ -44,6 +46,16 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [confirmTarget, setConfirmTarget] = useState<{
+    batch: any;
+    reject: boolean;
+  } | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const showToast = (type: "success" | "error", text: string) => {
+    setToast({ type, text });
+    window.setTimeout(() => setToast(null), 4000);
+  };
 
   const refresh = async () => {
     setRefreshing(true);
@@ -70,23 +82,24 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
 
   const handleApprove = async (id: string, reject: boolean) => {
     const batch = pending.find((b: any) => b.id === id);
-    const label = reject ? "devolver a revisión" : "aceptar y acreditar el pago";
-    if (
-      !confirm(
-        `¿${reject ? "Devolver" : "Aceptar"} el lote ${batch?.batchNumber ?? ""}? ` +
-          `${reject ? "Volverá a EN REVISIÓN sin pagar." : `Se acreditarán ${money(batch?.estimatedAmount ?? 0)} a los revisores.`}`
-      )
-    )
-      return;
+    if (!batch) return;
+    // Abre el modal moderno de confirmación en lugar del confirm() genérico
+    setConfirmTarget({ batch, reject });
+  };
 
-    setProcessingId(id);
-    const res = await approveRevisionBatchAction({ id, reject });
+  const confirmApprove = async () => {
+    if (!confirmTarget) return;
+    const { batch, reject } = confirmTarget;
+
+    setProcessingId(batch.id);
+    const res = await approveRevisionBatchAction({ id: batch.id, reject });
     setProcessingId(null);
+    setConfirmTarget(null);
     if (res.success) {
-      alert(res.message ?? "Lote procesado.");
+      showToast("success", res.message ?? "Lote procesado.");
       refresh();
     } else {
-      alert(res.error || "No se pudo procesar el lote.");
+      showToast("error", res.error || "No se pudo procesar el lote.");
     }
   };
 
@@ -329,6 +342,33 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
           </div>
         )}
       </div>
+
+      {/* Modal de confirmación moderno (reemplaza confirm() nativo) */}
+      <ConfirmBatchModal
+        batch={confirmTarget?.batch ?? null}
+        reject={confirmTarget?.reject ?? false}
+        loading={processingId !== null}
+        onCancel={() => setConfirmTarget(null)}
+        onConfirm={confirmApprove}
+      />
+
+      {/* Toast de resultado */}
+      {toast && (
+        <div
+          className={`fixed bottom-5 right-5 z-[60] flex items-center gap-2.5 rounded-2xl px-5 py-3.5 shadow-2xl border animate-in slide-in-from-bottom-4 duration-200 ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white border-emerald-700"
+              : "bg-red-600 text-white border-red-700"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCheck className="w-4.5 h-4.5 shrink-0" />
+          ) : (
+            <XCircle className="w-4.5 h-4.5 shrink-0" />
+          )}
+          <span className="text-xs font-bold leading-snug">{toast.text}</span>
+        </div>
+      )}
     </div>
   );
 }
