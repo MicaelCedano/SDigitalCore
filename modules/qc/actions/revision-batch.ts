@@ -357,7 +357,7 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
 export async function getRevisionBatchFormDataAction() {
   try {
     await requirePermission("qc.read");
-    const [suppliers, branches, lastBatch] = await Promise.all([
+    const [suppliers, branches, lastBatch, existingModels] = await Promise.all([
       prisma.qcSupplier.findMany({
         where: { status: "ACTIVE" },
         orderBy: { name: "asc" },
@@ -373,6 +373,14 @@ export async function getRevisionBatchFormDataAction() {
         orderBy: { createdAt: "desc" },
         select: { supplierId: true, supplierName: true },
       }),
+      // Modelos ya existentes en el sistema (para autocompletar: marca + modelo)
+      prisma.$queryRaw<{ brand: string; model: string; count: number }[]>`
+        SELECT UPPER(brand) AS brand, UPPER(model) AS model, COUNT(*)::int AS count
+        FROM device_unit
+        GROUP BY UPPER(brand), UPPER(model)
+        ORDER BY count DESC
+        LIMIT 500
+      `,
     ]);
 
     return {
@@ -382,13 +390,14 @@ export async function getRevisionBatchFormDataAction() {
         branches,
         lastSupplierId: lastBatch?.supplierId ?? null,
         lastSupplierName: lastBatch?.supplierName ?? null,
+        existingModels: existingModels.map((m) => `${m.brand} ${m.model}`),
       },
     };
   } catch (error: any) {
     console.error("Error al obtener datos auxiliares para el lote:", error);
     return {
       success: false,
-      data: { suppliers: [], branches: [], lastSupplierId: null, lastSupplierName: null },
+      data: { suppliers: [], branches: [], lastSupplierId: null, lastSupplierName: null, existingModels: [] },
     };
   }
 }

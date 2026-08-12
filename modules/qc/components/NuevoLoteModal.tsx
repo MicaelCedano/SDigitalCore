@@ -37,6 +37,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   // Datos auxiliares
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [branches, setBranches] = useState<{ id: string; name: string; code?: string | null }[]>([]);
+  const [existingModels, setExistingModels] = useState<string[]>([]);
   const [loadingFormOptions, setLoadingFormOptions] = useState(true);
 
   // Formulario
@@ -64,6 +65,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
       if (res.success && res.data) {
         setSuppliers(res.data.suppliers);
         setBranches(res.data.branches);
+        setExistingModels(res.data.existingModels ?? []);
         if (res.data.branches.length > 0) {
           setBranch(res.data.branches[0].name);
         }
@@ -350,11 +352,13 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
               </label>
               <input
                 type="text"
+                list="existing-models-list"
                 value={defaultModel}
                 onChange={(e) => setDefaultModel(e.target.value)}
                 placeholder="Ej: iPhone 13 128GB"
                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
               />
+              <p className="mt-1 text-[10px] text-slate-400">Escribe o elige de los modelos ya registrados.</p>
             </div>
           </div>
 
@@ -450,6 +454,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                           <td className="px-3 py-2">
                             <input
                               type="text"
+                              list="existing-models-list"
                               value={row.model}
                               onChange={(e) => {
                                 const next = [...manualDevices];
@@ -567,6 +572,15 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
             </button>
           </div>
         </form>
+
+        {/* Datalist compartido: modelos ya registrados en el sistema */}
+        {existingModels.length > 0 ? (
+          <datalist id="existing-models-list">
+            {existingModels.map((modelName) => (
+              <option key={modelName} value={modelName} />
+            ))}
+          </datalist>
+        ) : null}
       </div>
     </div>
   );
