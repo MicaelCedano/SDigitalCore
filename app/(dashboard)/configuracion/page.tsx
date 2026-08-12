@@ -60,6 +60,7 @@ export default function ConfiguracionPage() {
   const [selectedModulesForNewUser, setSelectedModulesForNewUser] = useState<string[]>([
     ...DEFAULT_ROLE_MODULES["VENTAS"],
   ]);
+  const [linkLegacyCandidate, setLinkLegacyCandidate] = useState(false);
 
   // Modal state for Direct User Creation
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -122,7 +123,8 @@ export default function ConfiguracionPage() {
     const result = await approveAccessRequestAction(
       selectedReq.id,
       selectedRole,
-      selectedModulesForNewUser
+      selectedModulesForNewUser,
+      linkLegacyCandidate ? selectedReq.legacyCandidate?.id : undefined,
     );
     if (result.success) {
       await loadData();
@@ -130,6 +132,7 @@ export default function ConfiguracionPage() {
         `¡Cuenta activada! Usuario @${selectedReq.username} (${selectedReq.name}) registrado con ${selectedModulesForNewUser.length} módulos.`
       );
       setSelectedReq(null);
+      setLinkLegacyCandidate(false);
       setTimeout(() => setActionNotice(null), 4000);
     } else {
       setActionNotice(result.error);
@@ -577,6 +580,7 @@ export default function ConfiguracionPage() {
                           className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700"
                           onClick={() => {
                             setSelectedReq(req);
+                            setLinkLegacyCandidate(false);
                             setSelectedRole("VENTAS");
                             setSelectedModulesForNewUser([...DEFAULT_ROLE_MODULES["VENTAS"]]);
                           }}
@@ -913,6 +917,24 @@ export default function ConfiguracionPage() {
                   })}
                 </div>
               </div>
+
+              {selectedReq.legacyCandidate ? (
+                <label className="flex cursor-pointer gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                  <input
+                    type="checkbox"
+                    checked={linkLegacyCandidate}
+                    onChange={(event) => setLinkLegacyCandidate(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-indigo-600"
+                  />
+                  <span>
+                    <strong className="block">Confirmar que es el mismo usuario anterior</strong>
+                    <span className="mt-1 block leading-5">
+                      @{selectedReq.legacyCandidate.username} · saldo {new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(Number(selectedReq.legacyCandidate.balance))} · {selectedReq.legacyCandidate.transactionCount} movimientos.
+                    </span>
+                    <span className="mt-1 block text-[11px] font-semibold">La coincidencia por {selectedReq.legacyCandidate.matchMethod === "exact_email" ? "correo" : "usuario"} es solo una sugerencia; debes confirmarla.</span>
+                  </span>
+                </label>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

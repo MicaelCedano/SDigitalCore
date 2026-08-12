@@ -27,6 +27,15 @@ export interface AccessRequest {
   createdAt: string;
   assignedRole?: string;
   customModules?: string[];
+  legacyCandidate?: {
+    id: string;
+    username: string;
+    name?: string;
+    email?: string;
+    balance: string;
+    transactionCount: number;
+    matchMethod: "exact_email" | "exact_username";
+  };
 }
 
 export interface SystemUser {
@@ -55,6 +64,7 @@ export const SYSTEM_ROLES: SystemRole[] = [
 export const SYSTEM_MODULES: ModuleDefinition[] = [
   { key: "almacen", label: "Almacén", permission: "warehouse.read", description: "Ubicaciones y solicitudes" },
   { key: "qc", label: "Control de Calidad", permission: "qc.read", description: "Inspecciones y equipos revisados" },
+  { key: "wallet", label: "Wallet", permission: "wallet.read", description: "Saldo e historial personal" },
   { key: "precios", label: "Lista de Precios", permission: "prices.read", description: "Listas de precios" },
   { key: "facturas", label: "Facturas PDF", permission: "invoices.read", description: "Comprobantes" },
   { key: "garantias", label: "Gestión de Garantías", permission: "warranties.read", description: "Casos, flujos y documentos" },
@@ -62,7 +72,7 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
 ];
 
 export const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
-  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "configuracion"],
+  ADMIN: ["almacen", "qc", "wallet", "precios", "facturas", "garantias", "configuracion"],
   ALMACEN: ["almacen"],
   VENTAS: ["precios", "facturas"],
   TECNICO: [],

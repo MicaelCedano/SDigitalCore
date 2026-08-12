@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser, requirePermission } from "@/lib/auth/helpers";
 import { hashPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
+import { linkLegacyIdentity } from "@/lib/wallet/legacy-identity";
 import { accessRequestSchema, type AccessRequestInput } from "@/lib/validation/access-request";
 import {
   DEFAULT_ROLE_MODULES,
@@ -101,7 +102,35 @@ export async function getUserManagementDataAction() {
       prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.accessRequest.findMany({ orderBy: { createdAt: "desc" } }),
     ]);
-    return { success: true as const, data: { users: users.map(serializeUser), requests: requests.map(serializeRequest) } };
+    let identities: Awaited<ReturnType<typeof prisma.legacyUserIdentity.findMany>> = [];
+    try {
+      identities = await prisma.legacyUserIdentity.findMany({
+        where: { matchStatus: { in: ["UNMATCHED", "SUGGESTED", "CONFLICT"] }, coreUserId: null },
+      });
+    } catch (error) {
+      if (!(error instanceof Error && /legacy_user_identity|does not exist|P2021/i.test(error.message))) throw error;
+    }
+    const serializedRequests = requests.map((request) => {
+      const email = request.email.trim().toLocaleLowerCase("es");
+      const username = request.username.trim().toLocaleLowerCase("es");
+      const emailMatches = identities.filter((identity) => identity.emailSnapshot?.trim().toLocaleLowerCase("es") === email);
+      const usernameMatches = identities.filter((identity) => identity.usernameSnapshot.trim().toLocaleLowerCase("es") === username);
+      const candidate = emailMatches.length === 1 ? emailMatches[0] : usernameMatches.length === 1 ? usernameMatches[0] : null;
+      const matchMethod = emailMatches.length === 1 ? "exact_email" as const : "exact_username" as const;
+      return {
+        ...serializeRequest(request),
+        legacyCandidate: candidate ? {
+          id: candidate.id,
+          username: candidate.usernameSnapshot,
+          name: candidate.nameSnapshot ?? undefined,
+          email: candidate.emailSnapshot ?? undefined,
+          balance: candidate.sourceWalletBalance.toFixed(2),
+          transactionCount: candidate.sourceTransactionCount,
+          matchMethod,
+        } : undefined,
+      };
+    });
+    return { success: true as const, data: { users: users.map(serializeUser), requests: serializedRequests } };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudieron cargar los usuarios."), data: { users: [], requests: [] } };
   }
@@ -161,11 +190,11 @@ export async function createDirectUserAction(input: z.input<typeof userSchema>) 
   }
 }
 
-export async function approveAccessRequestAction(requestId: string, roleCode: string, allowedModules: string[]) {
+export async function approveAccessRequestAction(requestId: string, roleCode: string, allowedModules: string[], legacyIdentityId?: string) {
   try {
     const actor = await requireUserAdmin();
     if (!validRoles.has(roleCode) || !allowedModules.every((value) => validModules.has(value))) throw new Error("Rol o módulos inválidos.");
-    const created = await prisma.$transaction(async (tx) => {
+    const approval = await prisma.$transaction(async (tx) => {
       const request = await tx.accessRequest.findUnique({ where: { id: requestId } });
       if (!request || request.status !== "PENDING") throw new Error("La solicitud ya fue procesada o no existe.");
       const user = await tx.user.create({
@@ -181,13 +210,29 @@ export async function approveAccessRequestAction(requestId: string, roleCode: st
         },
       });
       await tx.accessRequest.update({ where: { id: requestId }, data: { status: "APPROVED", assignedRole: roleCode, customModules: allowedModules } });
-      return user;
+      const linked = legacyIdentityId
+        ? await linkLegacyIdentity(tx, { legacyIdentityId: z.string().min(1).parse(legacyIdentityId), coreUserId: user.id, actorId: actor.id, method: "admin_confirmed_on_registration" })
+        : null;
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          action: "access_request.approve",
+          module: "configuracion",
+          entityType: "access_request",
+          entityId: requestId,
+          afterData: {
+            createdUserId: user.id,
+            roleCode,
+            ...(linked ? { linkedLegacyIdentityId: linked.identity.id } : {}),
+          },
+        },
+      });
+      return { user, linkedIdentityId: linked?.identity.id ?? null };
     });
-    await logAudit({ userId: actor.id, action: "access_request.approve", module: "configuracion", entityType: "access_request", entityId: requestId, afterData: { createdUserId: created.id, roleCode } });
     revalidatePath("/configuracion");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
-    return { success: true as const, data: serializeUser(created) };
+    return { success: true as const, data: serializeUser(approval.user) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo aprobar la solicitud.") };
   }

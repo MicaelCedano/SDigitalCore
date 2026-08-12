@@ -16,6 +16,7 @@ import {
   ScanSearch,
   Tag,
   Warehouse,
+  WalletCards,
   X,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { label: "Control de Calidad", href: "/qc/equipos-revisados", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
     { label: "Equipos revisados", href: "/qc/equipos-revisados" },
   ] },
+  { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards, section: "Comercial" },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },
   { label: "Gestión de Garantías", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck, section: "Operaciones", children: [
@@ -63,6 +65,7 @@ const navItems: NavItem[] = [
     { label: "Usuarios y permisos", href: "/configuracion" },
     { label: "Sucursales", href: "/configuracion/sucursales" },
     { label: "Proveedores de control de calidad", href: "/configuracion/proveedores-qc" },
+    { label: "Migración de usuarios y wallets", href: "/configuracion/migracion-usuarios", adminOnly: true },
   ] },
 ];
 

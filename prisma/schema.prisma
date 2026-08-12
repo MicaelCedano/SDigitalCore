@@ -32,6 +32,10 @@ model User {
   accounts Account[]
   sessions Session[]
   auditLogs AuditLog[]
+  wallet Wallet?
+  legacyIdentities LegacyUserIdentity[] @relation("LegacyIdentityCoreUser")
+  legacyIdentitiesLinked LegacyUserIdentity[] @relation("LegacyIdentityLinkedBy")
+  walletLedgerEntries WalletLedgerEntry[] @relation("WalletLedgerActor")
 
   warrantiesCreated WarrantyCase[] @relation("WarrantyCreatedBy")
   warrantiesUpdated WarrantyCase[] @relation("WarrantyUpdatedBy")
@@ -139,6 +143,186 @@ enum AccessRequestStatus {
   REJECTED
 
   @@map("access_request_status")
+}
+
+enum LegacyIdentityMatchStatus {
+  UNMATCHED
+  SUGGESTED
+  LINKED_PENDING_CUTOVER
+  TRANSFERRED
+  CONFLICT
+  EXCLUDED
+
+  @@map("legacy_identity_match_status")
+}
+
+enum LegacyMigrationMode {
+  DRY_RUN
+  APPLY
+  CUTOVER
+
+  @@map("legacy_migration_mode")
+}
+
+enum LegacyMigrationStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  REVERSED
+
+  @@map("legacy_migration_status")
+}
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+
+  @@map("wallet_status")
+}
+
+enum WalletLedgerEntryType {
+  LEGACY_OPENING_BALANCE
+  CREDIT
+  DEBIT
+  ADJUSTMENT
+  REVERSAL
+
+  @@map("wallet_ledger_entry_type")
+}
+
+enum WalletLedgerEntryStatus {
+  POSTED
+  VOID
+
+  @@map("wallet_ledger_entry_status")
+}
+
+// ============================================================
+// MIGRACION DE IDENTIDAD Y WALLET LEGACY
+// ============================================================
+
+model LegacyMigrationBatch {
+  id                    String                @id @default(cuid())
+  sourceSystem          String                @map("source_system") @db.VarChar(80)
+  mode                  LegacyMigrationMode
+  status                LegacyMigrationStatus @default(RUNNING)
+  cutoffAt              DateTime?             @map("cutoff_at")
+  sourceUserCount       Int                   @default(0) @map("source_user_count")
+  sourceWalletCount     Int                   @default(0) @map("source_wallet_count")
+  sourceTransactionCount Int                  @default(0) @map("source_transaction_count")
+  sourceBalanceTotal    Decimal               @default(0) @map("source_balance_total") @db.Decimal(14, 2)
+  transferredUserCount  Int                   @default(0) @map("transferred_user_count")
+  transferredBalanceTotal Decimal             @default(0) @map("transferred_balance_total") @db.Decimal(14, 2)
+  checksum              String?               @db.VarChar(128)
+  reconciliation        Json?
+  errorMessage          String?               @map("error_message") @db.Text
+  createdAt             DateTime              @default(now()) @map("created_at")
+  completedAt           DateTime?             @map("completed_at")
+
+  identities LegacyUserIdentity[]
+  archivedTransactions LegacyWalletTransaction[]
+  ledgerEntries WalletLedgerEntry[]
+
+  @@index([sourceSystem, createdAt])
+  @@index([status, createdAt])
+  @@map("legacy_migration_batch")
+}
+
+model LegacyUserIdentity {
+  id                     String                    @id @default(cuid())
+  sourceSystem           String                    @map("source_system") @db.VarChar(80)
+  sourceUserId           String                    @map("source_user_id") @db.VarChar(80)
+  usernameSnapshot       String                    @map("username_snapshot") @db.VarChar(160)
+  nameSnapshot           String?                   @map("name_snapshot") @db.VarChar(200)
+  emailSnapshot          String?                   @map("email_snapshot") @db.VarChar(240)
+  roleSnapshot           String?                   @map("role_snapshot") @db.VarChar(80)
+  activeSnapshot         Boolean                   @default(true) @map("active_snapshot")
+  sourceWalletBalance    Decimal                   @default(0) @map("source_wallet_balance") @db.Decimal(14, 2)
+  sourceTransactionCount Int                       @default(0) @map("source_transaction_count")
+  matchStatus            LegacyIdentityMatchStatus @default(UNMATCHED) @map("match_status")
+  matchMethod            String?                   @map("match_method") @db.VarChar(80)
+  coreUserId             String?                   @map("core_user_id")
+  linkedById             String?                   @map("linked_by_id")
+  linkedAt               DateTime?                 @map("linked_at")
+  transferredAt          DateTime?                 @map("transferred_at")
+  importedAt             DateTime                  @default(now()) @map("imported_at")
+  lastSyncedAt           DateTime                  @default(now()) @map("last_synced_at")
+  batchId                String?                   @map("batch_id")
+
+  coreUser User? @relation("LegacyIdentityCoreUser", fields: [coreUserId], references: [id], onDelete: Restrict)
+  linkedBy User? @relation("LegacyIdentityLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  archivedTransactions LegacyWalletTransaction[]
+
+  @@unique([sourceSystem, sourceUserId])
+  @@unique([sourceSystem, coreUserId])
+  @@index([matchStatus, lastSyncedAt])
+  @@index([usernameSnapshot])
+  @@index([emailSnapshot])
+  @@map("legacy_user_identity")
+}
+
+model LegacyWalletTransaction {
+  id                  String   @id @default(cuid())
+  sourceSystem        String   @map("source_system") @db.VarChar(80)
+  sourceTransactionId String   @map("source_transaction_id") @db.VarChar(80)
+  legacyIdentityId    String   @map("legacy_identity_id")
+  amount              Decimal  @db.Decimal(14, 2)
+  typeSnapshot        String   @map("type_snapshot") @db.VarChar(80)
+  statusSnapshot      String?  @map("status_snapshot") @db.VarChar(80)
+  descriptionSnapshot String?  @map("description_snapshot") @db.Text
+  occurredAt          DateTime? @map("occurred_at")
+  redeemedSnapshot    Boolean? @map("redeemed_snapshot")
+  batchId             String?  @map("batch_id")
+  importedAt          DateTime @default(now()) @map("imported_at")
+
+  legacyIdentity LegacyUserIdentity @relation(fields: [legacyIdentityId], references: [id], onDelete: Restrict)
+  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceSystem, sourceTransactionId])
+  @@index([legacyIdentityId, occurredAt])
+  @@map("legacy_wallet_transaction")
+}
+
+model Wallet {
+  id        String       @id @default(cuid())
+  userId    String       @unique @map("user_id")
+  currency  String       @default("DOP") @db.Char(3)
+  balance   Decimal      @default(0) @db.Decimal(14, 2)
+  status    WalletStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  entries WalletLedgerEntry[]
+
+  @@index([status, updatedAt])
+  @@map("wallet")
+}
+
+model WalletLedgerEntry {
+  id          String                  @id @default(cuid())
+  walletId    String                  @map("wallet_id")
+  type        WalletLedgerEntryType
+  status      WalletLedgerEntryStatus @default(POSTED)
+  amount      Decimal                 @db.Decimal(14, 2)
+  description String?                 @db.Text
+  externalKey String                  @unique @map("external_key") @db.VarChar(180)
+  actorId     String?                 @map("actor_id")
+  batchId     String?                 @map("batch_id")
+  reversalOfId String?                @unique @map("reversal_of_id")
+  occurredAt  DateTime                @default(now()) @map("occurred_at")
+  createdAt   DateTime                @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  actor User? @relation("WalletLedgerActor", fields: [actorId], references: [id], onDelete: SetNull)
+  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  reversalOf WalletLedgerEntry? @relation("WalletLedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy WalletLedgerEntry? @relation("WalletLedgerReversal")
+
+  @@index([walletId, occurredAt])
+  @@index([batchId])
+  @@map("wallet_ledger_entry")
 }
 
 enum GoodsReceiptStatus {
