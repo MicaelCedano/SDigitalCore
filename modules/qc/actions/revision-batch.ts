@@ -1146,7 +1146,7 @@ export async function getQcDashboardAction() {
 
     const startOfDay = santoDomingoStartOfDay();
 
-    const [devices, hoyTotal, hoyFuncional, hoyNoFuncional, myRequests, wallet] = await Promise.all([
+    const [devices, hoyInspecciones, myRequests, wallet] = await Promise.all([
       prisma.deviceUnit.findMany({
         where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
         orderBy: { updatedAt: "desc" },
@@ -1166,14 +1166,13 @@ export async function getQcDashboardAction() {
           inspections: { orderBy: { createdAt: "desc" }, take: 3 },
         },
       }),
-      prisma.qcInspection.count({
+      // Revisados hoy = EQUIPOS ÚNICOS con inspección completada hoy
+      // (una re-revisión/corrección del mismo equipo no suma dos veces).
+      // El resultado cuenta el de la última revisión del día.
+      prisma.qcInspection.findMany({
         where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED" },
-      }),
-      prisma.qcInspection.count({
-        where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED", result: "FUNCTIONAL" },
-      }),
-      prisma.qcInspection.count({
-        where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED", result: "NON_FUNCTIONAL" },
+        orderBy: { reviewedAt: "desc" },
+        select: { deviceId: true, result: true },
       }),
       prisma.qcImeiRequest.findMany({
         where: { requesterId: persisted.id },
@@ -1185,6 +1184,18 @@ export async function getQcDashboardAction() {
         select: { balance: true },
       }),
     ]);
+
+    // Revisados hoy: equipos únicos (la última revisión del día gana)
+    const hoyPorEquipo = new Map<string, string | null>();
+    for (const ins of hoyInspecciones) {
+      if (!hoyPorEquipo.has(ins.deviceId)) hoyPorEquipo.set(ins.deviceId, ins.result);
+    }
+    let hoyFuncional = 0;
+    let hoyNoFuncional = 0;
+    for (const result of hoyPorEquipo.values()) {
+      if (result === "FUNCTIONAL") hoyFuncional++;
+      else if (result === "NON_FUNCTIONAL") hoyNoFuncional++;
+    }
 
     // Reingresos: solo cuentan inspecciones posteriores a la creación del lote actual
     let revisados = 0;
@@ -1204,10 +1215,10 @@ export async function getQcDashboardAction() {
           asignados: devices.length,
           revisados,
           pendientes: devices.length - revisados,
-          revisadosHoy: hoyTotal,
+          revisadosHoy: hoyPorEquipo.size,
           aprobadosHoy: hoyFuncional,
           rechazadosHoy: hoyNoFuncional,
-          ganadoHoy: hoyTotal * QC_REVIEW_RATE,
+          ganadoHoy: hoyPorEquipo.size * QC_REVIEW_RATE,
           saldoWallet: wallet ? Number(wallet.balance) : 0,
         },
         welcome:
