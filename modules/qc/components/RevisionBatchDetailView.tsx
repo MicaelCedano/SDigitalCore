@@ -294,9 +294,19 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
                         {dev.color || "—"} {dev.storageGb ? `/ ${dev.storageGb}GB` : ""}
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                          {dev.status}
-                        </span>
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                            {dev.status}
+                          </span>
+                          {dev.hasPreviousQC ? (
+                            <span
+                              title="Equipo reingresado: conserva historial de revisiones anteriores, se revisa desde cero en este lote"
+                              className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            >
+                              REINGRESADO
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-center">
                         {hasQC ? (

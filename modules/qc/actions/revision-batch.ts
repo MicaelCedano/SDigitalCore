@@ -282,7 +282,7 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
           include: {
             inspections: {
               orderBy: { createdAt: "desc" },
-              take: 1,
+              take: 3,
             },
           },
           orderBy: { createdAt: "asc" },
@@ -294,13 +294,26 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
       return { success: false, error: "Lote de Revisión no encontrado" };
     }
 
+    // Equipos reingresados conservan inspecciones de lotes anteriores (historial).
+    // Para la revisión vigente solo cuentan las inspecciones posteriores a la
+    // creación de ESTE lote — así un reingreso sin revisar aparece PENDIENTE.
+    const batchStart = batch.createdAt;
+    const devices = batch.devices.map((dev) => {
+      const hasPreviousQC = dev.inspections.some((i) => i.createdAt < batchStart);
+      return {
+        ...dev,
+        inspections: dev.inspections.filter((i) => i.createdAt >= batchStart),
+        hasPreviousQC,
+      };
+    });
+
     // Calcular estadísticas dinámicas de los equipos
-    const totalDevices = batch.devices.length;
+    const totalDevices = devices.length;
     let functionalCount = 0;
     let nonFunctionalCount = 0;
     let reviewedDevices = 0;
 
-    for (const dev of batch.devices) {
+    for (const dev of devices) {
       const lastInspection = dev.inspections[0];
       if (lastInspection && lastInspection.status === "COMPLETED") {
         reviewedDevices++;
@@ -313,6 +326,7 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
       success: true,
       data: {
         ...batch,
+        devices,
         totalDevices,
         reviewedDevices,
         functionalCount,
@@ -477,9 +491,11 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
     const reviewerName = actor.name || actor.email || "Control de Calidad";
 
     const updatedBatch = await prisma.$transaction(async (tx) => {
-      // Si ya había una inspección completada, la nueva la reemplaza (cadena de correcciones)
+      // Si ya había una inspección completada EN ESTE LOTE, la nueva la reemplaza
+      // (cadena de correcciones). Las inspecciones de lotes anteriores (reingresos)
+      // NO se encadenan: el equipo vuelve a revisarse desde cero.
       const lastCompleted = await tx.qcInspection.findFirst({
-        where: { deviceId: device.id, status: "COMPLETED" },
+        where: { deviceId: device.id, status: "COMPLETED", createdAt: { gte: batch.createdAt } },
         orderBy: { createdAt: "desc" },
         select: { id: true },
       });
@@ -506,11 +522,13 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
         },
       });
 
-      // Recalcular contadores del lote desde las inspecciones reales (idempotente)
+      // Recalcular contadores del lote desde las inspecciones reales (idempotente).
+      // Solo cuentan inspecciones de ESTE lote (createdAt >= lote) — los reingresos
+      // sin revisar no se contabilizan como revisados.
       const batchDevices = await tx.deviceUnit.findMany({
         where: { batchId: batch.id },
         include: {
-          inspections: { orderBy: { createdAt: "desc" }, take: 1 },
+          inspections: { where: { createdAt: { gte: batch.createdAt } }, orderBy: { createdAt: "desc" }, take: 1 },
         },
       });
 
@@ -613,9 +631,10 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
     const reviewerName = actor.name || actor.email || "Administración";
 
     const updatedBatch = await prisma.$transaction(async (tx) => {
-      // Inspección nueva que reemplaza a la última completada (cadena de correcciones)
+      // Inspección nueva que reemplaza a la última completada EN ESTE LOTE
+      // (cadena de correcciones). Inspecciones de lotes anteriores no se encadenan.
       const lastCompleted = await tx.qcInspection.findFirst({
-        where: { deviceId: device.id, status: "COMPLETED" },
+        where: { deviceId: device.id, status: "COMPLETED", createdAt: { gte: batch.createdAt } },
         orderBy: { createdAt: "desc" },
         select: { id: true },
       });
@@ -639,10 +658,12 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
         data: { status: "AVAILABLE" },
       });
 
-      // Recalcular contadores del lote (idempotente)
+      // Recalcular contadores del lote (idempotente) — solo inspecciones de ESTE lote
       const batchDevices = await tx.deviceUnit.findMany({
         where: { batchId: batch.id },
-        include: { inspections: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: {
+          inspections: { where: { createdAt: { gte: batch.createdAt } }, orderBy: { createdAt: "desc" }, take: 1 },
+        },
       });
       let reviewed = 0;
       let functional = 0;
@@ -751,8 +772,8 @@ export async function getQcDashboardAction() {
         orderBy: { updatedAt: "desc" },
         take: 100,
         include: {
-          batch: { select: { id: true, batchNumber: true, supplierName: true } },
-          inspections: { orderBy: { createdAt: "desc" }, take: 1 },
+          batch: { select: { id: true, batchNumber: true, supplierName: true, createdAt: true } },
+          inspections: { orderBy: { createdAt: "desc" }, take: 3 },
         },
       }),
       prisma.qcInspection.count({
@@ -775,11 +796,13 @@ export async function getQcDashboardAction() {
       }),
     ]);
 
+    // Reingresos: solo cuentan inspecciones posteriores a la creación del lote actual
     let revisados = 0;
     const devicesConInspeccion = devices.map((d) => {
-      const last = d.inspections[0] ?? null;
-      if (last && last.status === "COMPLETED") revisados++;
-      return { ...d, lastInspection: last };
+      const batchStart = d.batch?.createdAt ?? new Date(0);
+      const vigente = d.inspections.find((i) => i.createdAt >= batchStart) ?? null;
+      if (vigente && vigente.status === "COMPLETED") revisados++;
+      return { ...d, lastInspection: vigente };
     });
 
     return {

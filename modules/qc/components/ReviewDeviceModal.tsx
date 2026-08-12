@@ -83,14 +83,24 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
     };
   }, [device.id]);
 
-  // Sincronizar estado con el equipo al abrir (prefill si ya estaba revisado)
+  // Sincronizar estado con el equipo al abrir (prefill solo si ya estaba revisado
+  // EN ESTE lote — los reingresos con historial previo se revisan desde cero)
   useEffect(() => {
     const lastInspection = device.inspections?.[0];
-    if (lastInspection && lastInspection.status === "COMPLETED") {
+    const batchStart = device.batch?.createdAt ? new Date(device.batch.createdAt).getTime() : 0;
+    const isFromThisBatch =
+      lastInspection && new Date(lastInspection.createdAt).getTime() >= batchStart;
+    if (lastInspection && lastInspection.status === "COMPLETED" && isFromThisBatch) {
       setFuncionalidad(lastInspection.result === "FUNCTIONAL" ? "FUNCTIONAL" : "NON_FUNCTIONAL");
       setGrado(lastInspection.grade || "");
       setBatteryHealth(lastInspection.batteryHealth != null ? String(lastInspection.batteryHealth) : "");
       setObservacion(lastInspection.functionalityNotes || "");
+    } else {
+      // Reingreso o revisión nueva: formulario limpio
+      setFuncionalidad("");
+      setGrado("");
+      setBatteryHealth("");
+      setObservacion("");
     }
     const key = `sdigitalcore.qc.checklist.${device.id}`;
     const saved =
