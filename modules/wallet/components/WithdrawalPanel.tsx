@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toJpeg } from "html-to-image";
 import { Loader2, Landmark, Download, CheckCircle2, AlertTriangle, X, ReceiptText } from "lucide-react";
 import { requestWithdrawalAction } from "@/modules/wallet/actions/withdrawals";
@@ -16,11 +17,9 @@ interface WithdrawalResult {
 export function WithdrawalPanel({
   balance,
   ownerName,
-  onWithdrawn,
 }: {
   balance: number;
   ownerName: string;
-  onWithdrawn: () => void;
 }) {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,6 +28,7 @@ export function WithdrawalPanel({
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const baucherRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const parsed = amount === "" ? NaN : Number(amount);
   const adjusted = Number.isFinite(parsed) ? Math.floor(parsed / 100) * 100 : 0;
@@ -46,7 +46,8 @@ export function WithdrawalPanel({
     setResult(res.data);
     setConfirming(false);
     setAmount("");
-    onWithdrawn();
+    // Refresca los server components (saldo del topbar y de la página) sin perder el baucher
+    router.refresh();
   }
 
   async function handleDownload() {

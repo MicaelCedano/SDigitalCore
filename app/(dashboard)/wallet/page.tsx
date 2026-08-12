@@ -58,7 +58,6 @@ export default async function WalletPage() {
         <WithdrawalPanel
           balance={Number(principal.balance)}
           ownerName={wallet.owner}
-          onWithdrawn={() => window.location.reload()}
         />
       ) : null}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
