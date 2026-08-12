@@ -95,6 +95,46 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
 }
 
 /**
+ * Validación en vivo para el modal del QC: clasifica cada IMEI pegado como
+ * disponible, inexistente o asignado a otro QC (misma regla que
+ * createImeiRequestAction). No muta nada — solo informa al QC antes de enviar.
+ */
+export async function validateImeisAction(input: { imeis: string[] }) {
+  try {
+    const user = await requirePermission("qc.write");
+    if (!user.id) {
+      return { success: false, error: "La sesión no tiene un usuario identificable.", data: [] };
+    }
+
+    const imeis = Array.from(
+      new Set((input.imeis || []).map((i) => i.trim()).filter((i) => i.length >= 4))
+    ).slice(0, 1000);
+
+    if (imeis.length === 0) return { success: true, data: [] };
+
+    const devices = await prisma.deviceUnit.findMany({
+      where: { imei: { in: imeis }, batch: { status: { not: "CANCELLED" } } },
+      select: { imei: true, assignedToId: true },
+    });
+    const deviceByImei = new Map(devices.map((d) => [d.imei, d]));
+
+    const data = imeis.map((imei) => {
+      const device = deviceByImei.get(imei);
+      if (!device) return { imei, status: "not_found" as const };
+      if (device.assignedToId && device.assignedToId !== user.id) {
+        return { imei, status: "assigned" as const };
+      }
+      return { imei, status: "ok" as const };
+    });
+
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Error al validar IMEIs:", error);
+    return { success: false, error: error.message || "Error al validar los IMEIs", data: [] };
+  }
+}
+
+/**
  * Solicitudes del QC actual (las suyas, con estado).
  */
 export async function getMyImeiRequestsAction() {

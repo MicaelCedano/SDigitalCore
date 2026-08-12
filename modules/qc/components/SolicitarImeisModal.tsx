@@ -1,8 +1,38 @@
 "use client";
 
-import { useState } from "react";
-import { X, Send, Loader2, AlertCircle, CheckCircle2, Scan } from "lucide-react";
-import { createImeiRequestAction } from "../actions/imei-requests";
+import { useEffect, useMemo, useState } from "react";
+import {
+  X,
+  Send,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Scan,
+  Check,
+  Ban,
+  UserX,
+} from "lucide-react";
+import { createImeiRequestAction, validateImeisAction } from "../actions/imei-requests";
+
+type ImeiStatus = "ok" | "not_found" | "assigned";
+
+const STATUS_CFG: Record<ImeiStatus, { label: string; cls: string; Icon: typeof Check }> = {
+  ok: {
+    label: "Disponible",
+    cls: "text-emerald-700 bg-emerald-50 border-emerald-200",
+    Icon: Check,
+  },
+  not_found: {
+    label: "No existe",
+    cls: "text-red-700 bg-red-50 border-red-200",
+    Icon: Ban,
+  },
+  assigned: {
+    label: "Asignado a otro QC",
+    cls: "text-amber-700 bg-amber-50 border-amber-200",
+    Icon: UserX,
+  },
+};
 
 interface SolicitarImeisModalProps {
   onClose: () => void;
@@ -12,27 +42,89 @@ interface SolicitarImeisModalProps {
 export function SolicitarImeisModal({ onClose, onSent }: SolicitarImeisModalProps) {
   const [imeisText, setImeisText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [validation, setValidation] = useState<Record<string, ImeiStatus> | null>(null);
 
-  const imeis = imeisText
-    .split(/[\r\n,;\t]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 4);
+  const imeis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          imeisText
+            .split(/[\r\n,;\t]+/)
+            .map((s) => s.trim())
+            .filter((s) => s.length >= 4)
+        )
+      ),
+    [imeisText]
+  );
+
+  // Validación en vivo (debounced): al pegar, cada IMEI se clasifica al instante.
+  useEffect(() => {
+    if (imeis.length === 0) {
+      setValidation(null);
+      setValidating(false);
+      return;
+    }
+    setValidation(null);
+    setValidating(true);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const res = await validateImeisAction({ imeis });
+      if (cancelled) return;
+      setValidating(false);
+      if (res.success && res.data) {
+        const map: Record<string, ImeiStatus> = {};
+        for (const item of res.data) map[item.imei] = item.status;
+        setValidation(map);
+      } else {
+        setError(res.error || "No se pudieron validar los IMEIs.");
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [imeis]);
+
+  const counts = useMemo(() => {
+    const c = { ok: 0, not_found: 0, assigned: 0 };
+    if (!validation) return c;
+    for (const imei of imeis) {
+      const st = validation[imei];
+      if (st) c[st] += 1;
+    }
+    return c;
+  }, [validation, imeis]);
+
+  const summary = validating
+    ? "Validando..."
+    : validation
+    ? `${counts.ok} de ${imeis.length} disponibles` +
+      (counts.not_found > 0 ? ` · ${counts.not_found} no existen` : "") +
+      (counts.assigned > 0 ? ` · ${counts.assigned} asignados a otro QC` : "")
+    : "Solo se aceptan IMEIs existentes y libres; el resto se omite.";
 
   const submit = async () => {
     setError(null);
     setSuccess(null);
-    if (imeis.length === 0) {
-      setError("Pega al menos un IMEI.");
+    const toSend = validation ? imeis.filter((i) => validation[i] === "ok") : imeis;
+    if (toSend.length === 0) {
+      setError(
+        validation
+          ? "Ninguno de los IMEIs está disponible para solicitar."
+          : "Pega al menos un IMEI."
+      );
       return;
     }
     setLoading(true);
-    const res = await createImeiRequestAction({ imeis });
+    const res = await createImeiRequestAction({ imeis: toSend });
     setLoading(false);
     if (res.success) {
       setSuccess(res.message || "Solicitud enviada.");
       setImeisText("");
+      setValidation(null);
     } else {
       setError(res.error || "No se pudo enviar la solicitud.");
     }
@@ -83,13 +175,41 @@ export function SolicitarImeisModal({ onClose, onSent }: SolicitarImeisModalProp
             className="w-full font-mono text-xs bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1] focus:bg-white transition-all"
           />
 
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <Scan className="w-3.5 h-3.5 text-[#5750f1]" />
-              Solo se aceptan IMEIs existentes y libres; el resto se omite.
+          {validation && imeis.length > 0 && (
+            <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-44 overflow-y-auto">
+              {imeis.map((imei) => {
+                const st = validation[imei];
+                if (!st) return null;
+                const cfg = STATUS_CFG[st];
+                const Icon = cfg.Icon;
+                return (
+                  <div key={imei} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                    <span className="font-mono text-[11px] font-bold text-slate-700 truncate">
+                      {imei}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${cfg.cls}`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {cfg.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5 min-w-0">
+              {validating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#5750f1] shrink-0" />
+              ) : (
+                <Scan className="w-3.5 h-3.5 text-[#5750f1] shrink-0" />
+              )}
+              <span className="truncate">{summary}</span>
             </span>
-            <span className="font-bold text-[#5750f1] bg-[#5750f1]/10 px-2.5 py-0.5 rounded-full">
-              {imeis.length} IMEI(s)
+            <span className="font-bold text-[#5750f1] bg-[#5750f1]/10 px-2.5 py-0.5 rounded-full shrink-0">
+              {validation ? `${counts.ok}/${imeis.length} disponibles` : `${imeis.length} IMEI(s)`}
             </span>
           </div>
         </div>
