@@ -5,6 +5,7 @@
 - Lee proveedores, equipos e historial de revisiones desde SDigitalSystem sin escribir en su base de datos.
 - Importa proveedores QC con identidad externa estable.
 - Importa un `DeviceUnit` y la última inspección válida por cada equipo con historial `Revisado`.
+- Crea un `qc_revision_batch` por cada compra de SDigitalSystem (80 lotes), con su proveedor, fecha de compra y conteos; cada equipo queda asociado al lote de su compra.
 - Conserva IMEI, marca, modelo, almacenamiento, color, grado, observación, resultado y fecha.
 - Recupera el último revisor identificado cuando el evento final no tiene `user_id`.
 - Enlaza `reviewer_id` solo cuando la identidad legacy fue confirmada en Core; siempre conserva `reviewer_name_snapshot`.
@@ -13,12 +14,20 @@
 
 ## Orden operativo
 
-1. Aplicar `20260811210000_add_qc_suppliers`.
-2. Aplicar `20260812170000_add_legacy_qc_traceability`.
-3. Configurar temporalmente `SOURCE_DATABASE_URL` con acceso de lectura al origen.
-4. Ejecutar `npm run migration:legacy-qc:dry-run`.
-5. Revisar conteos y ejecutar `npm run migration:legacy-qc:apply`.
-6. Verificar tablas, resultados, revisores y auditoría.
+1. Aplicar en Supabase las migraciones en orden:
+   - `20260811150000_add_qc_reviewed_devices` (tablas `device_unit` y `qc_inspection` + enums)
+   - `20260811210000_add_qc_suppliers` (tabla `qc_supplier`)
+   - `20260811233000_add_legacy_identity_wallet_bridge` (tabla `legacy_user_identity`, enlaza revisores)
+   - `20260812_add_qc_revision_batch.sql` (tabla `qc_revision_batch` + `batch_id` en `device_unit`)
+   - `20260812170000_add_legacy_qc_traceability` (columnas `source_system`/`source_record_id`)
+   - `20260812183000_add_unspecified_qc_result` (valor de enum `UNSPECIFIED`)
+2. Configurar temporalmente `SOURCE_DATABASE_URL` con acceso de lectura al origen (y `DATABASE_URL` apuntando a Core).
+3. Ejecutar `npm run migration:legacy-qc:dry-run`.
+4. Revisar conteos (`sourceBatches` = cantidad de compras) y ejecutar `npm run migration:legacy-qc:apply`.
+5. Verificar tablas, resultados, revisores, lotes y auditoría.
+
+El migrador es idempotente (clave `source_system + source_record_id`): si se reejecuta, actualiza
+los lotes por compra y reasocia los equipos sin duplicar.
 
 El importador procesa bloques de 500 dentro de transacciones cortas. Si un bloque falla, puede corregirse la causa y repetir el comando sin duplicar registros.
 
@@ -40,6 +49,11 @@ El importador procesa bloques de 500 dentro de transacciones cortas. Si un bloqu
 
 ```sql
 SELECT COUNT(*) FROM qc_supplier WHERE source_system = 'SDIGITALSYSTEM';
+
+SELECT batch_number, supplier_name, total_devices, reviewed_devices
+FROM qc_revision_batch
+WHERE batch_number LIKE 'LOT-LEGACY-SDS-%'
+ORDER BY received_at;
 
 SELECT result, COUNT(*)
 FROM qc_inspection

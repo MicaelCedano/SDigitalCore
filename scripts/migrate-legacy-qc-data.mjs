@@ -80,12 +80,18 @@ async function readSource(source) {
       NULLIF(BTRIM(e.grado), '') AS grade,
       NULLIF(BTRIM(e.observacion), '') AS notes,
       e.funcionalidad AS functionality,
+      e.purchase_id::text AS "purchaseId",
+      p.purchase_date AS "purchaseDate",
+      s.id::text AS "supplierSourceId",
+      NULLIF(BTRIM(s.name), '') AS "supplierName",
       latest_review.fecha AS "reviewedAt",
       COALESCE(latest_review.user_id, latest_identified_reviewer.user_id)::text AS "reviewerSourceUserId",
       COALESCE(NULLIF(BTRIM(u.name), ''), NULLIF(BTRIM(u.username), ''), 'Revisor histórico no registrado') AS "reviewerName"
     FROM equipo e
     LEFT JOIN latest_review ON e.id = latest_review.equipo_id
     LEFT JOIN latest_identified_reviewer ON latest_identified_reviewer.equipo_id = latest_review.equipo_id
+    LEFT JOIN purchase p ON p.id = e.purchase_id
+    LEFT JOIN supplier s ON s.id = p.supplier_id
     LEFT JOIN users u ON u.id = COALESCE(latest_review.user_id, latest_identified_reviewer.user_id)
     WHERE e.modelo IS NOT NULL
       AND BTRIM(e.modelo) <> ''
@@ -123,10 +129,21 @@ function buildSnapshot(sourceData, reviewerLinks) {
     notes: clean(supplier.contactInfo),
   }));
 
+  const batches = new Map();
   const records = sourceData.purchases.map((item) => {
     const result = normalizeResult(item.functionality);
     const sourceRecordId = item.sourceRecordId;
     const hasReview = Boolean(item.reviewedAt);
+    const batchId = `legacy-sds-batch-p${item.purchaseId ?? "unknown"}`;
+    if (!batches.has(batchId)) {
+      batches.set(batchId, {
+        id: batchId,
+        batchNumber: `LOT-LEGACY-SDS-C${item.purchaseId ?? "unknown"}`,
+        supplierId: item.supplierSourceId ? `legacy-sds-supplier-${item.supplierSourceId}` : null,
+        supplierName: clean(item.supplierName) || "Importación Compras SDigitalSystem",
+        receivedAt: item.purchaseDate || null,
+      });
+    }
 
     return {
       device: {
@@ -137,7 +154,7 @@ function buildSnapshot(sourceData, reviewerLinks) {
         storageGb: item.storageGb,
         color: clean(item.color),
         status: deviceStatus(item.sourceStatus, result),
-        batchId: "legacy-sds-batch-initial",
+        batchId,
         sourceSystem: SOURCE_SYSTEM,
         sourceRecordId,
         createdAt: item.createdAt || new Date(),
@@ -160,7 +177,7 @@ function buildSnapshot(sourceData, reviewerLinks) {
     };
   });
 
-  return { suppliers, records };
+  return { suppliers, records, batches: [...batches.values()] };
 }
 
 async function assertTargetSchema(target) {
@@ -208,35 +225,88 @@ async function importSuppliers(target, suppliers) {
   return result.rowCount;
 }
 
-async function importLegacyBatch(target, summary) {
-  await target.query(`
-    INSERT INTO qc_revision_batch (
-      id, batch_number, supplier_name, branch, received_by, status,
-      total_devices, reviewed_devices, functional_count, non_functional_count,
-      notes, created_at, updated_at
-    ) VALUES (
-      'legacy-sds-batch-initial',
-      'LOT-LEGACY-SDIGITALSYSTEM',
-      'Importación Compras SDigitalSystem',
-      'Principal',
-      'Migración de Sistema Legacy',
-      'COMPLETED'::qc_batch_status,
-      $1, $2, $3, $4,
-      'Lote generado automáticamente durante la migración de todas las compras y equipos desde SDigitalSystem',
-      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+async function importBatches(target, batches, records) {
+  const counts = new Map(
+    batches.map((b) => [b.id, { total: 0, reviewed: 0, functional: 0, nonFunctional: 0, lastReviewedAt: null }])
+  );
+  for (const record of records) {
+    const entry = counts.get(record.device.batchId);
+    if (!entry) continue;
+    entry.total += 1;
+    if (record.inspection) {
+      entry.reviewed += 1;
+      if (record.inspection.result === "FUNCTIONAL") entry.functional += 1;
+      else if (record.inspection.result === "NON_FUNCTIONAL") entry.nonFunctional += 1;
+      if (!entry.lastReviewedAt || record.inspection.reviewedAt > entry.lastReviewedAt) {
+        entry.lastReviewedAt = record.inspection.reviewedAt;
+      }
+    }
+  }
+
+  const payload = batches.map((b) => {
+    const c = counts.get(b.id);
+    return {
+      id: b.id,
+      batchNumber: b.batchNumber,
+      supplierId: b.supplierId,
+      supplierName: b.supplierName,
+      receivedAt: b.receivedAt,
+      completedAt: c?.lastReviewedAt ?? null,
+      total: c?.total ?? 0,
+      reviewed: c?.reviewed ?? 0,
+      functional: c?.functional ?? 0,
+      nonFunctional: c?.nonFunctional ?? 0,
+    };
+  });
+
+  const result = await target.query(`
+    WITH payload AS (
+      SELECT *
+      FROM jsonb_to_recordset($1::jsonb) AS item(
+        id text,
+        "batchNumber" text,
+        "supplierId" text,
+        "supplierName" text,
+        "receivedAt" timestamp,
+        "completedAt" timestamp,
+        total int,
+        reviewed int,
+        functional int,
+        "nonFunctional" int
+      )
     )
+    INSERT INTO qc_revision_batch (
+      id, batch_number, supplier_id, supplier_name, branch, received_by, status,
+      total_devices, reviewed_devices, functional_count, non_functional_count,
+      notes, received_at, completed_at, created_at, updated_at
+    )
+    SELECT
+      id, "batchNumber", "supplierId", "supplierName", 'Principal', 'Migración de Sistema Legacy',
+      'COMPLETED'::qc_batch_status,
+      total, reviewed, functional, "nonFunctional",
+      'Lote generado automáticamente durante la migración de compras y equipos desde SDigitalSystem',
+      COALESCE("receivedAt", CURRENT_TIMESTAMP), "completedAt", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    FROM payload
     ON CONFLICT (batch_number) DO UPDATE SET
+      supplier_id = EXCLUDED.supplier_id,
+      supplier_name = EXCLUDED.supplier_name,
       total_devices = EXCLUDED.total_devices,
       reviewed_devices = EXCLUDED.reviewed_devices,
       functional_count = EXCLUDED.functional_count,
       non_functional_count = EXCLUDED.non_functional_count,
+      received_at = EXCLUDED.received_at,
+      completed_at = EXCLUDED.completed_at,
       updated_at = CURRENT_TIMESTAMP
-  `, [
-    summary.totalPurchases,
-    summary.reviewedDevices,
-    summary.functional,
-    summary.nonFunctional,
-  ]);
+  `, [JSON.stringify(payload)]);
+  return result.rowCount;
+}
+
+async function removeLegacyInitialBatch(target) {
+  const result = await target.query(`
+    DELETE FROM qc_revision_batch
+    WHERE id = 'legacy-sds-batch-initial' OR batch_number = 'LOT-LEGACY-SDIGITALSYSTEM'
+  `);
+  return result.rowCount;
 }
 
 async function importInspectionBatch(target, records) {
@@ -357,6 +427,7 @@ async function main() {
     const summary = {
       mode: apply ? "APPLY" : "DRY_RUN",
       sourceSuppliers: snapshot.suppliers.length,
+      sourceBatches: snapshot.batches.length,
       totalPurchases: snapshot.records.length,
       reviewedDevices: reviewedRecords.length,
       unreviewedDevices: snapshot.records.length - reviewedRecords.length,
@@ -371,15 +442,16 @@ async function main() {
 
     await assertTargetSchema(target);
     const importedSuppliers = await importSuppliers(target, snapshot.suppliers);
-    await importLegacyBatch(target, summary);
+    const importedBatches = await importBatches(target, snapshot.batches, snapshot.records);
     let importedPurchases = 0;
     for (const batch of chunks(snapshot.records, BATCH_SIZE)) {
       await importInspectionBatch(target, batch);
       importedPurchases += batch.length;
       console.log(JSON.stringify({ progress: importedPurchases, total: snapshot.records.length }));
     }
-    await writeAudit(target, { ...summary, importedSuppliers, importedPurchases });
-    console.log(JSON.stringify({ success: true, importedSuppliers, importedPurchases }, null, 2));
+    const removedLegacyBatch = await removeLegacyInitialBatch(target);
+    await writeAudit(target, { ...summary, importedSuppliers, importedBatches, removedLegacyBatch, importedPurchases });
+    console.log(JSON.stringify({ success: true, importedSuppliers, importedBatches, removedLegacyBatch, importedPurchases }, null, 2));
   } finally {
     await Promise.allSettled([source.end(), target.end()]);
   }

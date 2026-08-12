@@ -207,7 +207,7 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
 
     const batches = await prisma.qcRevisionBatch.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
       include: {
         _count: {
           select: { devices: true },

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   createRevisionBatchAction,
   getRevisionBatchFormDataAction,
 } from "../actions/revision-batch";
+import { readPurchaseExcel } from "../lib/excel-parser";
 import {
   X,
   Building2,
@@ -18,6 +19,7 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface NuevoLoteModalProps {
@@ -28,6 +30,9 @@ interface NuevoLoteModalProps {
 export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Datos auxiliares
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
@@ -94,6 +99,50 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
 
   const handleRemoveDeviceRow = (index: number) => {
     setManualDevices((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // permite volver a seleccionar el mismo archivo
+    if (!file) return;
+    setImportingExcel(true);
+    setError(null);
+    setImportNotice(null);
+    try {
+      const { rows, errors } = await readPurchaseExcel(file);
+      if (rows.length === 0 && errors.length === 0) {
+        setError("No se encontraron datos en el Excel.");
+        return;
+      }
+      if (rows.length > 0) {
+        setManualDevices(
+          rows.map((r) => ({
+            model: r.modelName,
+            brand: r.brand,
+            imei: r.imei,
+            color: r.color || "",
+            storageGb: r.storageGb ? String(r.storageGb) : "",
+          }))
+        );
+        setEntryMode("TABLE");
+        setImportNotice(
+          `${rows.length} equipo(s) importado(s) del Excel. Revisa la tabla antes de crear el lote.`
+        );
+      }
+      if (errors.length > 0) {
+        const sample = errors
+          .slice(0, 5)
+          .map((e) => `Fila ${e.row}: ${e.reason}`)
+          .join(" · ");
+        setError(
+          `${errors.length} fila(s) omitida(s) del Excel: ${sample}${errors.length > 5 ? " ..." : ""}`
+        );
+      }
+    } catch (err: any) {
+      setError(err.message || "Error crítico al procesar el Excel.");
+    } finally {
+      setImportingExcel(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -190,6 +239,12 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{error}</span>
+            </div>
+          )}
+          {importNotice && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{importNotice}</span>
             </div>
           )}
 
@@ -300,29 +355,51 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                 <Scan className="w-4 h-4 text-[#5750f1]" /> Equipos del Lote
               </label>
 
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  ref={fileInputRef}
+                  onChange={handleExcelUpload}
+                  className="hidden"
+                />
                 <button
                   type="button"
-                  onClick={() => setEntryMode("BULK")}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                    entryMode === "BULK"
-                      ? "bg-white text-[#5750f1] shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importingExcel}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl border border-[#5750f1]/30 bg-[#5750f1]/5 text-[#5750f1] hover:bg-[#5750f1]/10 transition-all flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Pega Masiva (IMEIs)
+                  {importingExcel ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                  )}
+                  {importingExcel ? "Procesando..." : "Importar Excel"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setEntryMode("TABLE")}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                    entryMode === "TABLE"
-                      ? "bg-white text-[#5750f1] shadow-2xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Tabla Detallada
-                </button>
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode("BULK")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      entryMode === "BULK"
+                        ? "bg-white text-[#5750f1] shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Pega Masiva (IMEIs)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode("TABLE")}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      entryMode === "TABLE"
+                        ? "bg-white text-[#5750f1] shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Tabla Detallada
+                  </button>
+                </div>
               </div>
             </div>
 
