@@ -113,6 +113,7 @@ export async function getCurrentWallet() {
           description: entry.description,
           accountName: entry.account.name,
           occurredAt: entry.occurredAt.toISOString(),
+          secureToken: entry.secureToken ?? null,
         })),
       } : null,
       legacyHistory: identity?.archivedTransactions.map((entry) => ({
