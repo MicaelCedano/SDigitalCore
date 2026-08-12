@@ -45,6 +45,9 @@ model User {
   warrantyDocuments WarrantyDocument[]
   qcInspections QcInspection[] @relation("QcInspectionReviewer")
   assignedBatches QcRevisionBatch[] @relation("QcBatchAssignee")
+  qcAssignedDevices DeviceUnit[] @relation("QcDeviceAssignee")
+  qcImeiRequests QcImeiRequest[] @relation("QcImeiRequestRequester")
+  qcImeiRequestsAccepted QcImeiRequest[] @relation("QcImeiRequestAcceptor")
 
   @@map("user")
 }
@@ -463,17 +466,20 @@ model DeviceUnit {
   color          String?                 @db.VarChar(80)
   status         DeviceOperationalStatus @default(PENDING_QC)
   batchId        String?                 @map("batch_id")
+  assignedToId   String?                 @map("assigned_to_id")
   sourceSystem   String?                 @map("source_system") @db.VarChar(50)
   sourceRecordId String?                 @map("source_record_id") @db.VarChar(80)
   createdAt      DateTime                @default(now()) @map("created_at")
   updatedAt      DateTime                @updatedAt @map("updated_at")
 
   batch       QcRevisionBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  assignedTo  User?            @relation("QcDeviceAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   inspections QcInspection[]
 
   @@index([status, updatedAt])
   @@index([brand, model])
   @@index([batchId])
+  @@index([assignedToId])
   @@unique([sourceSystem, sourceRecordId])
   @@map("device_unit")
 }
@@ -507,6 +513,25 @@ model QcInspection {
   @@index([result, reviewedAt])
   @@unique([sourceSystem, sourceRecordId])
   @@map("qc_inspection")
+}
+
+model QcImeiRequest {
+  id          String    @id @default(cuid())
+  requesterId String    @map("requester_id")
+  imeis       Json      @map("imeis")
+  status      String    @default("PENDING") @db.VarChar(20)
+  notes       String?
+  acceptedBy  String?   @map("accepted_by")
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  requester User @relation("QcImeiRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  acceptor  User? @relation("QcImeiRequestAcceptor", fields: [acceptedBy], references: [id], onDelete: SetNull)
+
+  @@index([requesterId, createdAt])
+  @@index([status, createdAt])
+  @@map("qc_imei_request")
 }
 
 enum WarrantyStatus {

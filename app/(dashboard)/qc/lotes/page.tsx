@@ -15,5 +15,5 @@ export default async function RevisionBatchesPage() {
   if (persisted?.roleCode !== "ADMIN") {
     redirect("/qc");
   }
-  return <RevisionBatchesList isAdmin />;
+  return <RevisionBatchesList />;
 }

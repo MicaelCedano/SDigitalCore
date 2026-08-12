@@ -9,11 +9,9 @@ import {
   createRevisionBatchSchema,
   updateRevisionBatchStatusSchema,
   reviewDeviceSchema,
-  assignRevisionBatchSchema,
   CreateRevisionBatchInput,
   UpdateRevisionBatchStatusInput,
   ReviewDeviceInput,
-  AssignRevisionBatchInput,
 } from "@/lib/validation/revision-batch";
 import type { QcBatchStatus } from "@prisma/client";
 
@@ -185,11 +183,7 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
 export async function getRevisionBatchesAction(query?: string, status?: string) {
   try {
     await requirePermission("qc.read");
-    const viewer = await getPersistedCurrentUser();
     const where: any = {};
-    if (viewer && viewer.roleCode !== "ADMIN") {
-      where.assignedToId = viewer.id;
-    }
 
     if (status && status !== "ALL") {
       where.status = status as QcBatchStatus;
@@ -221,7 +215,6 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
       where,
       orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
       include: {
-        assignedTo: { select: { id: true, name: true, username: true } },
         _count: {
           select: { devices: true },
         },
@@ -246,7 +239,6 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
         OR: [{ id: idOrNumber }, { batchNumber: idOrNumber }],
       },
       include: {
-        assignedTo: { select: { id: true, name: true, username: true } },
         devices: {
           include: {
             inspections: {
@@ -261,10 +253,6 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
 
     if (!batch) {
       return { success: false, error: "Lote de Revisión no encontrado" };
-    }
-    const viewer = await getPersistedCurrentUser();
-    if (viewer && viewer.roleCode !== "ADMIN" && batch.assignedToId !== viewer.id) {
-      return { success: false, error: "Este lote no está asignado a tu usuario." };
     }
 
     // Calcular estadísticas dinámicas de los equipos
@@ -417,8 +405,8 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       return { success: false, error: "No se puede revisar un equipo de un lote cancelado." };
     }
     const reviewer = await getPersistedCurrentUser();
-    if (reviewer && reviewer.roleCode !== "ADMIN" && device.batch.assignedToId !== reviewer.id) {
-      return { success: false, error: "Este lote no está asignado a tu usuario." };
+    if (reviewer && reviewer.roleCode !== "ADMIN" && device.assignedToId !== reviewer.id) {
+      return { success: false, error: "Este IMEI no está asignado a tu usuario." };
     }
 
     const batch = device.batch;
@@ -530,84 +518,6 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
 }
 
 /**
- * Asigna un Lote de Revisión a un usuario de Control de Calidad (admin only).
- * assignedToId = null quita la asignación.
- */
-export async function assignRevisionBatchAction(input: AssignRevisionBatchInput) {
-  try {
-    const actor = await requirePermission("qc.write");
-    const persisted = await getPersistedCurrentUser();
-    if (!persisted || persisted.roleCode !== "ADMIN") {
-      return { success: false, error: "Solo el administrador puede asignar lotes de revisión." };
-    }
-
-    const validated = assignRevisionBatchSchema.parse(input);
-    const existing = await prisma.qcRevisionBatch.findUnique({
-      where: { id: validated.id },
-      select: { id: true, batchNumber: true, assignedToId: true },
-    });
-    if (!existing) {
-      return { success: false, error: "Lote de Revisión no encontrado" };
-    }
-
-    const updated = await prisma.qcRevisionBatch.update({
-      where: { id: validated.id },
-      data: { assignedToId: validated.assignedToId },
-    });
-
-    await logAudit({
-      userId: persisted.id,
-      action: "qc_batch.assign",
-      module: "qc",
-      entityType: "qc_revision_batch",
-      entityId: updated.id,
-      beforeData: { assignedToId: existing.assignedToId },
-      afterData: { assignedToId: updated.assignedToId },
-    });
-
-    revalidatePath("/qc/lotes");
-    revalidatePath(`/qc/lotes/${updated.id}`);
-
-    return {
-      success: true,
-      data: updated,
-      message: validated.assignedToId
-        ? `Lote ${existing.batchNumber} asignado correctamente.`
-        : `Asignación del lote ${existing.batchNumber} eliminada.`,
-    };
-  } catch (error: any) {
-    console.error("Error al asignar lote:", error);
-    return {
-      success: false,
-      error: error.message || "Error al asignar el Lote de Revisión",
-    };
-  }
-}
-
-/**
- * Lista los usuarios asignables a lotes (tienen el módulo qc) — admin only.
- */
-export async function getQcAssigneesAction() {
-  try {
-    const persisted = await getPersistedCurrentUser();
-    if (!persisted || persisted.roleCode !== "ADMIN") {
-      return { success: false, error: "Solo el administrador puede ver asignaciones.", data: [] };
-    }
-
-    const users = await prisma.user.findMany({
-      where: { status: "ACTIVE", allowedModules: { has: "qc" } },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, username: true, email: true, roleCode: true },
-    });
-
-    return { success: true, data: users };
-  } catch (error: any) {
-    console.error("Error al obtener usuarios asignables:", error);
-    return { success: false, error: "Error al obtener los usuarios de Control de Calidad", data: [] };
-  }
-}
-
-/**
  * Inicio del día en America/Santo_Domingo (UTC-4) como fecha UTC.
  * El día local comienza a las 04:00 UTC.
  */
@@ -623,8 +533,9 @@ function santoDomingoStartOfDay(): Date {
 }
 
 /**
- * Dashboard del Control de Calidad: lotes asignados al usuario + estadísticas.
- * Los administradores se gestionan desde /qc/lotes y no usan este dashboard.
+ * Panel del Control de Calidad (fórmula SDigitalSystem): muestra los IMEIs
+ * asignados al QC (device_unit.assigned_to_id), sus solicitudes y estadísticas.
+ * El administrador se gestiona desde /qc/lotes y /qc/solicitudes.
  */
 export async function getQcDashboardAction() {
   try {
@@ -639,12 +550,14 @@ export async function getQcDashboardAction() {
 
     const startOfDay = santoDomingoStartOfDay();
 
-    const [lotes, hoyTotal, hoyFuncional, hoyNoFuncional] = await Promise.all([
-      prisma.qcRevisionBatch.findMany({
-        where: { assignedToId: persisted.id, status: { not: "CANCELLED" } },
-        orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
+    const [devices, hoyTotal, hoyFuncional, hoyNoFuncional, myRequests] = await Promise.all([
+      prisma.deviceUnit.findMany({
+        where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
+        orderBy: { updatedAt: "desc" },
+        take: 100,
         include: {
-          assignedTo: { select: { id: true, name: true, username: true } },
+          batch: { select: { id: true, batchNumber: true, supplierName: true } },
+          inspections: { orderBy: { createdAt: "desc" }, take: 1 },
         },
       }),
       prisma.qcInspection.count({
@@ -656,22 +569,29 @@ export async function getQcDashboardAction() {
       prisma.qcInspection.count({
         where: { reviewerId: persisted.id, reviewedAt: { gte: startOfDay }, status: "COMPLETED", result: "NON_FUNCTIONAL" },
       }),
+      prisma.qcImeiRequest.findMany({
+        where: { requesterId: persisted.id },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
     ]);
 
-    let pendientesTotal = 0;
-    const lotesConPendientes = lotes.map((l) => {
-      const pending = Math.max(0, (l.totalDevices || 0) - (l.reviewedDevices || 0));
-      pendientesTotal += pending;
-      return { ...l, pendingDevices: pending };
+    let revisados = 0;
+    const devicesConInspeccion = devices.map((d) => {
+      const last = d.inspections[0] ?? null;
+      if (last && last.status === "COMPLETED") revisados++;
+      return { ...d, lastInspection: last };
     });
 
     return {
       success: true,
       data: {
-        lotes: lotesConPendientes,
+        devices: devicesConInspeccion,
+        myRequests,
         stats: {
-          lotesAsignados: lotes.length,
-          pendientesTotal,
+          asignados: devices.length,
+          revisados,
+          pendientes: devices.length - revisados,
           revisadosHoy: hoyTotal,
           aprobadosHoy: hoyFuncional,
           rechazadosHoy: hoyNoFuncional,
@@ -681,7 +601,7 @@ export async function getQcDashboardAction() {
       },
     };
   } catch (error: any) {
-    console.error("Error al cargar dashboard QC:", error);
+    console.error("Error al cargar panel QC:", error);
     return { success: false, error: "Error al cargar el panel de Control de Calidad", data: null };
   }
 }

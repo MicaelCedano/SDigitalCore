@@ -7,6 +7,7 @@ import {
   getRevisionBatchDetailAction,
 } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
+import { AssignDeviceModal } from "./AssignDeviceModal";
 import {
   ArrowLeft,
   Package,
@@ -24,6 +25,7 @@ import {
   FileSpreadsheet,
   CheckCheck,
   ClipboardCheck,
+  UserCheck,
 } from "lucide-react";
 
 interface RevisionBatchDetailViewProps {
@@ -35,6 +37,7 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewDevice, setReviewDevice] = useState<any>(null);
+  const [assignDevice, setAssignDevice] = useState<any>(null);
 
   const refreshBatch = async () => {
     const res = await getRevisionBatchDetailAction(batch.id);
@@ -130,11 +133,6 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
               <span>Fecha: {formattedDate}</span>
               <span>•</span>
               <span>Registrado por: {batch.receivedBy}</span>
-              <span>•</span>
-              <span className={batch.assignedTo ? "font-semibold text-slate-700" : "text-amber-600 font-semibold"}>
-                Asignado a:{" "}
-                {batch.assignedTo?.name || batch.assignedTo?.username || "Sin asignar"}
-              </span>
             </p>
             {batch.notes && (
               <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl mt-2 border border-slate-200">
@@ -310,6 +308,14 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
+                            onClick={() => setAssignDevice(dev)}
+                            title={dev.assignedToId ? "Cambiar asignación" : "Asignar IMEI a QC"}
+                            className="p-1.5 bg-slate-100 hover:bg-[#5750f1] hover:text-white text-slate-700 rounded-lg text-xs transition-colors inline-flex items-center"
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setReviewDevice(dev)}
                             className="px-2.5 py-1.5 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-lg text-xs transition-colors inline-flex items-center gap-1"
                           >
@@ -340,6 +346,18 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
           onClose={() => setReviewDevice(null)}
           onSaved={() => {
             setReviewDevice(null);
+            refreshBatch();
+          }}
+        />
+      )}
+
+      {/* Modal de asignación de IMEI a QC */}
+      {assignDevice && (
+        <AssignDeviceModal
+          device={assignDevice}
+          onClose={() => setAssignDevice(null)}
+          onAssigned={() => {
+            setAssignDevice(null);
             refreshBatch();
           }}
         />

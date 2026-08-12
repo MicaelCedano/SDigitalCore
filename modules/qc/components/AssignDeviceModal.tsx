@@ -3,21 +3,21 @@
 import { useState, useEffect } from "react";
 import { X, UserCheck, Loader2, AlertCircle, UserX } from "lucide-react";
 import {
-  assignRevisionBatchAction,
+  assignDeviceToQcAction,
   getQcAssigneesAction,
-} from "../actions/revision-batch";
+} from "../actions/imei-requests";
 
-interface AssignBatchModalProps {
-  batch: any;
+interface AssignDeviceModalProps {
+  device: any;
   onClose: () => void;
   onAssigned: () => void;
 }
 
-export function AssignBatchModal({ batch, onClose, onAssigned }: AssignBatchModalProps) {
+export function AssignDeviceModal({ device, onClose, onAssigned }: AssignDeviceModalProps) {
   const [assignees, setAssignees] = useState<
     { id: string; name: string | null; username: string | null; email: string | null }[]
   >([]);
-  const [selected, setSelected] = useState<string>(batch.assignedToId || "");
+  const [selected, setSelected] = useState<string>(device.assignedToId || "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,15 +32,12 @@ export function AssignBatchModal({ batch, onClose, onAssigned }: AssignBatchModa
   const save = async () => {
     setError(null);
     setSaving(true);
-    const res = await assignRevisionBatchAction({
-      id: batch.id,
-      assignedToId: selected || null,
-    });
+    const res = await assignDeviceToQcAction(device.id, selected || null);
     setSaving(false);
     if (res.success) {
       onAssigned();
     } else {
-      setError(res.error || "No se pudo asignar el lote.");
+      setError(res.error || "No se pudo asignar el IMEI.");
     }
   };
 
@@ -53,11 +50,9 @@ export function AssignBatchModal({ batch, onClose, onAssigned }: AssignBatchModa
               <UserCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-800 tracking-tight">Asignar Lote a QC</h2>
-              <p className="text-xs text-slate-500">
-                <span className="font-mono font-bold text-[#5750f1]">{batch.batchNumber}</span>
-                {" · "}
-                {batch.supplierName}
+              <h2 className="text-base font-bold text-slate-800 tracking-tight">Asignar IMEI a QC</h2>
+              <p className="text-xs text-slate-500 font-mono">
+                {device.imei || device.serialNumber} · {device.brand} {device.model}
               </p>
             </div>
           </div>
@@ -99,16 +94,11 @@ export function AssignBatchModal({ batch, onClose, onAssigned }: AssignBatchModa
                 ))}
               </select>
             )}
-            {!loading && assignees.length === 0 && (
-              <p className="text-[11px] text-amber-600 font-semibold mt-1.5">
-                No hay usuarios con el módulo QC activo para asignar.
-              </p>
-            )}
           </div>
 
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            El usuario asignado verá este lote en su lista y podrá revisar sus equipos.
-            El administrador puede revisar cualquier lote.
+            El QC asignado verá este IMEI en su panel y podrá revisarlo. El administrador
+            puede revisar cualquier equipo.
           </p>
         </div>
 
@@ -128,7 +118,7 @@ export function AssignBatchModal({ batch, onClose, onAssigned }: AssignBatchModa
             className="px-4 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-1.5 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : selected ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-            {selected ? "Asignar Lote" : "Quitar Asignación"}
+            {selected ? "Asignar IMEI" : "Quitar Asignación"}
           </button>
         </div>
       </div>

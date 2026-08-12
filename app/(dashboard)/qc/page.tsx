@@ -19,5 +19,5 @@ export default async function QcPage() {
   }
 
   const res = await getQcDashboardAction();
-  return <QcDashboardView data={res.data} />;
+  return <QcDashboardView initialData={res.data} />;
 }
