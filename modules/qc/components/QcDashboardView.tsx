@@ -15,6 +15,7 @@ import {
   Loader2,
   Wallet,
   Coins,
+  Search,
 } from "lucide-react";
 import { getQcDashboardAction } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
@@ -29,6 +30,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [showSolicitar, setShowSolicitar] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (!data) {
     return (
@@ -48,9 +50,29 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const { devices, myRequests, stats, welcome } = data;
   const requestCount = myRequests?.length || 0;
 
+  // Búsqueda local: IMEI, serial, marca/modelo, lote
+  const filteredDevices = (devices || []).filter((dev: any) => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return true;
+    const haystack = [
+      dev.imei,
+      dev.serialNumber,
+      dev.brand,
+      dev.model,
+      dev.color,
+      dev.batch?.batchNumber,
+    ]
+      .filter(Boolean)
+      .map((v) => String(v).toLowerCase())
+      .join(" ");
+    return haystack.includes(term);
+  });
+
   const statusLabel = (s: string) =>
     s === "COMPLETED"
       ? "COMPLETADO"
+      : s === "SUBMITTED"
+      ? "ENVIADO A APROBACIÓN"
       : s === "IN_REVIEW"
       ? "EN REVISIÓN"
       : s === "PENDING_REVIEW"
@@ -62,6 +84,8 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const statusTone = (s: string) =>
     s === "COMPLETED"
       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : s === "SUBMITTED"
+      ? "bg-violet-50 text-violet-700 border-violet-200"
       : s === "IN_REVIEW"
       ? "bg-blue-50 text-blue-700 border-blue-200"
       : s === "PENDING_REVIEW"
@@ -218,13 +242,25 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
 
       {/* Mis IMEIs asignados */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-[#5750f1]" /> Mis IMEIs Asignados
           </h2>
-          <span className="text-[11px] font-bold text-slate-400">
-            {devices.length} IMEI(s) · {stats.revisados} revisados
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar IMEI, modelo o lote..."
+                className="w-56 rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-xs outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
+              />
+            </div>
+            <span className="text-[11px] font-bold text-slate-400">
+              {filteredDevices.length} de {devices.length} IMEI(s) · {stats.revisados} revisados
+            </span>
+          </div>
         </div>
 
         {devices.length === 0 ? (
@@ -251,7 +287,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {devices.map((dev: any) => {
+                  {filteredDevices.map((dev: any) => {
                     const last = dev.lastInspection;
                     const hasQC = last && last.status === "COMPLETED";
                     return (
@@ -310,6 +346,15 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                     );
                   })}
                 </tbody>
+                {filteredDevices.length === 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-xs text-slate-500">
+                        {searchQuery.trim() ? "No se encontraron equipos con ese criterio de búsqueda." : "Sin equipos asignados."}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
