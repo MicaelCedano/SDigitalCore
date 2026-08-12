@@ -140,13 +140,13 @@ const renderPriceListCanvas = async (groups: PriceListGroup[], logo: string | nu
     const rowHeight = layout.rowHeights[rowIndex];
     row.forEach((group, columnIndex) => {
       const x = columnIndex * layout.cellWidth;
-      const color = /^#[0-9a-f]{6}$/i.test(group.brand.color) ? group.brand.color : "#111827";
       context.fillStyle = "#ffffff";
       context.fillRect(x, rowY, layout.cellWidth, rowHeight);
       context.strokeStyle = "#e2e8f0";
       context.strokeRect(x, rowY, layout.cellWidth, rowHeight);
-      drawText(context, group.brand.name.slice(0, 21), x + 14, rowY + 35, "900 23px Arial", color);
-      context.fillStyle = color;
+      // Nombre de marca y línea en negro para visibilidad (no usar color de marca)
+      drawText(context, group.brand.name.slice(0, 21), x + 14, rowY + 35, "900 23px Arial", "#000000");
+      context.fillStyle = "#000000";
       context.fillRect(x + 14, rowY + 47, layout.cellWidth - 28, 2);
       group.items.forEach((item, itemIndex) => {
         const itemY = rowY + 82 + itemIndex * layout.itemRowHeight;
@@ -157,7 +157,8 @@ const renderPriceListCanvas = async (groups: PriceListGroup[], logo: string | nu
         const labelMaxWidth = layout.cellWidth - 28 - priceWidth - 10;
         drawFittedText(context, item.model, x + 14, itemY, labelMaxWidth, "900 15px Arial", "#111827", 11);
         if (item.capacity) drawFittedText(context, item.capacity, x + 14, itemY + 16, labelMaxWidth, "700 11px Arial", "#475569", 10);
-        drawText(context, price, x + layout.cellWidth - 14, itemY + 4, priceFont, color, "right");
+        // Precio siempre en negro para máxima visibilidad (independiente del color de la marca)
+        drawText(context, price, x + layout.cellWidth - 14, itemY + 4, priceFont, "#000000", "right");
         context.strokeStyle = "#f1f5f9";
         context.beginPath(); context.moveTo(x + 14, itemY + 27); context.lineTo(x + layout.cellWidth - 14, itemY + 27); context.stroke();
       });
@@ -392,7 +393,7 @@ export function PriceListManager() {
       </section>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm"><div className="flex items-center justify-between border-b border-slate-200 bg-white p-4"><div><h2 className="font-black text-slate-900">Vista previa HD</h2><p className="text-xs text-slate-500">1080 px · formato catálogo listo para publicar</p></div><ListPlus className="h-5 w-5 text-red-600" /></div><div className="max-h-[880px] overflow-auto p-4"><div ref={previewRef} className="mx-auto w-[1080px] bg-white text-black shadow-xl" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
         <div className="flex min-h-[170px] items-center gap-8 border-b border-slate-100 px-10 py-5"><div className="flex h-32 w-40 shrink-0 items-center justify-center">{logo ? <img src={logo} alt="Logo de SDigital" className="max-h-full max-w-full object-contain" /> : <div className="flex h-full w-full flex-col items-center justify-center text-red-700"><ImageIcon className="h-12 w-12" /><span className="mt-2 text-sm font-black tracking-widest">SEÑAL DIGITAL</span></div>}</div><div className="min-w-0 flex-1"><h3 className="text-[58px] font-black leading-none tracking-[-0.06em] text-black">LISTA DE <span className="text-red-700">PRECIOS</span></h3><p className="mt-3 text-[22px] font-bold text-slate-600">✓ Los mejores equipos, al <span className="text-red-700">mejor precio</span></p></div><div className="flex items-center gap-3 rounded-xl bg-red-700 px-5 py-4 text-white"><CalendarDays className="h-9 w-9" /><div><div className="text-sm font-bold uppercase">Actualizado:</div><div className="text-lg font-black">{new Date().toLocaleDateString("es-DO")}</div></div></div></div>
-        <div className="border-b border-slate-200"><div className="flex items-center justify-center gap-3 bg-red-700 px-6 py-2 text-[28px] font-black uppercase tracking-wide text-white"><Package className="h-8 w-8" />PRODUCTOS</div><div className="grid grid-cols-4">{grouped.map(({ brand, items }) => <div key={brand.id} className="min-h-[190px] border-b border-r border-slate-200 p-3 last:border-r-0"><div className="mb-2 border-b-2 px-1 pb-1 text-[23px] font-black uppercase" style={{ color: brand.color, borderColor: brand.color }}>{brand.name}</div><div>{items.map((item) => <div key={item.id} className="flex items-baseline justify-between gap-2 border-b border-slate-100 py-1.5 last:border-0"><span className="min-w-0 text-[16px] font-black leading-tight">{item.model} <small className="font-medium text-slate-600">{item.capacity}</small></span><span className="whitespace-nowrap text-[20px] font-black" style={{ color: brand.color }}>{money(item.retailPrice)}</span></div>)}</div></div>)}</div></div>
+        <div className="border-b border-slate-200"><div className="flex items-center justify-center gap-3 bg-red-700 px-6 py-2 text-[28px] font-black uppercase tracking-wide text-white"><Package className="h-8 w-8" />PRODUCTOS</div><div className="grid grid-cols-4">{grouped.map(({ brand, items }) => <div key={brand.id} className="min-h-[190px] border-b border-r border-slate-200 p-3 last:border-r-0"><div className="mb-2 border-b-2 px-1 pb-1 text-[23px] font-black uppercase text-black" style={{ borderColor: "#000000" }}>{brand.name}</div><div>{items.map((item) => <div key={item.id} className="flex items-baseline justify-between gap-2 border-b border-slate-100 py-1.5 last:border-0"><span className="min-w-0 text-[16px] font-black leading-tight">{item.model} <small className="font-medium text-slate-600">{item.capacity}</small></span><span className="whitespace-nowrap text-[20px] font-black text-black">{money(item.retailPrice)}</span></div>)}</div></div>)}</div></div>
         {!activeList.length && <div className="p-20 text-center text-3xl italic text-slate-300">Lista de precios vacía</div>}
         <div className="grid grid-cols-3 gap-3 bg-white px-3 py-3"><div className="flex items-center gap-3 rounded-lg border border-slate-200 px-4 py-3"><ShieldCheck className="h-10 w-10 shrink-0 text-red-700" /><div><div className="font-black">GARANTÍA</div><div className="text-sm text-slate-600">En todos nuestros productos</div></div></div><div className="flex items-center gap-3 rounded-lg border border-slate-200 px-4 py-3"><Award className="h-10 w-10 shrink-0 text-red-700" /><div><div className="font-black">PRODUCTOS 100% ORIGINALES</div><div className="text-sm text-slate-600">Calidad garantizada</div></div></div><div className="flex items-center gap-3 rounded-lg border border-slate-200 px-4 py-3"><Headphones className="h-10 w-10 shrink-0 text-red-700" /><div><div className="font-black">SOPORTE Y ASESORÍA</div><div className="text-sm text-slate-600">Estamos para ayudarte</div></div></div></div>
         <div className="flex items-center justify-between bg-red-700 px-8 py-3 text-base font-bold text-white"><span>Contáctanos por WhatsApp</span><span>Precios sujetos a disponibilidad sin previo aviso.</span><span>Gracias por elegir Señal Digital ♥</span></div>
