@@ -357,7 +357,7 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
 export async function getRevisionBatchFormDataAction() {
   try {
     await requirePermission("qc.read");
-    const [suppliers, branches] = await Promise.all([
+    const [suppliers, branches, lastBatch] = await Promise.all([
       prisma.qcSupplier.findMany({
         where: { status: "ACTIVE" },
         orderBy: { name: "asc" },
@@ -368,6 +368,11 @@ export async function getRevisionBatchFormDataAction() {
         orderBy: { name: "asc" },
         select: { id: true, name: true, code: true },
       }),
+      // Último lote creado → su proveedor es el "último usado" (predeterminado del formulario)
+      prisma.qcRevisionBatch.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { supplierId: true, supplierName: true },
+      }),
     ]);
 
     return {
@@ -375,13 +380,15 @@ export async function getRevisionBatchFormDataAction() {
       data: {
         suppliers,
         branches,
+        lastSupplierId: lastBatch?.supplierId ?? null,
+        lastSupplierName: lastBatch?.supplierName ?? null,
       },
     };
   } catch (error: any) {
     console.error("Error al obtener datos auxiliares para el lote:", error);
     return {
       success: false,
-      data: { suppliers: [], branches: [] },
+      data: { suppliers: [], branches: [], lastSupplierId: null, lastSupplierName: null },
     };
   }
 }

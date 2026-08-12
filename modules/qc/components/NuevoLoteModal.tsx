@@ -68,8 +68,18 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
           setBranch(res.data.branches[0].name);
         }
         if (res.data.suppliers.length > 0) {
-          setSupplierName(res.data.suppliers[0].name);
-          setSupplierId(res.data.suppliers[0].id);
+          // Predeterminar el último proveedor usado en una compra (si sigue activo);
+          // si no, el primero de la lista.
+          const lastUsed = res.data.lastSupplierId
+            ? res.data.suppliers.find((s) => s.id === res.data.lastSupplierId)
+            : undefined;
+          if (lastUsed) {
+            setSupplierName(lastUsed.name);
+            setSupplierId(lastUsed.id);
+          } else {
+            setSupplierName(res.data.suppliers[0].name);
+            setSupplierId(res.data.suppliers[0].id);
+          }
         }
       }
       setLoadingFormOptions(false);
