@@ -95,21 +95,36 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
       };
     }
 
-    // Comprobar si algún IMEI ya existe registrado en la base de datos
+    // Comprobar si algún IMEI ya existe registrado en la base de datos.
+    // Los que están en cola activa (PENDING_QC / IN_QC) sí bloquean el lote:
+    // ya esperan revisión y sería un duplicado real.
+    // Los demás (AVAILABLE / QUARANTINED / ARCHIVED — equipos ya revisados,
+    // reparados o vendidos) se REINGRESAN: conservan su historial (mismo id
+    // e inspecciones) y vuelven a pasar por QC en este lote.
     const imeisToCheck = devicesToCreate.map((d) => d.imei).filter(Boolean) as string[];
+    const existingByImei = new Map<string, { id: string; imei: string | null; status: string }>();
     if (imeisToCheck.length > 0) {
       const existingUnits = await prisma.deviceUnit.findMany({
         where: { imei: { in: imeisToCheck } },
-        select: { imei: true },
+        select: { id: true, imei: true, status: true },
       });
-      if (existingUnits.length > 0) {
-        const dupes = existingUnits.map((u) => u.imei).join(", ");
+      for (const unit of existingUnits) {
+        if (unit.imei) existingByImei.set(unit.imei, unit);
+      }
+      const activeDupes = existingUnits.filter((u) => u.status === "PENDING_QC" || u.status === "IN_QC");
+      if (activeDupes.length > 0) {
+        const dupes = activeDupes.map((u) => u.imei).join(", ");
         return {
           success: false,
-          error: `Los siguientes IMEIs ya existen en el sistema: ${dupes}`,
+          error: `Los siguientes IMEIs ya están en un lote pendiente de revisión: ${dupes}`,
         };
       }
     }
+
+    // Separar: equipos nuevos (se crean) vs reingresos (se reasignan al lote)
+    const reingresoUnits = devicesToCreate.filter((d) => d.imei && existingByImei.has(d.imei));
+    const newDevicesToCreate = devicesToCreate.filter((d) => !d.imei || !existingByImei.has(d.imei));
+    const totalDevices = newDevicesToCreate.length + reingresoUnits.length;
 
     const createdBatch = await prisma.$transaction(async (tx) => {
       const batchNumber = validated.batchNumber?.trim() || (await nextOperationalNumber(tx, "REVISION_BATCH", "LOT"));
@@ -122,13 +137,13 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
           branch: validated.branch,
           receivedBy,
           status: "PENDING_REVIEW",
-          totalDevices: devicesToCreate.length,
+          totalDevices,
           reviewedDevices: 0,
           functionalCount: 0,
           nonFunctionalCount: 0,
           notes: validated.notes || null,
           devices: {
-            create: devicesToCreate.map((d) => ({
+            create: newDevicesToCreate.map((d) => ({
               imei: d.imei || null,
               serialNumber: d.serialNumber || null,
               brand: d.brand,
@@ -143,6 +158,23 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
           devices: true,
         },
       });
+
+      // Reingresos: reasignar el device_unit existente al lote nuevo (mismo id → historial intacto)
+      for (const re of reingresoUnits) {
+        const existing = existingByImei.get(re.imei!);
+        if (!existing) continue;
+        await tx.deviceUnit.update({
+          where: { id: existing.id },
+          data: {
+            batchId: batch.id,
+            status: "PENDING_QC",
+            brand: re.brand,
+            model: re.model,
+            storageGb: re.storageGb ?? undefined,
+            color: re.color ?? undefined,
+          },
+        });
+      }
 
       return batch;
     });
@@ -167,7 +199,10 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
     return {
       success: true,
       data: createdBatch,
-      message: `Lote de Revisión ${createdBatch.batchNumber} creado con ${createdBatch.totalDevices} equipos.`,
+      message:
+        reingresoUnits.length > 0
+          ? `Lote de Revisión ${createdBatch.batchNumber} creado con ${createdBatch.totalDevices} equipos (${reingresoUnits.length} reingresados con su historial).`
+          : `Lote de Revisión ${createdBatch.batchNumber} creado con ${createdBatch.totalDevices} equipos.`,
     };
   } catch (error: any) {
     console.error("Error al crear Lote de Revisión:", error);
