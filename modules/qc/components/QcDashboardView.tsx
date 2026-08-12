@@ -113,7 +113,9 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   }, [devices]);
 
   const canSubmitLote = (lote: any) =>
-    lote.status === "IN_REVIEW" && lote.reviewedDevices >= lote.totalDevices && lote.totalDevices > 0;
+    (lote.status === "IN_REVIEW" || lote.status === "PENDING_REVIEW") &&
+    lote.reviewedDevices >= lote.totalDevices &&
+    lote.totalDevices > 0;
 
   const statusLabel = (s: string) =>
     s === "COMPLETED"

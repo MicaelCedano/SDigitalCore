@@ -420,8 +420,8 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
       select: { id: true, batchNumber: true, status: true, reviewedDevices: true, totalDevices: true },
     });
     if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
-    if (batch.status !== "IN_REVIEW") {
-      return { success: false, error: `Solo se puede enviar un lote EN REVISIÓN (estado actual: ${batch.status}).` };
+    if (batch.status !== "IN_REVIEW" && batch.status !== "PENDING_REVIEW") {
+      return { success: false, error: `Solo se puede enviar un lote activo (estado actual: ${batch.status}).` };
     }
     if (batch.reviewedDevices < batch.totalDevices) {
       return { success: false, error: `Faltan ${batch.totalDevices - batch.reviewedDevices} equipo(s) por revisar antes de enviar el lote.` };

@@ -259,7 +259,7 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
             </>
           ) : (
             <>
-              {batch.status === "IN_REVIEW" && batch.reviewedDevices >= batch.totalDevices && (
+              {(batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") && batch.reviewedDevices >= batch.totalDevices && (
                 <button
                   onClick={handleSubmitBatch}
                   disabled={loadingStatus}
