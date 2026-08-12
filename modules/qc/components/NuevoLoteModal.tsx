@@ -53,9 +53,9 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   // Modo de ingreso: 'BULK' (pegar IMEIs) o 'TABLE' (línea por línea)
   const [entryMode, setEntryMode] = useState<"BULK" | "TABLE">("BULK");
   const [manualDevices, setManualDevices] = useState<
-    { model: string; brand: string; imei: string; color: string; storageGb: string }[]
+    { model: string; brand: string; imei: string; storageGb: string }[]
   >([
-    { model: "iPhone 13 128GB", brand: "Apple", imei: "", color: "Negro", storageGb: "128" },
+    { model: "iPhone 13 128GB", brand: "Apple", imei: "", storageGb: "128" },
   ]);
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   const handleAddDeviceRow = () => {
     setManualDevices((prev) => [
       ...prev,
-      { model: defaultModel || "iPhone 13 128GB", brand: defaultBrand || "Apple", imei: "", color: "", storageGb: "" },
+      { model: defaultModel || "iPhone 13 128GB", brand: defaultBrand || "Apple", imei: "", storageGb: "" },
     ]);
   };
 
@@ -132,7 +132,6 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
             model: r.modelName,
             brand: r.brand,
             imei: r.imei,
-            color: r.color || "",
             storageGb: r.storageGb ? String(r.storageGb) : "",
           }))
         );
@@ -198,7 +197,6 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
               brand: d.brand || defaultBrand,
               model: d.model || defaultModel,
               imei: d.imei,
-              color: d.color,
               storageGb: d.storageGb ? Number(d.storageGb) : undefined,
             }))
           : [],
@@ -443,7 +441,6 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                       <tr>
                         <th className="px-3 py-2">Modelo</th>
                         <th className="px-3 py-2">IMEI / Serie</th>
-                        <th className="px-3 py-2">Color</th>
                         <th className="px-3 py-2 w-24">GB</th>
                         <th className="px-3 py-2 text-right"></th>
                       </tr>
@@ -476,19 +473,6 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                               }}
                               placeholder="3587..."
                               className="w-full font-mono bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#5750f1]"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={row.color}
-                              onChange={(e) => {
-                                const next = [...manualDevices];
-                                next[idx].color = e.target.value;
-                                setManualDevices(next);
-                              }}
-                              placeholder="Negro"
-                              className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#5750f1]"
                             />
                           </td>
                           <td className="px-3 py-2">
