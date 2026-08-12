@@ -11,10 +11,11 @@ import {
   Check,
   Ban,
   UserX,
+  History,
 } from "lucide-react";
 import { createImeiRequestAction, validateImeisAction } from "../actions/imei-requests";
 
-type ImeiStatus = "ok" | "not_found" | "assigned";
+type ImeiStatus = "ok" | "not_found" | "assigned" | "reviewed";
 
 const STATUS_CFG: Record<ImeiStatus, { label: string; cls: string; Icon: typeof Check }> = {
   ok: {
@@ -31,6 +32,11 @@ const STATUS_CFG: Record<ImeiStatus, { label: string; cls: string; Icon: typeof 
     label: "Asignado a otro QC",
     cls: "text-amber-700 bg-amber-50 border-amber-200",
     Icon: UserX,
+  },
+  reviewed: {
+    label: "Ya revisado",
+    cls: "text-[#475467] bg-[#f2f4f7] border-[#e4e7ec]",
+    Icon: History,
   },
 };
 
@@ -89,7 +95,7 @@ export function SolicitarImeisModal({ onClose, onSent }: SolicitarImeisModalProp
   }, [imeis]);
 
   const counts = useMemo(() => {
-    const c = { ok: 0, not_found: 0, assigned: 0 };
+    const c = { ok: 0, not_found: 0, assigned: 0, reviewed: 0 };
     if (!validation) return c;
     for (const imei of imeis) {
       const st = validation[imei];
@@ -103,8 +109,9 @@ export function SolicitarImeisModal({ onClose, onSent }: SolicitarImeisModalProp
     : validation
     ? `${counts.ok} de ${imeis.length} disponibles` +
       (counts.not_found > 0 ? ` · ${counts.not_found} no existen` : "") +
-      (counts.assigned > 0 ? ` · ${counts.assigned} asignados a otro QC` : "")
-    : "Solo se aceptan IMEIs existentes y libres; el resto se omite.";
+      (counts.assigned > 0 ? ` · ${counts.assigned} asignados a otro QC` : "") +
+      (counts.reviewed > 0 ? ` · ${counts.reviewed} ya revisados` : "")
+    : "Solo se aceptan IMEIs existentes, libres y sin revisar; el resto se omite.";
 
   const submit = async () => {
     setError(null);

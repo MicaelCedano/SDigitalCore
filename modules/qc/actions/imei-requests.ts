@@ -13,8 +13,10 @@ import {
 
 /**
  * El QC solicita IMEIs que quiere revisar (fórmula SDigitalSystem).
- * Solo se aceptan equipos existentes, en lotes no cancelados y libres
- * (no asignados a otro QC).
+ * Solo se aceptan equipos existentes, en lotes no cancelados, libres
+ * (no asignados a otro QC) y que AÚN NO hayan sido revisados
+ * (sin inspección COMPLETADA) — los del historial/inventario ya revisado
+ * no se pueden volver a solicitar.
  */
 export async function createImeiRequestAction(input: CreateImeiRequestInput) {
   try {
@@ -28,7 +30,13 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
 
     const devices = await prisma.deviceUnit.findMany({
       where: { imei: { in: imeis }, batch: { status: { not: "CANCELLED" } } },
-      select: { id: true, imei: true, model: true, assignedToId: true },
+      select: {
+        id: true,
+        imei: true,
+        model: true,
+        assignedToId: true,
+        _count: { select: { inspections: { where: { status: "COMPLETED" } } } },
+      },
     });
     const deviceByImei = new Map(devices.map((d) => [d.imei, d]));
 
@@ -37,9 +45,13 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
       const d = deviceByImei.get(i);
       return d && d.assignedToId && d.assignedToId !== user.id;
     });
+    const alreadyReviewed = imeis.filter((i) => {
+      const d = deviceByImei.get(i);
+      return d && d._count.inspections > 0;
+    });
     const validImeis = imeis.filter((i) => {
       const d = deviceByImei.get(i);
-      return d && (!d.assignedToId || d.assignedToId === user.id);
+      return d && d._count.inspections === 0 && (!d.assignedToId || d.assignedToId === user.id);
     });
 
     if (validImeis.length === 0) {
@@ -49,6 +61,7 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
           "Ninguno de los IMEIs es válido para solicitar" +
           (notFound.length > 0 ? " (algunos no existen en el sistema)" : "") +
           (alreadyAssigned.length > 0 ? " (otros ya están asignados a otro QC)" : "") +
+          (alreadyReviewed.length > 0 ? " (otros ya fueron revisados)" : "") +
           ".",
       };
     }
@@ -83,7 +96,8 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
       message:
         `Solicitud enviada con ${validImeis.length} IMEI(s).` +
         (notFound.length > 0 ? ` Se omitieron ${notFound.length} que no existen.` : "") +
-        (alreadyAssigned.length > 0 ? ` Se omitieron ${alreadyAssigned.length} ya asignados a otro QC.` : ""),
+        (alreadyAssigned.length > 0 ? ` Se omitieron ${alreadyAssigned.length} ya asignados a otro QC.` : "") +
+        (alreadyReviewed.length > 0 ? ` Se omitieron ${alreadyReviewed.length} ya revisados.` : ""),
     };
   } catch (error: any) {
     console.error("Error al crear solicitud de IMEIs:", error);
@@ -96,7 +110,7 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
 
 /**
  * Validación en vivo para el modal del QC: clasifica cada IMEI pegado como
- * disponible, inexistente o asignado a otro QC (misma regla que
+ * disponible, inexistente, asignado a otro QC o ya revisado (misma regla que
  * createImeiRequestAction). No muta nada — solo informa al QC antes de enviar.
  */
 export async function validateImeisAction(input: { imeis: string[] }) {
@@ -114,13 +128,19 @@ export async function validateImeisAction(input: { imeis: string[] }) {
 
     const devices = await prisma.deviceUnit.findMany({
       where: { imei: { in: imeis }, batch: { status: { not: "CANCELLED" } } },
-      select: { imei: true, assignedToId: true },
+      select: {
+        imei: true,
+        assignedToId: true,
+        _count: { select: { inspections: { where: { status: "COMPLETED" } } } },
+      },
     });
     const deviceByImei = new Map(devices.map((d) => [d.imei, d]));
 
     const data = imeis.map((imei) => {
       const device = deviceByImei.get(imei);
       if (!device) return { imei, status: "not_found" as const };
+      // Un equipo ya revisado (historial/inventario) no se puede volver a solicitar.
+      if (device._count.inspections > 0) return { imei, status: "reviewed" as const };
       if (device.assignedToId && device.assignedToId !== user.id) {
         return { imei, status: "assigned" as const };
       }
@@ -225,7 +245,11 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
 
     if (validated.accept) {
       const devices = await prisma.deviceUnit.findMany({
-        where: { imei: { in: imeis.map((i) => i.imei) } },
+        where: {
+          imei: { in: imeis.map((i) => i.imei) },
+          // Defensa: nunca asignar a revisión un equipo que ya fue revisado.
+          inspections: { none: { status: "COMPLETED" } },
+        },
         select: { id: true, imei: true, assignedToId: true },
       });
       const free = devices.filter((d) => !d.assignedToId || d.assignedToId === request.requesterId);
