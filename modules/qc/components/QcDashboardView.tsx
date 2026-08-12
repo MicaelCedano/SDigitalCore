@@ -71,12 +71,9 @@ export function QcDashboardView({ data }: { data: QcDashboardData | null }) {
             </p>
           </div>
         </div>
-        <Link
-          href="/qc/lotes"
-          className="px-4 py-2.5 bg-slate-100 hover:bg-[#5750f1] hover:text-white text-slate-700 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5"
-        >
-          Ver todos mis lotes <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+        <span className="text-[11px] font-bold text-slate-400">
+          {lotes.length} lote(s) asignado(s)
+        </span>
       </div>
 
       {/* Stats */}
