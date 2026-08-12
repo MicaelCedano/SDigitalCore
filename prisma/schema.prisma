@@ -414,28 +414,31 @@ enum QcInspectionResult {
 // ============================================================
 
 model DeviceUnit {
-  id           String                  @id @default(cuid())
-  imei         String?                 @unique @db.VarChar(20)
-  serialNumber String?                 @unique @map("serial_number") @db.VarChar(120)
-  brand        String?                 @db.VarChar(100)
-  model        String                  @db.VarChar(150)
-  storageGb    Int?                    @map("storage_gb")
-  color        String?                 @db.VarChar(80)
-  status       DeviceOperationalStatus @default(PENDING_QC)
-  createdAt    DateTime                @default(now()) @map("created_at")
-  updatedAt    DateTime                @updatedAt @map("updated_at")
+  id             String                  @id @default(cuid())
+  imei           String?                 @unique @db.VarChar(20)
+  serialNumber   String?                 @unique @map("serial_number") @db.VarChar(120)
+  brand          String?                 @db.VarChar(100)
+  model          String                  @db.VarChar(150)
+  storageGb      Int?                    @map("storage_gb")
+  color          String?                 @db.VarChar(80)
+  status         DeviceOperationalStatus @default(PENDING_QC)
+  sourceSystem   String?                 @map("source_system") @db.VarChar(50)
+  sourceRecordId String?                 @map("source_record_id") @db.VarChar(80)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
 
   inspections QcInspection[]
 
   @@index([status, updatedAt])
   @@index([brand, model])
+  @@unique([sourceSystem, sourceRecordId])
   @@map("device_unit")
 }
 
 model QcInspection {
   id                   String              @id @default(cuid())
   deviceId             String              @map("device_id")
-  reviewerId           String              @map("reviewer_id")
+  reviewerId           String?             @map("reviewer_id")
   reviewerNameSnapshot String              @map("reviewer_name_snapshot") @db.VarChar(160)
   status               QcInspectionStatus  @default(DRAFT)
   result               QcInspectionResult?
@@ -445,11 +448,13 @@ model QcInspection {
   physicalNotes        String?             @map("physical_notes") @db.Text
   reviewedAt           DateTime?           @map("reviewed_at")
   supersedesId         String?             @unique @map("supersedes_id")
+  sourceSystem         String?             @map("source_system") @db.VarChar(50)
+  sourceRecordId       String?             @map("source_record_id") @db.VarChar(80)
   createdAt            DateTime            @default(now()) @map("created_at")
   updatedAt            DateTime            @updatedAt @map("updated_at")
 
   device      DeviceUnit     @relation(fields: [deviceId], references: [id], onDelete: Restrict)
-  reviewer    User           @relation("QcInspectionReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  reviewer    User?          @relation("QcInspectionReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
   supersedes  QcInspection?  @relation("QcInspectionCorrections", fields: [supersedesId], references: [id], onDelete: Restrict)
   corrections QcInspection[] @relation("QcInspectionCorrections")
 
@@ -457,6 +462,7 @@ model QcInspection {
   @@index([reviewerId, reviewedAt])
   @@index([status, reviewedAt])
   @@index([result, reviewedAt])
+  @@unique([sourceSystem, sourceRecordId])
   @@map("qc_inspection")
 }
 
@@ -676,17 +682,20 @@ enum QcSupplierStatus {
 }
 
 model QcSupplier {
-  id          String           @id @default(cuid())
-  name        String           @unique @db.VarChar(160)
-  contactName String?          @map("contact_name") @db.VarChar(160)
-  phone       String?          @db.VarChar(40)
-  email       String?          @db.VarChar(200)
-  notes       String?          @db.Text
-  status      QcSupplierStatus @default(ACTIVE)
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  id             String           @id @default(cuid())
+  name           String           @unique @db.VarChar(160)
+  contactName    String?          @map("contact_name") @db.VarChar(160)
+  phone          String?          @db.VarChar(40)
+  email          String?          @db.VarChar(200)
+  notes          String?          @db.Text
+  status         QcSupplierStatus @default(ACTIVE)
+  sourceSystem   String?          @map("source_system") @db.VarChar(50)
+  sourceRecordId String?          @map("source_record_id") @db.VarChar(80)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
   @@index([status, name])
+  @@unique([sourceSystem, sourceRecordId])
   @@map("qc_supplier")
 }
 

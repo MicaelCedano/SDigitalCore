@@ -18,7 +18,9 @@
     "migration:legacy-wallets:dry-run": "node --env-file=.env.local scripts/migrate-legacy-users-wallets.mjs",
     "migration:legacy-wallets:apply": "node --env-file=.env.local scripts/migrate-legacy-users-wallets.mjs --apply",
     "migration:legacy-wallets:cutover": "node --env-file=.env.local scripts/migrate-legacy-users-wallets.mjs --cutover",
-    "migration:legacy-wallets:reverse": "node --env-file=.env.local scripts/reverse-legacy-wallet-batch.mjs"
+    "migration:legacy-wallets:reverse": "node --env-file=.env.local scripts/reverse-legacy-wallet-batch.mjs",
+    "migration:legacy-qc:dry-run": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs",
+    "migration:legacy-qc:apply": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs --apply"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
