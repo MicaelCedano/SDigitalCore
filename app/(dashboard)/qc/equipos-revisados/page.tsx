@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { Prisma, QcInspectionResult } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
@@ -35,9 +35,10 @@ export default async function EquiposRevisadosPage({
 
   const params = await searchParams;
   const query = (params.q ?? "").trim().slice(0, 120);
-  const result = params.result === "FUNCTIONAL" || params.result === "NON_FUNCTIONAL" || params.result === "UNSPECIFIED"
-    ? params.result as QcInspectionResult
-    : undefined;
+  const result: "FUNCTIONAL" | "NON_FUNCTIONAL" | "UNSPECIFIED" | undefined =
+    params.result === "FUNCTIONAL" || params.result === "NON_FUNCTIONAL" || params.result === "UNSPECIFIED"
+      ? params.result
+      : undefined;
   const requestedPage = Number.parseInt(params.page ?? "1", 10);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const today = santoDomingoDayRange();
@@ -59,7 +60,7 @@ export default async function EquiposRevisadosPage({
       : {}),
   };
 
-  const [total, inspections, functional, nonFunctional, unspecified, reviewedToday] = await Promise.all([
+  const [total, inspections, resultStats, reviewedToday] = await Promise.all([
     prisma.qcInspection.count({ where }),
     prisma.qcInspection.findMany({
       where,
@@ -71,18 +72,41 @@ export default async function EquiposRevisadosPage({
         result: true,
         grade: true,
         batteryHealth: true,
+        functionalityNotes: true,
+        physicalNotes: true,
         reviewedAt: true,
+        createdAt: true,
         reviewerNameSnapshot: true,
+        reviewerId: true,
+        reviewer: { select: { id: true, name: true, username: true } },
         device: {
-          select: { id: true, imei: true, serialNumber: true, brand: true, model: true, storageGb: true, color: true, status: true },
+          select: {
+            id: true,
+            imei: true,
+            serialNumber: true,
+            brand: true,
+            model: true,
+            storageGb: true,
+            color: true,
+            status: true,
+            batch: { select: { batchNumber: true, supplierName: true, status: true } },
+          },
         },
       },
     }),
-    prisma.qcInspection.count({ where: { status: "COMPLETED", result: "FUNCTIONAL" } }),
-    prisma.qcInspection.count({ where: { status: "COMPLETED", result: "NON_FUNCTIONAL" } }),
-    prisma.qcInspection.count({ where: { status: "COMPLETED", result: "UNSPECIFIED" } }),
+    // Un solo groupBy para las tres estadísticas de resultado (antes eran 3 counts).
+    prisma.qcInspection.groupBy({
+      by: ["result"],
+      where: { status: "COMPLETED" },
+      _count: { _all: true },
+    }),
     prisma.qcInspection.count({ where: { status: "COMPLETED", reviewedAt: { gte: today.start, lt: today.end } } }),
   ]);
+
+  const byResult = new Map(resultStats.map((r) => [r.result, r._count._all]));
+  const functional = byResult.get("FUNCTIONAL") ?? 0;
+  const nonFunctional = byResult.get("NON_FUNCTIONAL") ?? 0;
+  const unspecified = byResult.get("UNSPECIFIED") ?? 0;
 
   return (
     <ReviewedDevicesPage
