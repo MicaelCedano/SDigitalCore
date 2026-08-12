@@ -144,9 +144,9 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         technician: { select: { name: true, username: true } },
       },
     }),
-    // QC: lotes de revisión pendientes o en revisión
+    // QC: lotes de revisión pendientes, en revisión o enviados a aprobación
     prisma.qcRevisionBatch.findMany({
-      where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW"] } },
+      where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW", "SUBMITTED"] } },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {

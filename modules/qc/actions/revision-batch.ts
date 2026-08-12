@@ -370,10 +370,8 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
         },
       });
 
-      // Al marcar el lote COMPLETED se paga a los revisores (RD$50 por equipo).
-      if (validated.status === "COMPLETED") {
-        await payReviewersForBatch(validated.id, tx);
-      }
+      // El pago a revisores NO ocurre aquí: solo en approveRevisionBatchAction
+      // (el admin acepta el lote SUBMITTED y se acredita el pago).
 
       return u;
     });
@@ -401,6 +399,130 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
   } catch (error: any) {
     console.error("Error al actualizar estado del lote:", error);
     return { success: false, error: "Error al actualizar el estado del Lote de Revisión" };
+  }
+}
+
+/**
+ * El QC ENVÍA el lote para aprobación del admin. Solo procede si todos los
+ * equipos del lote ya fueron revisados (reviewed == total). El lote pasa de
+ * IN_REVIEW → SUBMITTED. El pago NO ocurre aquí (lo acredita el admin).
+ */
+export async function submitRevisionBatchAction(input: { id: string }): Promise<Result<{ id: string; batchNumber: string; status: string }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+
+    const parsed = z.object({ id: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Lote inválido." };
+
+    const batch = await prisma.qcRevisionBatch.findUnique({
+      where: { id: parsed.data.id },
+      select: { id: true, batchNumber: true, status: true, reviewedDevices: true, totalDevices: true },
+    });
+    if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
+    if (batch.status !== "IN_REVIEW") {
+      return { success: false, error: `Solo se puede enviar un lote EN REVISIÓN (estado actual: ${batch.status}).` };
+    }
+    if (batch.reviewedDevices < batch.totalDevices) {
+      return { success: false, error: `Faltan ${batch.totalDevices - batch.reviewedDevices} equipo(s) por revisar antes de enviar el lote.` };
+    }
+
+    const updated = await prisma.qcRevisionBatch.update({
+      where: { id: batch.id },
+      data: { status: "SUBMITTED" },
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "qc_batch.submit",
+      module: "qc",
+      entityType: "qc_revision_batch",
+      entityId: batch.id,
+      beforeData: { status: batch.status },
+      afterData: { status: "SUBMITTED", batchNumber: batch.batchNumber },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${batch.id}`);
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: { id: updated.id, batchNumber: updated.batchNumber, status: updated.status },
+      message: `Lote ${updated.batchNumber} enviado para aprobación. El administrador aceptará y se acreditará el pago.`,
+    };
+  } catch (error: any) {
+    console.error("Error al enviar lote:", error);
+    return { success: false, error: error.message || "Error al enviar el lote" };
+  }
+}
+
+/**
+ * El ADMIN acepta un lote SUBMITTED (completo, buenos y malos ya revisados).
+ * Al aceptar: lote → COMPLETED y se acredita el pago a los revisores
+ * (RD$50 por equipo, idempotente por externalKey). También permite devolver
+ * a IN_REVIEW si faltó algo (reject → el QC sigue trabajando).
+ */
+export async function approveRevisionBatchAction(input: { id: string; reject?: boolean }): Promise<Result<{ id: string; batchNumber: string; status: string; paidReviewers: number }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede aceptar el lote." };
+    }
+
+    const parsed = z.object({ id: z.string().min(1), reject: z.boolean().optional() }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Lote inválido." };
+
+    const batch = await prisma.qcRevisionBatch.findUnique({
+      where: { id: parsed.data.id },
+      select: { id: true, batchNumber: true, status: true },
+    });
+    if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
+    if (batch.status !== "SUBMITTED") {
+      return { success: false, error: `Solo se puede aceptar un lote ENVIADO (estado actual: ${batch.status}).` };
+    }
+
+    let paidReviewers = 0;
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.qcRevisionBatch.update({
+        where: { id: batch.id },
+        data: {
+          status: parsed.data.reject ? "IN_REVIEW" : "COMPLETED",
+          completedAt: parsed.data.reject ? null : new Date(),
+        },
+      });
+      if (!parsed.data.reject) {
+        paidReviewers = await payReviewersForBatch(batch.id, tx);
+      }
+      return u;
+    });
+
+    await logAudit({
+      userId: persisted.id,
+      action: parsed.data.reject ? "qc_batch.reject" : "qc_batch.approve",
+      module: "qc",
+      entityType: "qc_revision_batch",
+      entityId: batch.id,
+      beforeData: { status: batch.status },
+      afterData: { status: updated.status, paidReviewers },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${batch.id}`);
+    revalidatePath("/qc/equipos-revisados");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: { id: updated.id, batchNumber: updated.batchNumber, status: updated.status, paidReviewers },
+      message: parsed.data.reject
+        ? `Lote ${updated.batchNumber} devuelto a revisión.`
+        : `Lote ${updated.batchNumber} ACEPTADO. Pago acreditado a ${paidReviewers} revisor(es).`,
+    };
+  } catch (error: any) {
+    console.error("Error al aprobar lote:", error);
+    return { success: false, error: error.message || "Error al aprobar el lote" };
   }
 }
 
@@ -802,11 +924,14 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       }
 
       const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
+      // Al terminar de revisar todos los equipos el lote queda listo en
+      // IN_REVIEW (reviewed == total). El QC lo ENVÍA con submitRevisionBatchAction
+      // y el admin lo ACEPTA con approveRevisionBatchAction (ahí se paga).
       const nextStatus =
-        allReviewed
+        batch.status === "COMPLETED"
           ? "COMPLETED"
-          : batch.status === "COMPLETED"
-            ? "COMPLETED"
+          : batch.status === "SUBMITTED"
+            ? "SUBMITTED"
             : batch.status;
 
       const updatedBatch = await tx.qcRevisionBatch.update({
@@ -815,16 +940,13 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
           reviewedDevices: reviewed,
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
-          status: nextStatus,
-          completedAt: allReviewed ? new Date() : batch.completedAt,
+          status: nextStatus as QcBatchStatus,
+          completedAt: nextStatus === "COMPLETED" ? batch.completedAt : null,
         },
       });
 
-      // Fórmula SDigitalSystem: al quedar el lote COMPLETED (entregado),
-      // cada revisor gana RD$50 por equipo revisado (idempotente).
-      if (nextStatus === "COMPLETED") {
-        await payReviewersForBatch(batch.id, tx);
-      }
+      // Sin pago aquí: el pago a revisores ocurre SOLO cuando el admin
+      // acepta el lote (approveRevisionBatchAction).
 
       return updatedBatch;
     });
@@ -934,11 +1056,13 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
         }
       }
       const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
+      // El lote queda listo en IN_REVIEW; el QC lo envía y el admin lo acepta
+      // (ahí se paga). No se auto-completa.
       const nextStatus =
-        allReviewed
+        batch.status === "COMPLETED"
           ? "COMPLETED"
-          : batch.status === "COMPLETED"
-            ? "COMPLETED"
+          : batch.status === "SUBMITTED"
+            ? "SUBMITTED"
             : batch.status;
 
       const updated = await tx.qcRevisionBatch.update({
@@ -947,14 +1071,13 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
           reviewedDevices: reviewed,
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
-          status: nextStatus,
-          completedAt: allReviewed ? new Date() : batch.completedAt,
+          status: nextStatus as QcBatchStatus,
+          completedAt: nextStatus === "COMPLETED" ? batch.completedAt : null,
         },
       });
 
-      if (nextStatus === "COMPLETED") {
-        await payReviewersForBatch(batch.id, tx);
-      }
+      // Sin pago aquí: el pago a revisores ocurre SOLO cuando el admin
+      // acepta el lote (approveRevisionBatchAction).
 
       return updated;
     });

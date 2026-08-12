@@ -7,6 +7,8 @@ import {
   updateRevisionBatchStatusAction,
   getRevisionBatchDetailAction,
   deleteRevisionBatchAction,
+  submitRevisionBatchAction,
+  approveRevisionBatchAction,
 } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { AssignDeviceModal } from "./AssignDeviceModal";
@@ -87,6 +89,33 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
     }
   };
 
+  const handleSubmitBatch = async () => {
+    if (!confirm(`¿Enviar el Lote ${batch.batchNumber} para aprobación del administrador? El pago se acreditará cuando lo acepte.`)) return;
+    setLoadingStatus(true);
+    const res = await submitRevisionBatchAction({ id: batch.id });
+    setLoadingStatus(false);
+    if (res.success) {
+      alert(res.message ?? "Lote enviado.");
+      setBatch((prev: any) => ({ ...prev, status: "SUBMITTED" }));
+    } else {
+      alert(res.error || "No se pudo enviar el lote.");
+    }
+  };
+
+  const handleApproveBatch = async (reject: boolean) => {
+    const actionLabel = reject ? "devolver a revisión" : "aceptar y acreditar el pago";
+    if (!confirm(`¿${reject ? "Devolver" : "Aceptar"} el Lote ${batch.batchNumber}? ${reject ? "Volverá a EN REVISIÓN." : "Se acreditará el pago a los revisores (RD$50/equipo)."}`)) return;
+    setLoadingStatus(true);
+    const res = await approveRevisionBatchAction({ id: batch.id, reject });
+    setLoadingStatus(false);
+    if (res.success) {
+      alert(res.message ?? "Lote procesado.");
+      setBatch((prev: any) => ({ ...prev, status: res.data?.status ?? (reject ? "IN_REVIEW" : "COMPLETED") }));
+    } else {
+      alert(res.error || "No se pudo procesar el lote.");
+    }
+  };
+
   // Filtrar equipos del lote
   const devices = (batch.devices || []).filter((dev: any) => {
     if (!searchQuery.trim()) return true;
@@ -138,6 +167,8 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
                 className={`px-3 py-1 text-xs font-bold rounded-full border ${
                   batch.status === "COMPLETED"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : batch.status === "SUBMITTED"
+                    ? "bg-violet-50 text-violet-700 border-violet-200"
                     : batch.status === "IN_REVIEW"
                     ? "bg-blue-50 text-blue-700 border-blue-200"
                     : batch.status === "PENDING_REVIEW"
@@ -147,6 +178,8 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
               >
                 {batch.status === "COMPLETED"
                   ? "COMPLETADO"
+                  : batch.status === "SUBMITTED"
+                  ? "ENVIADO A APROBACIÓN"
                   : batch.status === "IN_REVIEW"
                   ? "EN REVISIÓN"
                   : batch.status === "PENDING_REVIEW"
@@ -171,11 +204,29 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
           </div>
         </div>
 
-        {/* Acciones: admin gestiona la compra (verificar/recuperar/eliminar);
-            el control de calidad gestiona los estados del lote */}
+        {/* Acciones: admin gestiona la compra (verificar/recuperar/eliminar/aceptar);
+            el control de calidad revisa, envía el lote y gestiona estados */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
           {isAdmin ? (
             <>
+              {batch.status === "SUBMITTED" && (
+                <>
+                  <button
+                    onClick={() => handleApproveBatch(false)}
+                    disabled={loadingStatus}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
+                  >
+                    <CheckCheck className="w-4 h-4" /> Aceptar Lote (pagar)
+                  </button>
+                  <button
+                    onClick={() => handleApproveBatch(true)}
+                    disabled={loadingStatus}
+                    className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-xl border border-amber-200 flex items-center gap-2"
+                  >
+                    Devolver a Revisión
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setShowVerifier(true)}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
@@ -208,13 +259,13 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
             </>
           ) : (
             <>
-              {batch.status !== "COMPLETED" && (
+              {batch.status === "IN_REVIEW" && batch.reviewedDevices >= batch.totalDevices && (
                 <button
-                  onClick={() => handleStatusChange("COMPLETED")}
+                  onClick={handleSubmitBatch}
                   disabled={loadingStatus}
                   className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
                 >
-                  <CheckCheck className="w-4 h-4" /> Marcar Lote Completado
+                  <CheckCheck className="w-4 h-4" /> Enviar Lote
                 </button>
               )}
 
@@ -228,7 +279,13 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
                 </button>
               )}
 
-              {batch.status !== "CANCELLED" && (
+              {batch.status === "SUBMITTED" && (
+                <span className="px-4 py-2.5 bg-violet-50 text-violet-700 font-bold text-xs rounded-xl border border-violet-200 flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> Esperando aprobación del admin
+                </span>
+              )}
+
+              {batch.status !== "CANCELLED" && batch.status !== "SUBMITTED" && batch.status !== "COMPLETED" && (
                 <button
                   onClick={() => handleStatusChange("CANCELLED")}
                   disabled={loadingStatus}

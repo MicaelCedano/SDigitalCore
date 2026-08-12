@@ -47,7 +47,7 @@ export function RevisionBatchesList() {
 
   // Métricas
   const totalBatches = batches.length;
-  const inReviewBatches = batches.filter((b) => b.status === "IN_REVIEW" || b.status === "PENDING_REVIEW").length;
+  const inReviewBatches = batches.filter((b) => b.status === "IN_REVIEW" || b.status === "PENDING_REVIEW" || b.status === "SUBMITTED").length;
   const completedBatches = batches.filter((b) => b.status === "COMPLETED").length;
   const totalDevices = batches.reduce((acc, b) => acc + (b.totalDevices || 0), 0);
 
@@ -145,6 +145,7 @@ export function RevisionBatchesList() {
             <option value="ALL">Todos los Estados</option>
             <option value="PENDING_REVIEW">Pendientes de Revisión</option>
             <option value="IN_REVIEW">En Revisión QC</option>
+            <option value="SUBMITTED">Enviados a Aprobación</option>
             <option value="COMPLETED">Completados</option>
             <option value="CANCELLED">Cancelados</option>
           </select>
@@ -246,6 +247,8 @@ export function RevisionBatchesList() {
                           className={`px-2.5 py-1 text-[11px] font-bold rounded-full border ${
                             batch.status === "COMPLETED"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : batch.status === "SUBMITTED"
+                              ? "bg-violet-50 text-violet-700 border-violet-200"
                               : batch.status === "IN_REVIEW"
                               ? "bg-blue-50 text-blue-700 border-blue-200"
                               : batch.status === "PENDING_REVIEW"
@@ -255,6 +258,8 @@ export function RevisionBatchesList() {
                         >
                           {batch.status === "COMPLETED"
                             ? "COMPLETADO"
+                            : batch.status === "SUBMITTED"
+                            ? "ENVIADO A APROBACIÓN"
                             : batch.status === "IN_REVIEW"
                             ? "EN REVISIÓN"
                             : batch.status === "PENDING_REVIEW"
