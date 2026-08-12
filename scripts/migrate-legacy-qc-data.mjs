@@ -135,11 +135,12 @@ function buildSnapshot(sourceData, reviewerLinks) {
       device: {
         id: `legacy-sds-device-${sourceRecordId}`,
         imei: inspection.imei,
-        brand: clean(inspection.brand),
+        brand: clean(inspection.brand) || "Apple",
         model: inspection.model.trim(),
         storageGb: inspection.storageGb,
         color: clean(inspection.color),
         status: deviceStatus(inspection.sourceStatus, result),
+        batchId: "legacy-sds-batch-initial",
         sourceSystem: SOURCE_SYSTEM,
         sourceRecordId,
         createdAt: inspection.createdAt,
@@ -167,6 +168,7 @@ async function assertTargetSchema(target) {
   const row = (await target.query(`
     SELECT
       to_regclass('public.qc_supplier') IS NOT NULL AS suppliers,
+      to_regclass('public.qc_revision_batch') IS NOT NULL AS batches,
       EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'device_unit' AND column_name = 'source_record_id'
@@ -176,8 +178,8 @@ async function assertTargetSchema(target) {
         WHERE table_schema = 'public' AND table_name = 'qc_inspection' AND column_name = 'source_record_id'
       ) AS inspections
   `)).rows[0];
-  if (!row.suppliers || !row.devices || !row.inspections) {
-    throw new Error("El esquema de proveedores o trazabilidad QC todavía no está aplicado en Core.");
+  if (!row.suppliers || !row.batches || !row.devices || !row.inspections) {
+    throw new Error("El esquema de proveedores, lotes o trazabilidad QC todavía no está aplicado en Core.");
   }
 }
 
@@ -207,6 +209,37 @@ async function importSuppliers(target, suppliers) {
   return result.rowCount;
 }
 
+async function importLegacyBatch(target, summary) {
+  await target.query(`
+    INSERT INTO qc_revision_batch (
+      id, batch_number, supplier_name, branch, received_by, status,
+      total_devices, reviewed_devices, functional_count, non_functional_count,
+      notes, created_at, updated_at
+    ) VALUES (
+      'legacy-sds-batch-initial',
+      'LOT-LEGACY-SDIGITALSYSTEM',
+      'Importación Histórica SDigitalSystem',
+      'Principal',
+      'Migración de Sistema Legacy',
+      'COMPLETED'::qc_batch_status,
+      $1, $2, $3, $4,
+      'Lote generado automáticamente durante la migración de equipos y compras desde SDigitalSystem',
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (batch_number) DO UPDATE SET
+      total_devices = EXCLUDED.total_devices,
+      reviewed_devices = EXCLUDED.reviewed_devices,
+      functional_count = EXCLUDED.functional_count,
+      non_functional_count = EXCLUDED.non_functional_count,
+      updated_at = CURRENT_TIMESTAMP
+  `, [
+    summary.importableInspections,
+    summary.importableInspections,
+    summary.functional,
+    summary.nonFunctional,
+  ]);
+}
+
 async function importInspectionBatch(target, records) {
   const devices = records.map((record) => record.device);
   const inspections = records.map((record) => record.inspection);
@@ -225,6 +258,7 @@ async function importInspectionBatch(target, records) {
           "storageGb" integer,
           color text,
           status text,
+          "batchId" text,
           "sourceSystem" text,
           "sourceRecordId" text,
           "createdAt" timestamp,
@@ -232,11 +266,11 @@ async function importInspectionBatch(target, records) {
         )
       )
       INSERT INTO device_unit (
-        id, imei, brand, model, storage_gb, color, status,
+        id, imei, brand, model, storage_gb, color, status, batch_id,
         source_system, source_record_id, created_at, updated_at
       )
       SELECT
-        id, imei, brand, model, "storageGb", color, status::"DeviceOperationalStatus",
+        id, imei, brand, model, "storageGb", color, status::"DeviceOperationalStatus", "batchId",
         "sourceSystem", "sourceRecordId", "createdAt", "updatedAt"
       FROM payload
       ON CONFLICT (source_system, source_record_id) DO UPDATE SET
@@ -246,6 +280,7 @@ async function importInspectionBatch(target, records) {
         storage_gb = EXCLUDED.storage_gb,
         color = EXCLUDED.color,
         status = EXCLUDED.status,
+        batch_id = EXCLUDED.batch_id,
         updated_at = EXCLUDED.updated_at
     `, [JSON.stringify(devices)]);
 
@@ -334,6 +369,7 @@ async function main() {
 
     await assertTargetSchema(target);
     const importedSuppliers = await importSuppliers(target, snapshot.suppliers);
+    await importLegacyBatch(target, summary);
     let importedInspections = 0;
     for (const batch of chunks(snapshot.inspections, BATCH_SIZE)) {
       await importInspectionBatch(target, batch);
