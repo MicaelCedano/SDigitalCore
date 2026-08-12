@@ -744,11 +744,14 @@ model RepairJob {
   approvedAt     DateTime?       @map("approved_at")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
+  sourceSystem   String?         @map("source_system")
+  sourceRecordId String?         @map("source_record_id")
 
   technician User  @relation("RepairJobTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
   approvedBy User? @relation("RepairJobApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   items      RepairJobItem[]
 
+  @@unique([sourceSystem, sourceRecordId])
   @@index([technicianId, status])
   @@index([status, createdAt])
   @@map("repair_job")
@@ -764,10 +767,13 @@ model RepairJobItem {
   cliente        String
   warrantyCaseId String?  @map("warranty_case_id")
   createdAt      DateTime @default(now()) @map("created_at")
+  sourceSystem   String?  @map("source_system")
+  sourceRecordId String?  @map("source_record_id")
 
   job          RepairJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
   warrantyCase WarrantyCase? @relation(fields: [warrantyCaseId], references: [id], onDelete: SetNull)
 
+  @@unique([sourceSystem, sourceRecordId])
   @@index([imei])
   @@index([jobId])
   @@map("repair_job_item")
