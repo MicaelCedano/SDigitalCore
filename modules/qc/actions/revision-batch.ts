@@ -8,8 +8,10 @@ import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import {
   createRevisionBatchSchema,
   updateRevisionBatchStatusSchema,
+  reviewDeviceSchema,
   CreateRevisionBatchInput,
   UpdateRevisionBatchStatusInput,
+  ReviewDeviceInput,
 } from "@/lib/validation/revision-batch";
 import type { QcBatchStatus } from "@prisma/client";
 
@@ -370,3 +372,139 @@ export async function getRevisionBatchFormDataAction() {
   }
 }
 
+/**
+ * Registra la revisión QC de un equipo dentro de un Lote de Revisión.
+ * Crea una inspección COMPLETED, actualiza el estado operativo del equipo
+ * y recalcula los contadores del lote. Si con esta revisión quedan todos
+ * los equipos revisados, el lote pasa automáticamente a COMPLETED.
+ */
+export async function reviewDeviceAction(input: ReviewDeviceInput) {
+  try {
+    const actor = await requirePermission("qc.write");
+    if (!actor.id) {
+      return { success: false, error: "La sesión no tiene un usuario identificable." };
+    }
+
+    const validated = reviewDeviceSchema.parse(input);
+
+    const device = await prisma.deviceUnit.findUnique({
+      where: { id: validated.deviceId },
+      include: { batch: true },
+    });
+    if (!device) {
+      return { success: false, error: "El equipo no existe." };
+    }
+    if (!device.batch) {
+      return { success: false, error: "El equipo no pertenece a ningún Lote de Revisión." };
+    }
+    if (device.batch.status === "CANCELLED") {
+      return { success: false, error: "No se puede revisar un equipo de un lote cancelado." };
+    }
+
+    const batch = device.batch;
+    const reviewerName = actor.name || actor.email || "Control de Calidad";
+
+    const updatedBatch = await prisma.$transaction(async (tx) => {
+      // Si ya había una inspección completada, la nueva la reemplaza (cadena de correcciones)
+      const lastCompleted = await tx.qcInspection.findFirst({
+        where: { deviceId: device.id, status: "COMPLETED" },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+      await tx.qcInspection.create({
+        data: {
+          deviceId: device.id,
+          reviewerId: actor.id,
+          reviewerNameSnapshot: reviewerName.slice(0, 160),
+          status: "COMPLETED",
+          result: validated.result,
+          grade: validated.grade,
+          batteryHealth: validated.batteryHealth ?? null,
+          functionalityNotes: validated.notes || null,
+          reviewedAt: new Date(),
+          supersedesId: lastCompleted?.id ?? null,
+        },
+      });
+
+      await tx.deviceUnit.update({
+        where: { id: device.id },
+        data: {
+          status: validated.result === "FUNCTIONAL" ? "AVAILABLE" : "QUARANTINED",
+        },
+      });
+
+      // Recalcular contadores del lote desde las inspecciones reales (idempotente)
+      const batchDevices = await tx.deviceUnit.findMany({
+        where: { batchId: batch.id },
+        include: {
+          inspections: { orderBy: { createdAt: "desc" }, take: 1 },
+        },
+      });
+
+      let reviewed = 0;
+      let functional = 0;
+      let nonFunctional = 0;
+      for (const d of batchDevices) {
+        const last = d.inspections[0];
+        if (last && last.status === "COMPLETED") {
+          reviewed++;
+          if (last.result === "FUNCTIONAL") functional++;
+          else if (last.result === "NON_FUNCTIONAL") nonFunctional++;
+        }
+      }
+
+      const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
+      const nextStatus =
+        allReviewed
+          ? "COMPLETED"
+          : batch.status === "COMPLETED"
+            ? "COMPLETED"
+            : batch.status;
+
+      return tx.qcRevisionBatch.update({
+        where: { id: batch.id },
+        data: {
+          reviewedDevices: reviewed,
+          functionalCount: functional,
+          nonFunctionalCount: nonFunctional,
+          status: nextStatus,
+          completedAt: allReviewed ? new Date() : batch.completedAt,
+        },
+      });
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "qc_batch.review_device",
+      module: "qc",
+      entityType: "qc_inspection",
+      entityId: device.id,
+      afterData: {
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        deviceId: device.id,
+        result: validated.result,
+        grade: validated.grade,
+      },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${batch.id}`);
+    revalidatePath("/qc/equipos-revisados");
+    revalidatePath("/dashboard");
+
+    const completed = updatedBatch.reviewedDevices >= updatedBatch.totalDevices;
+    return {
+      success: true,
+      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). Lote ${batch.batchNumber}${completed ? " completado." : ""}`,
+      data: updatedBatch,
+    };
+  } catch (error: any) {
+    console.error("Error al revisar equipo:", error);
+    return {
+      success: false,
+      error: error.message || "Error al registrar la revisión del equipo",
+    };
+  }
+}

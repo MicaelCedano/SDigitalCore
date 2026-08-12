@@ -30,6 +30,18 @@ export const updateRevisionBatchStatusSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+export const reviewDeviceSchema = z.object({
+  deviceId: z.string().min(1, "El equipo es requerido"),
+  result: z.enum(["FUNCTIONAL", "NON_FUNCTIONAL"]),
+  grade: z.string().trim().min(1, "El grado estético es obligatorio").max(16),
+  notes: z.string().max(1000, "Las observaciones son muy largas").optional().nullable(),
+  batteryHealth: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().min(0).max(100).optional().nullable()
+  ),
+});
+
 export type RevisionBatchDeviceInput = z.infer<typeof revisionBatchDeviceSchema>;
 export type CreateRevisionBatchInput = z.infer<typeof createRevisionBatchSchema>;
 export type UpdateRevisionBatchStatusInput = z.infer<typeof updateRevisionBatchStatusSchema>;
+export type ReviewDeviceInput = z.infer<typeof reviewDeviceSchema>;

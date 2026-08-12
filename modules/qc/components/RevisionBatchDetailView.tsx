@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { updateRevisionBatchStatusAction } from "../actions/revision-batch";
+import {
+  updateRevisionBatchStatusAction,
+  getRevisionBatchDetailAction,
+} from "../actions/revision-batch";
+import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import {
   ArrowLeft,
   Package,
@@ -19,6 +23,7 @@ import {
   RefreshCw,
   FileSpreadsheet,
   CheckCheck,
+  ClipboardCheck,
 } from "lucide-react";
 
 interface RevisionBatchDetailViewProps {
@@ -29,6 +34,12 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
   const [batch, setBatch] = useState(initialBatch);
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [reviewDevice, setReviewDevice] = useState<any>(null);
+
+  const refreshBatch = async () => {
+    const res = await getRevisionBatchDetailAction(batch.id);
+    if (res.success && res.data) setBatch(res.data);
+  };
 
   const handleStatusChange = async (newStatus: "PENDING_REVIEW" | "IN_REVIEW" | "COMPLETED" | "CANCELLED") => {
     if (!confirm(`¿Desea cambiar el estado del Lote ${batch.batchNumber} a "${newStatus}"?`)) return;
@@ -291,12 +302,22 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
                         )}
                       </td>
                       <td className="px-4 py-4 text-right">
-                        <Link
-                          href={`/qc/equipos-revisados?q=${dev.imei || dev.serialNumber || ""}`}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-[#5750f1] hover:text-white text-slate-700 font-bold rounded-lg text-xs transition-colors inline-flex items-center gap-1"
-                        >
-                          <ScanSearch className="w-3.5 h-3.5" /> QC
-                        </Link>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setReviewDevice(dev)}
+                            className="px-2.5 py-1.5 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold rounded-lg text-xs transition-colors inline-flex items-center gap-1"
+                          >
+                            <ClipboardCheck className="w-3.5 h-3.5" /> Revisar
+                          </button>
+                          <Link
+                            href={`/qc/equipos-revisados?q=${dev.imei || dev.serialNumber || ""}`}
+                            title="Ver en equipos revisados"
+                            className="p-1.5 bg-slate-100 hover:bg-[#5750f1] hover:text-white text-slate-700 rounded-lg text-xs transition-colors inline-flex items-center"
+                          >
+                            <ScanSearch className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -306,6 +327,18 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
           </div>
         )}
       </div>
+
+      {/* Modal de revisión QC */}
+      {reviewDevice && (
+        <ReviewDeviceModal
+          device={reviewDevice}
+          onClose={() => setReviewDevice(null)}
+          onSaved={() => {
+            setReviewDevice(null);
+            refreshBatch();
+          }}
+        />
+      )}
     </div>
   );
 }
