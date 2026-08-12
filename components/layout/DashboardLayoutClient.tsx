@@ -11,6 +11,7 @@ interface DashboardLayoutClientProps {
   userRole?: string | null;
   userAvatarUrl?: string | null;
   allowedModules?: string[];
+  walletBalance?: string | null;
   notifications?: TopbarNotification[];
   notificationCount?: number;
   children: React.ReactNode;
@@ -22,6 +23,7 @@ export function DashboardLayoutClient({
   userRole,
   userAvatarUrl,
   allowedModules,
+  walletBalance,
   notifications,
   notificationCount,
   children,
@@ -45,6 +47,7 @@ export function DashboardLayoutClient({
           userEmail={userEmail}
           userRole={userRole}
           userAvatarUrl={userAvatarUrl}
+          walletBalance={walletBalance}
           notifications={notifications}
           notificationCount={notificationCount}
           onMobileToggle={() => setMobileOpen((v) => !v)}

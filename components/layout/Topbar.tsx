@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User } from "lucide-react";
+import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User, Wallet } from "lucide-react";
 import { GlobalImeiSearch } from "@/components/layout/GlobalImeiSearch";
 
 export interface TopbarNotification {
@@ -22,6 +22,7 @@ interface TopbarProps {
   userEmail?: string | null;
   userRole?: string | null;
   userAvatarUrl?: string | null;
+  walletBalance?: string | null;
   notifications?: TopbarNotification[];
   notificationCount?: number;
   onMobileToggle?: () => void;
@@ -64,7 +65,7 @@ function formatNotificationDate(value: string) {
   }).format(new Date(value));
 }
 
-export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notifications = [], notificationCount = 0, onMobileToggle }: TopbarProps) {
+export function Topbar({ userName, userEmail, userRole, userAvatarUrl, walletBalance, notifications = [], notificationCount = 0, onMobileToggle }: TopbarProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -189,7 +190,17 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
 
         <div className="hidden h-7 w-px bg-[#e4e7ec] sm:block" />
 
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative flex items-center gap-2" ref={dropdownRef}>
+          {walletBalance !== null && walletBalance !== undefined ? (
+            <Link
+              href="/wallet"
+              className="hidden items-center gap-1.5 rounded-full border border-[#e4e7ec] bg-[#f8fafc] px-2.5 py-1.5 text-[11px] font-bold text-[#4338ca] transition-colors hover:border-[#c7d2fe] hover:bg-[#eef2ff] md:inline-flex"
+              title="Ver Mi Wallet"
+            >
+              <Wallet size={13} strokeWidth={2} />
+              RD$ {Number(walletBalance).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Link>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -215,6 +226,20 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, notificat
               <div className="border-b border-[#f0f1f3] px-3 py-2.5">
                 <p className="truncate text-sm font-semibold text-[#101828]">{userName ?? "Usuario"}</p>
                 <p className="truncate text-xs text-[#667085]">{userEmail ?? ""}</p>
+                {walletBalance !== null && walletBalance !== undefined ? (
+                  <Link
+                    href="/wallet"
+                    onClick={() => setDropdownOpen(false)}
+                    className="mt-2 flex items-center gap-2 rounded-lg border border-[#e4e7ec] bg-[#f8fafc] px-2.5 py-2 transition-colors hover:bg-[#eef2ff]"
+                    role="menuitem"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#eef2ff] text-[#4338ca]"><Wallet size={14} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#667085]">Mi Wallet</span>
+                      <span className="block font-mono text-[13px] font-bold text-[#101828]">RD$ {Number(walletBalance).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </span>
+                  </Link>
+                ) : null}
               </div>
               <div className="py-1">
                 <Link href="/perfil" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-[#344054] hover:bg-[#f8fafc]" role="menuitem">
