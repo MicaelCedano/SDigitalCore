@@ -1152,7 +1152,17 @@ export async function getQcDashboardAction() {
         orderBy: { updatedAt: "desc" },
         take: 100,
         include: {
-          batch: { select: { id: true, batchNumber: true, supplierName: true, createdAt: true } },
+          batch: {
+            select: {
+              id: true,
+              batchNumber: true,
+              supplierName: true,
+              createdAt: true,
+              status: true,
+              totalDevices: true,
+              reviewedDevices: true,
+            },
+          },
           inspections: { orderBy: { createdAt: "desc" }, take: 3 },
         },
       }),

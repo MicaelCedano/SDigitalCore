@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Package,
   Clock,
@@ -16,8 +16,9 @@ import {
   Wallet,
   Coins,
   Search,
+  CheckCheck,
 } from "lucide-react";
-import { getQcDashboardAction } from "../actions/revision-batch";
+import { getQcDashboardAction, submitRevisionBatchAction } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { SolicitarImeisModal } from "./SolicitarImeisModal";
 
@@ -47,6 +48,25 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     setRefreshing(false);
   };
 
+  const handleSubmitLote = async (lote: any) => {
+    if (
+      !confirm(
+        `¿Enviar el Lote ${lote.batchNumber} para aprobación del administrador? ` +
+          `El pago se acreditará cuando ${lote.supplierName ? "el admin lo acepte" : "lo acepte el administrador"}.`
+      )
+    )
+      return;
+    setRefreshing(true);
+    const res = await submitRevisionBatchAction({ id: lote.id });
+    setRefreshing(false);
+    if (res.success) {
+      alert(res.message ?? "Lote enviado.");
+      refresh();
+    } else {
+      alert(res.error || "No se pudo enviar el lote.");
+    }
+  };
+
   const { devices, myRequests, stats, welcome } = data;
   const requestCount = myRequests?.length || 0;
 
@@ -67,6 +87,33 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
       .join(" ");
     return haystack.includes(term);
   });
+
+  // Agrupar por lote para mostrar el avance y el botón de envío
+  const lotes = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const dev of devices || []) {
+      const b = dev.batch;
+      if (!b) continue;
+      const entry = map.get(b.id) || {
+        id: b.id,
+        batchNumber: b.batchNumber,
+        supplierName: b.supplierName,
+        status: b.status,
+        totalDevices: b.totalDevices || 0,
+        reviewedDevices: b.reviewedDevices || 0,
+        myCount: 0,
+        myReviewed: 0,
+      };
+      entry.myCount += 1;
+      const vigente = (dev.lastInspection?.createdAt ?? new Date(0)) >= new Date(b.createdAt);
+      if (dev.lastInspection?.status === "COMPLETED" && vigente) entry.myReviewed += 1;
+      map.set(b.id, entry);
+    }
+    return [...map.values()].sort((a, b) => (a.status === "IN_REVIEW" ? -1 : 1) - (b.status === "IN_REVIEW" ? -1 : 1));
+  }, [devices]);
+
+  const canSubmitLote = (lote: any) =>
+    lote.status === "IN_REVIEW" && lote.reviewedDevices >= lote.totalDevices && lote.totalDevices > 0;
 
   const statusLabel = (s: string) =>
     s === "COMPLETED"
@@ -194,6 +241,100 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
           </div>
         </div>
       </div>
+
+      {/* Mis lotes en revisión */}
+      {lotes.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Package className="w-4 h-4 text-[#5750f1]" /> Mis lotes en revisión
+              </h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Cuando un lote esté completo, envíalo al administrador para que acepte y acredite el pago.
+              </p>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {lotes.map((lote: any) => {
+              const ready = canSubmitLote(lote);
+              const enviado = lote.status === "SUBMITTED";
+              return (
+                <div key={lote.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-bold text-slate-800 text-sm">{lote.batchNumber}</span>
+                      {lote.supplierName && (
+                        <span className="text-xs text-slate-500">· {lote.supplierName}</span>
+                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          enviado
+                            ? "bg-violet-50 text-violet-700 border-violet-200"
+                            : ready
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : lote.status === "COMPLETED"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}
+                      >
+                        {enviado
+                          ? "ENVIADO A APROBACIÓN"
+                          : ready
+                          ? "LISTO PARA ENVIAR"
+                          : lote.status === "COMPLETED"
+                          ? "COMPLETADO"
+                          : "EN REVISIÓN"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-1.5 w-40 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[#5750f1] transition-all"
+                          style={{
+                            width: `${lote.totalDevices > 0 ? Math.round((lote.reviewedDevices / lote.totalDevices) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600">
+                        {lote.reviewedDevices}/{lote.totalDevices} revisados
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        · tuyos: {lote.myReviewed}/{lote.myCount}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    {enviado ? (
+                      <span className="px-3 py-2 bg-violet-50 text-violet-700 font-bold text-xs rounded-xl border border-violet-200 inline-flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" /> Esperando aprobación
+                      </span>
+                    ) : ready ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitLote(lote)}
+                        disabled={refreshing}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {refreshing ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        Enviar Lote
+                      </button>
+                    ) : (
+                      <span className="px-3 py-2 bg-slate-50 text-slate-500 font-bold text-xs rounded-xl border border-slate-200 inline-flex items-center gap-1.5">
+                        <ClipboardCheck className="w-3.5 h-3.5" /> Falta revisar equipos
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Mis solicitudes */}
       {requestCount > 0 && (
