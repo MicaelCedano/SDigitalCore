@@ -11,6 +11,7 @@ interface WithdrawalResult {
   requestedAmount: number;
   adjusted: boolean;
   baucherCode: string;
+  secureToken: string;
   newBalance: number;
 }
 
@@ -94,18 +95,36 @@ export function WithdrawalPanel({
               </div>
             </div>
 
-            {/* Baucher */}
-            <div ref={baucherRef} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <div className="bg-indigo-700 px-6 py-4 text-white">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Baucher de Retiro</p>
-                <p className="mt-1 text-2xl font-black tracking-tight">RD$ {result.amount.toLocaleString("es-DO")}</p>
+            {/* Baucher — diseño System (RMA Señal Digital) */}
+            <div ref={baucherRef} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="pointer-events-none absolute top-0 right-0 p-6 opacity-5">
+                <ReceiptText className="h-40 w-40 text-indigo-900" />
               </div>
-              <div className="space-y-2.5 px-6 py-5 text-sm">
-                <div className="flex justify-between gap-4"><span className="text-slate-500">Código</span><span className="font-mono font-bold text-slate-800">{result.baucherCode}</span></div>
-                <div className="flex justify-between gap-4"><span className="text-slate-500">Titular</span><span className="font-bold text-slate-800">{ownerName}</span></div>
-                <div className="flex justify-between gap-4"><span className="text-slate-500">Concepto</span><span className="font-semibold text-slate-700 text-right">Retiro de efectivo</span></div>
-                <div className="flex justify-between gap-4"><span className="text-slate-500">Fecha</span><span className="font-semibold text-slate-700">{new Date().toLocaleString("es-DO", { timeZone: "America/Santo_Domingo", dateStyle: "medium", timeStyle: "short" })}</span></div>
-                <div className="flex justify-between gap-4 border-t border-slate-100 pt-2.5"><span className="font-bold text-slate-700">Nuevo saldo Principal</span><span className="font-black text-slate-900">RD$ {result.newBalance.toLocaleString("es-DO")}</span></div>
+              <div className="relative z-10 p-6">
+                <div className="mb-5 text-center">
+                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                    <CheckCircle2 className="h-7 w-7" />
+                  </div>
+                  <h2 className="text-xl font-black text-slate-800">Baucher de Pago</h2>
+                  <p className="text-xs font-bold text-slate-400">RMA Señal Digital</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                    <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Monto Depositado</span>
+                    <span className="font-mono text-xl font-black text-indigo-600">RD$ {result.amount.toLocaleString("es-DO")}</span>
+                  </div>
+                  <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Código</span><span className="font-mono font-black text-slate-800">{result.baucherCode}</span></div>
+                  <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Titular</span><span className="font-black text-slate-800">{ownerName}</span></div>
+                  <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Fecha</span><span className="font-black text-slate-800">{new Date().toLocaleString("es-DO", { timeZone: "America/Santo_Domingo", dateStyle: "medium", timeStyle: "short" })}</span></div>
+                  <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Estado</span><span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black tracking-wider text-emerald-600 uppercase">Pendiente de Canje</span></div>
+                  <div className="flex justify-between text-sm border-t border-slate-100 pt-3"><span className="font-bold text-slate-500">Nuevo saldo Principal</span><span className="font-black text-slate-900">RD$ {result.newBalance.toLocaleString("es-DO")}</span></div>
+                </div>
+
+                <div className="mt-5 text-center">
+                  <p className="mb-1 text-[9px] font-black tracking-widest text-slate-400 uppercase">Token de Seguridad Unívoco</p>
+                  <p className="break-all rounded-lg bg-slate-100 p-2 font-mono text-[10px] text-slate-600">{result.secureToken}</p>
+                </div>
               </div>
             </div>
 

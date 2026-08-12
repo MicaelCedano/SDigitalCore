@@ -1,7 +1,9 @@
 import { ArrowDownLeft, ArrowUpRight, Landmark, PiggyBank, WalletCards } from "lucide-react";
 import { getCurrentWallet } from "@/modules/wallet/data";
+import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { WithdrawalPanel } from "@/modules/wallet/components/WithdrawalPanel";
 import { WalletAccountsSection } from "@/modules/wallet/components/WalletAccountsSection";
+import { WithdrawalValidator } from "@/modules/wallet/components/WithdrawalValidator";
 
 function money(value: string) {
   return new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(Number(value));
@@ -13,6 +15,8 @@ function date(value: string) {
 
 export default async function WalletPage() {
   const data = await getCurrentWallet();
+  const persisted = await getPersistedCurrentUser();
+  const isAdmin = persisted?.roleCode === "ADMIN";
   if (!data.schemaReady) {
     return <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-black text-slate-950">Mi Wallet</h1><p className="mt-3 text-slate-600">El módulo está preparado y mostrará saldo RD$ 0.00 cuando se aplique la migración de base de datos.</p></div>;
   }
@@ -41,6 +45,7 @@ export default async function WalletPage() {
           ownerName={wallet.owner}
         />
       ) : null}
+      {isAdmin ? <WithdrawalValidator /> : null}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold text-slate-950">Movimientos</h2><p className="mt-1 text-xs text-slate-500">El historial anterior se conserva separado y no duplica este saldo.</p></div>
         {!wallet || wallet.entries.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">Todavía no hay movimientos en esta wallet.</div> : (

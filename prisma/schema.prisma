@@ -36,6 +36,7 @@ model User {
   legacyIdentities LegacyUserIdentity[] @relation("LegacyIdentityCoreUser")
   legacyIdentitiesLinked LegacyUserIdentity[] @relation("LegacyIdentityLinkedBy")
   walletLedgerEntries WalletLedgerEntry[] @relation("WalletLedgerActor")
+  redeemedWithdrawals WalletLedgerEntry[] @relation("WalletLedgerRedeemer")
 
   warrantiesCreated WarrantyCase[] @relation("WarrantyCreatedBy")
   warrantiesUpdated WarrantyCase[] @relation("WarrantyUpdatedBy")
@@ -375,15 +376,19 @@ model WalletLedgerEntry {
   amount      Decimal                 @db.Decimal(14, 2)
   description String?                 @db.Text
   externalKey String                  @unique @map("external_key") @db.VarChar(255)
+  secureToken String?                 @unique @map("secure_token") @db.VarChar(64)
   actorId     String?                 @map("actor_id")
   batchId     String?                 @map("batch_id")
   reversalOfId String?                @unique @map("reversal_of_id")
+  redeemedAt  DateTime?               @map("redeemed_at")
+  redeemedById String?                @map("redeemed_by_id")
   occurredAt  DateTime                @default(now()) @map("occurred_at")
   createdAt   DateTime                @default(now()) @map("created_at")
 
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
   account WalletAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
   actor User? @relation("WalletLedgerActor", fields: [actorId], references: [id], onDelete: SetNull)
+  redeemedBy User? @relation("WalletLedgerRedeemer", fields: [redeemedById], references: [id], onDelete: SetNull)
   batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
   reversalOf WalletLedgerEntry? @relation("WalletLedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversedBy WalletLedgerEntry? @relation("WalletLedgerReversal")
