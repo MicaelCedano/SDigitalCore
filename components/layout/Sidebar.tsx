@@ -18,6 +18,7 @@ import {
   Warehouse,
   WalletCards,
   Wrench,
+  Lock,
   X,
 } from "lucide-react";
 
@@ -53,6 +54,10 @@ const navItems: NavItem[] = [
   { label: "Reparaciones", href: "/reparaciones", moduleKey: "reparaciones", icon: Wrench, section: "Operaciones", children: [
     { label: "Panel de reparaciones", href: "/reparaciones" },
     { label: "Aprobar pagos", href: "/reparaciones/pagos", adminOnly: true },
+  ] },
+  { label: "Desbloqueos", href: "/desbloqueos", moduleKey: "desbloqueos", icon: Lock, section: "Operaciones", children: [
+    { label: "Panel de desbloqueos", href: "/desbloqueos" },
+    { label: "Aprobar y pagar", href: "/desbloqueos/pagos", adminOnly: true },
   ] },
   { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards, section: "Comercial" },
   { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
