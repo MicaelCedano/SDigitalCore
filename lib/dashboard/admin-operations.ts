@@ -20,6 +20,10 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     recentWarrantyCases,
     recentWarrantyEvents,
     warrantyGroupStats,
+    repairJobsPending,
+    unlockRequestsPending,
+    qcBatchesPending,
+    walletRedemptionsPending,
   ] = await Promise.all([
     prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
     prisma.warehouseRequest.findMany({
@@ -110,6 +114,66 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
       where: { archivedAt: null },
       _count: { _all: true },
     }),
+    // Reparaciones: trabajos pendientes de pago (admin aprueba en /reparaciones/pagos)
+    prisma.repairJob.findMany({
+      where: { status: "PENDING_PAYMENT" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        jobCode: true,
+        totalEquipos: true,
+        montoTotal: true,
+        montoPorEquipo: true,
+        createdAt: true,
+        technician: { select: { name: true, username: true } },
+      },
+    }),
+    // Desbloqueos: solicitudes pendientes de aprobar/pagar
+    prisma.unlockRequest.findMany({
+      where: { status: "PENDING_ADMIN" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        requestCode: true,
+        model: true,
+        totalEquipos: true,
+        montoTotalPagado: true,
+        createdAt: true,
+        technician: { select: { name: true, username: true } },
+      },
+    }),
+    // QC: lotes de revisión pendientes o en revisión
+    prisma.qcRevisionBatch.findMany({
+      where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW"] } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        batchNumber: true,
+        supplierName: true,
+        status: true,
+        totalDevices: true,
+        reviewedDevices: true,
+        createdAt: true,
+      },
+    }),
+    // Wallet: retiros pendientes de canje (bauchers generados sin redimir)
+    prisma.walletLedgerEntry.findMany({
+      where: { secureToken: { not: null }, redeemedAt: null, status: "POSTED", reversalOfId: null },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        amount: true,
+        description: true,
+        createdAt: true,
+        wallet: {
+          select: { user: { select: { name: true, username: true } } },
+        },
+      },
+    }),
   ]);
 
   const warrantyCounts = warrantyGroupStats.reduce<Record<string, number>>(
@@ -120,6 +184,11 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     },
     { totalActive: 0 },
   );
+
+  const repairPendingTotal = repairJobsPending.reduce((sum, job) => sum + Number(job.montoTotal), 0);
+  const unlockPendingTotal = unlockRequestsPending.reduce((sum, req) => sum + Number(req.montoTotalPagado), 0);
+  const qcPendingTotalDevices = qcBatchesPending.reduce((sum, batch) => sum + batch.totalDevices, 0);
+  const redemptionsPendingTotal = walletRedemptionsPending.reduce((sum, e) => sum + Number(e.amount), 0);
 
   return {
     pendingWarehouseRequestCount,
@@ -137,6 +206,19 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     recentWarrantyCases,
     recentWarrantyEvents,
     warrantyCounts,
+    // Módulos activos: reparaciones, desbloqueos, QC, wallet
+    repairJobsPending,
+    repairPendingCount: repairJobsPending.length,
+    repairPendingTotal,
+    unlockRequestsPending,
+    unlockPendingCount: unlockRequestsPending.length,
+    unlockPendingTotal,
+    qcBatchesPending,
+    qcPendingCount: qcBatchesPending.length,
+    qcPendingTotalDevices,
+    walletRedemptionsPending,
+    redemptionsPendingCount: walletRedemptionsPending.length,
+    redemptionsPendingTotal,
   };
 });
 

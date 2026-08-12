@@ -6,29 +6,32 @@ import { AdminWarrantyWidget } from "@/components/dashboard/AdminWarrantyWidget"
 import {
   ArrowRight,
   BellRing,
-  Boxes,
   ClipboardCheck,
   FileText,
   PackageCheck,
   Plus,
   Settings,
-  Tag,
   UserPlus,
-  Users,
   Warehouse,
   ShieldCheck,
+  Wrench,
+  Lock,
+  ScanSearch,
+  WalletCards,
+  Banknote,
 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Resumen general" };
 
 const operations = [
+  { label: "Control de Calidad", href: "/qc", moduleKey: "qc", icon: ScanSearch },
+  { label: "Reparaciones", href: "/reparaciones", moduleKey: "reparaciones", icon: Wrench },
+  { label: "Desbloqueos", href: "/desbloqueos", moduleKey: "desbloqueos", icon: Lock },
   { label: "Gestión de Garantías", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck },
-  { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse },
 ];
 
 const commercial = [
-  { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag },
-  { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText },
+  { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards },
 ];
 
 const administration = [
@@ -57,10 +60,10 @@ const groups = [
 ];
 
 const adminShortcuts = [
-  { label: "Nueva garantía", description: "Ingresar equipo en garantía", href: "/garantias/ingreso", icon: ShieldCheck },
-  { label: "Nuevo recibo", description: "Registrar mercancía recibida", href: "/almacen/recibos", icon: Plus },
-  { label: "Solicitudes", description: "Aprobar entradas y salidas", href: "/almacen/transferencias", icon: ClipboardCheck },
-  { label: "Inventario", description: "Consultar existencias actuales", href: "/almacen", icon: Boxes },
+  { label: "Aprobar pagos reparaciones", description: "Trabajos de técnicos por pagar", href: "/reparaciones/pagos", icon: Wrench },
+  { label: "Aprobar desbloqueos", description: "Solicitudes pendientes de aprobar", href: "/desbloqueos/pagos", icon: Lock },
+  { label: "Compra de lotes", description: "Registrar compras para revisión QC", href: "/qc/lotes", icon: ScanSearch },
+  { label: "Validador de bauchers", description: "Canjear retiros pendientes", href: "/wallet", icon: Banknote },
 ];
 
 function formatDate(value: Date) {
@@ -110,11 +113,11 @@ export default async function DashboardPage() {
         </div>
         {overview ? (
           <div className="flex flex-wrap items-center gap-2.5">
-            <Link href="/garantias/ingreso" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#4338ca]">
-              <Plus size={17} /> Nueva garantía
+            <Link href="/qc/lotes" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#4f46e5] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#4338ca]">
+              <Plus size={17} /> Nueva compra
             </Link>
-            <Link href="/almacen/recibos" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] shadow-xs transition-colors hover:bg-[#f8fafc]">
-              Registrar mercancía
+            <Link href="/reparaciones/pagos" className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#344054] shadow-xs transition-colors hover:bg-[#f8fafc]">
+              Aprobar pagos
             </Link>
           </div>
         ) : null}
@@ -144,6 +147,51 @@ export default async function DashboardPage() {
                   </Link>
                 );
               })}
+            </div>
+          </section>
+
+          {/* Resumen de módulos activos */}
+          <section aria-label="Resumen de módulos">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold tracking-[-0.02em] text-[#101828]">Resumen de módulos</h3>
+              <p className="mt-1 text-sm text-[#667085]">Lo que está pendiente de tu decisión en cada módulo.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Link href="/reparaciones/pagos" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#c7d2fe] hover:shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#fef3f2] text-[#b42318]"><Wrench size={18} /></span>
+                  <span className="rounded-full bg-[#fef3f2] px-2 py-0.5 text-xs font-bold text-[#b42318]">{overview.repairPendingCount} trabajo{overview.repairPendingCount === 1 ? "" : "s"}</span>
+                </div>
+                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">RD$ {overview.repairPendingTotal.toLocaleString("es-DO")}</p>
+                <p className="mt-1 text-xs font-medium text-[#667085]">Reparaciones por pagar</p>
+              </Link>
+
+              <Link href="/desbloqueos/pagos" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#c7d2fe] hover:shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#fff4e5] text-[#b54708]"><Lock size={18} /></span>
+                  <span className="rounded-full bg-[#fff4e5] px-2 py-0.5 text-xs font-bold text-[#b54708]">{overview.unlockPendingCount} solicitud{overview.unlockPendingCount === 1 ? "" : "es"}</span>
+                </div>
+                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">RD$ {overview.unlockPendingTotal.toLocaleString("es-DO")}</p>
+                <p className="mt-1 text-xs font-medium text-[#667085]">Desbloqueos por aprobar</p>
+              </Link>
+
+              <Link href="/qc/lotes" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#c7d2fe] hover:shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#eef2ff] text-[#4f46e5]"><ScanSearch size={18} /></span>
+                  <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-xs font-bold text-[#4338ca]">{overview.qcPendingCount} lote{overview.qcPendingCount === 1 ? "" : "s"}</span>
+                </div>
+                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">{overview.qcPendingTotalDevices} equipo{overview.qcPendingTotalDevices === 1 ? "" : "s"}</p>
+                <p className="mt-1 text-xs font-medium text-[#667085]">Lotes QC en revisión</p>
+              </Link>
+
+              <Link href="/wallet" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#c7d2fe] hover:shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#ecfdf3] text-[#027a48]"><Banknote size={18} /></span>
+                  <span className="rounded-full bg-[#ecfdf3] px-2 py-0.5 text-xs font-bold text-[#027a48]">{overview.redemptionsPendingCount} baucher{overview.redemptionsPendingCount === 1 ? "" : "es"}</span>
+                </div>
+                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">RD$ {overview.redemptionsPendingTotal.toLocaleString("es-DO")}</p>
+                <p className="mt-1 text-xs font-medium text-[#667085]">Retiros por canjear</p>
+              </Link>
             </div>
           </section>
 
