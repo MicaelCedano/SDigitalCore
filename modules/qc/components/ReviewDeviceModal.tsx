@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { reviewDeviceAction } from "../actions/revision-batch";
+import { ModelImageSearch } from "./ModelImageSearch";
 
 const CHECKLIST_ITEMS = [
   { id: "pantalla", label: "Pantalla & Táctil" },
@@ -164,6 +165,9 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
               <span>{error}</span>
             </div>
           )}
+
+          {/* Imagen de referencia del modelo (búsqueda en internet, como System) */}
+          <ModelImageSearch brand={device.brand} model={device.model} color={device.color} />
 
           {/* Grado y Funcionalidad */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
