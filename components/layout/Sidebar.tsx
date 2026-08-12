@@ -62,6 +62,7 @@ const navItems: NavItem[] = [
   { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings, section: "Administración", children: [
     { label: "Usuarios y permisos", href: "/configuracion" },
     { label: "Sucursales", href: "/configuracion/sucursales" },
+    { label: "Proveedores de control de calidad", href: "/configuracion/proveedores-qc" },
   ] },
 ];
 

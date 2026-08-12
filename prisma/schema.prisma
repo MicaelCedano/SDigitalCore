@@ -427,6 +427,28 @@ model Branch {
   @@map("branch")
 }
 
+enum QcSupplierStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("qc_supplier_status")
+}
+
+model QcSupplier {
+  id          String           @id @default(cuid())
+  name        String           @unique @db.VarChar(160)
+  contactName String?          @map("contact_name") @db.VarChar(160)
+  phone       String?          @db.VarChar(40)
+  email       String?          @db.VarChar(200)
+  notes       String?          @db.Text
+  status      QcSupplierStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, name])
+  @@map("qc_supplier")
+}
+
 enum StockCountStatus {
   IN_PROGRESS
   COMPLETED
