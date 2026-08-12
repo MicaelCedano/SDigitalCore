@@ -932,6 +932,9 @@ export default function ConfiguracionPage() {
                       @{selectedReq.legacyCandidate.username} · saldo {new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(Number(selectedReq.legacyCandidate.balance))} · {selectedReq.legacyCandidate.transactionCount} movimientos.
                     </span>
                     <span className="mt-1 block text-[11px] font-semibold">La coincidencia por {selectedReq.legacyCandidate.matchMethod === "exact_email" ? "correo" : "usuario"} es solo una sugerencia; debes confirmarla.</span>
+                    <span className="mt-1 block text-[11px] font-bold">
+                      {selectedReq.legacyCandidate.walletEligible ? "Es personal QC: se habilitará Wallet." : "No es personal QC: se enlazará la identidad sin habilitar Wallet."}
+                    </span>
                   </span>
                 </label>
               ) : null}

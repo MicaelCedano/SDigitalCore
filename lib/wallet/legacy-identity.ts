@@ -3,6 +3,11 @@ import type { Prisma } from "@prisma/client";
 export const LEGACY_SOURCE_SYSTEM = "SDIGITALSYSTEM";
 export const WALLET_MODULE_KEY = "wallet";
 
+function isQcLegacyRole(role: string | null) {
+  const normalized = role?.trim().toLocaleLowerCase("es").replaceAll("-", "_").replaceAll(" ", "_");
+  return normalized === "qc" || normalized === "control_calidad";
+}
+
 export async function linkLegacyIdentity(
   tx: Prisma.TransactionClient,
   input: { legacyIdentityId: string; coreUserId: string; actorId: string; method: string },
@@ -27,22 +32,25 @@ export async function linkLegacyIdentity(
   });
   if (occupied) throw new Error("Ese usuario nuevo ya está enlazado con otra identidad anterior.");
 
-  const allowedModules = user.allowedModules.includes(WALLET_MODULE_KEY)
-    ? user.allowedModules
-    : [...user.allowedModules, WALLET_MODULE_KEY];
+  const walletAccessGranted = isQcLegacyRole(identity.roleSnapshot);
+  const allowedModules = walletAccessGranted && !user.allowedModules.includes(WALLET_MODULE_KEY)
+    ? [...user.allowedModules, WALLET_MODULE_KEY]
+    : user.allowedModules;
 
-  await tx.user.update({ where: { id: user.id }, data: { allowedModules } });
-  const wallet = await tx.wallet.upsert({
+  if (walletAccessGranted) {
+    await tx.user.update({ where: { id: user.id }, data: { allowedModules } });
+  }
+  const wallet = walletAccessGranted ? await tx.wallet.upsert({
     where: { userId: user.id },
     create: { userId: user.id, currency: "DOP", balance: 0 },
     update: {},
-  });
-  const completedCutover = await tx.legacyMigrationBatch.findFirst({
+  }) : null;
+  const completedCutover = walletAccessGranted ? await tx.legacyMigrationBatch.findFirst({
     where: { sourceSystem: identity.sourceSystem, mode: "CUTOVER", status: "COMPLETED" },
     orderBy: { completedAt: "desc" },
     select: { id: true },
-  });
-  if (completedCutover && !identity.sourceWalletBalance.isZero()) {
+  }) : null;
+  if (wallet && completedCutover && !identity.sourceWalletBalance.isZero()) {
     await tx.walletLedgerEntry.create({
       data: {
         walletId: wallet.id,
@@ -65,10 +73,10 @@ export async function linkLegacyIdentity(
       coreUserId: user.id,
       linkedById: input.actorId,
       linkedAt: new Date(),
-      matchMethod: input.method,
-      matchStatus: completedCutover ? "TRANSFERRED" : "LINKED_PENDING_CUTOVER",
+      matchMethod: walletAccessGranted ? input.method : `${input.method}_identity_only`,
+      matchStatus: walletAccessGranted ? (completedCutover ? "TRANSFERRED" : "LINKED_PENDING_CUTOVER") : "EXCLUDED",
       transferredAt: completedCutover ? new Date() : null,
     },
   });
-  return { identity: linked, user };
+  return { identity: linked, user, walletAccessGranted };
 }

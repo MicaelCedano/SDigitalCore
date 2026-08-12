@@ -6,7 +6,8 @@
 - Conserva las transacciones anteriores como historial inmutable. No copia `secure_token` y ese historial no altera el saldo de Core.
 - Sugiere coincidencias por correo exacto normalizado y luego por nombre de usuario exacto normalizado.
 - Nunca enlaza por nombre visible ni aprueba automáticamente una coincidencia.
-- Al confirmar un enlace, conserva rol, correo, contraseña, estado y módulos actuales de Core; solo agrega el módulo `wallet`.
+- Al confirmar un enlace, conserva rol, correo, contraseña, estado y módulos actuales de Core.
+- Wallet solo se concede, de forma individual y con confirmación administrativa, cuando la identidad anterior tiene rol `control_calidad` o `qc`. No aparece en el selector general de módulos y nunca se asigna automáticamente a todos los usuarios QC.
 - En el corte final acredita el saldo vigente de la fuente como un único asiento idempotente.
 
 ## Variables de entorno de servidor

@@ -41,7 +41,7 @@ export async function linkLegacyIdentityAction(input: z.input<typeof linkSchema>
             sourceSystem: linked.identity.sourceSystem,
             sourceUserId: linked.identity.sourceUserId,
             coreUserId: linked.user.id,
-            walletAccessGranted: true,
+            walletAccessGranted: linked.walletAccessGranted,
           },
         },
       });
@@ -50,7 +50,12 @@ export async function linkLegacyIdentityAction(input: z.input<typeof linkSchema>
     revalidatePath("/configuracion/migracion-usuarios");
     revalidatePath("/wallet");
     revalidatePath("/", "layout");
-    return { success: true as const, message: `Identidad enlazada con ${result.user.name ?? result.user.email}.` };
+    return {
+      success: true as const,
+      message: result.walletAccessGranted
+        ? `Identidad QC enlazada con ${result.user.name ?? result.user.email}; Wallet habilitada.`
+        : `Identidad enlazada con ${result.user.name ?? result.user.email}; no se habilitó Wallet porque no pertenece a QC.`,
+    };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "No se pudo enlazar la identidad." };
   }

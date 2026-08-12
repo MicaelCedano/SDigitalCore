@@ -14,6 +14,7 @@ type Identity = {
   name: string | null;
   email: string | null;
   role: string | null;
+  walletEligible: boolean;
   active: boolean;
   balance: string;
   transactionCount: number;
@@ -117,6 +118,9 @@ export function LegacyMigrationManager({ identities, users, batches }: { identit
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-slate-950">{identity.name ?? identity.username}</p>
                       {!identity.active ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Inactivo anterior</span> : null}
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${identity.walletEligible ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600"}`}>
+                        {identity.walletEligible ? "Elegible para Wallet QC" : "Solo identidad · sin Wallet"}
+                      </span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">@{identity.username} · {identity.email ?? "sin correo"} · {identity.role ?? "sin rol"}</p>
                   </div>
