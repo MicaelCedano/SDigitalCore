@@ -13,6 +13,13 @@ import {
 } from "lucide-react";
 import { reviewDeviceAction } from "../actions/revision-batch";
 import { ModelImageSearch } from "./ModelImageSearch";
+import { DefectPhotosUploader } from "./DefectPhotosUploader";
+import {
+  getDevicePhotosAction,
+  deleteDevicePhotoAction,
+  uploadDevicePhotosAction,
+} from "../actions/device-photos";
+import { compressImage } from "@/lib/image-compression";
 
 const CHECKLIST_ITEMS = [
   { id: "pantalla", label: "Pantalla & Táctil" },
@@ -57,6 +64,24 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingPhotos, setExistingPhotos] = useState<{ id: string; url: string }[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  // Cargar fotos existentes del equipo (historial de defectos)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getDevicePhotosAction(device.id);
+      if (!cancelled && res.success) {
+        setExistingPhotos(
+          (res.data ?? []).flatMap((p) => (p && p.url ? [{ id: p.id, url: p.url }] : []))
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [device.id]);
 
   // Sincronizar estado con el equipo al abrir (prefill si ya estaba revisado)
   useEffect(() => {
@@ -111,6 +136,29 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
     }
 
     setIsLoading(true);
+
+    // Subir fotos nuevas (comprimidas en WebP) antes de guardar la revisión
+    if (selectedFiles.length > 0) {
+      const formData = new FormData();
+      formData.set("deviceId", device.id);
+      for (const file of selectedFiles) {
+        try {
+          const blob = await compressImage(file);
+          formData.append("files", blob, file.name.replace(/\.[^.]+$/, "") + ".webp");
+        } catch (e: any) {
+          setError(e.message || "Error al procesar una de las fotos.");
+          setIsLoading(false);
+          return;
+        }
+      }
+      const up = await uploadDevicePhotosAction(formData);
+      if (!up.success) {
+        setError(up.error || "No se pudieron subir las fotos.");
+        setIsLoading(false);
+        return;
+      }
+    }
+
     const res = await reviewDeviceAction({
       deviceId: device.id,
       result,
@@ -124,6 +172,16 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
       onSaved();
     } else {
       setError(res.error || "Error al registrar la revisión del equipo.");
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    setError(null);
+    const res = await deleteDevicePhotoAction(photoId);
+    if (res.success) {
+      setExistingPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    } else {
+      setError(res.error || "No se pudo eliminar la foto.");
     }
   };
 
@@ -265,6 +323,17 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Fotos de defectos */}
+          <div>
+            <DefectPhotosUploader
+              selectedFiles={selectedFiles}
+              onFilesChange={setSelectedFiles}
+              existingPhotos={existingPhotos}
+              onDeleteExistingPhoto={handleDeletePhoto}
+              isUploading={isLoading}
+            />
           </div>
 
           {/* Checklist */}

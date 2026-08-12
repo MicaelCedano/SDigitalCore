@@ -475,6 +475,7 @@ model DeviceUnit {
   batch       QcRevisionBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
   assignedTo  User?            @relation("QcDeviceAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   inspections QcInspection[]
+  photos      DevicePhoto[]    @relation("DevicePhotos")
 
   @@index([status, updatedAt])
   @@index([brand, model])
@@ -546,6 +547,19 @@ model QcModelImage {
   // duplicar por casing ("Apple" vs "APPLE").
   @@unique([brand, model])
   @@map("qc_model_image")
+}
+
+model DevicePhoto {
+  id          String   @id @default(cuid())
+  deviceId    String   @map("device_id")
+  storagePath String   @map("storage_path") @db.Text
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  device DeviceUnit @relation("DevicePhotos", fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, createdAt])
+  @@map("device_photo")
 }
 
 enum WarrantyStatus {

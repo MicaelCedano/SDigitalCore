@@ -12,8 +12,11 @@ import {
   Calendar,
   Package,
   StickyNote,
+  Camera,
+  History,
 } from "lucide-react";
 import { formatDateTimeRD } from "@/lib/utils/format";
+import { getDeviceHistoryAction } from "../actions/device-history";
 
 export type ReviewedInspection = {
   id: string;
@@ -88,8 +91,28 @@ function DetailRow({
   );
 }
 
+type HistoryInspection = {
+  id: string;
+  result: "FUNCTIONAL" | "NON_FUNCTIONAL" | "UNSPECIFIED" | null;
+  grade: string | null;
+  batteryHealth: number | null;
+  functionalityNotes: string | null;
+  physicalNotes: string | null;
+  reviewerNameSnapshot: string;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  status: "DRAFT" | "COMPLETED" | "SUPERSEDED";
+};
+
+type DeviceHistory = {
+  inspections: HistoryInspection[];
+  photos: { id: string; url: string }[];
+};
+
 export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedInspection[] }) {
   const [selected, setSelected] = useState<ReviewedInspection | null>(null);
+  const [history, setHistory] = useState<DeviceHistory | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selected) return;
@@ -98,6 +121,23 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  // Cargar historial completo del equipo (fotos + todas las inspecciones)
+  useEffect(() => {
+    if (!selected) {
+      setHistory(null);
+      return;
+    }
+    let cancelled = false;
+    setHistory(null);
+    (async () => {
+      const res = await getDeviceHistoryAction(selected.device.id);
+      if (!cancelled && res.success && res.data) setHistory(res.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [selected]);
 
   return (
@@ -272,6 +312,77 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
                   ) : null}
                 </div>
               )}
+
+              {/* Fotos del equipo */}
+              <div>
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#667085]">
+                  <Camera className="w-3.5 h-3.5" /> Fotos del equipo ({history?.photos.length ?? 0})
+                </p>
+                {history && history.photos.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {history.photos.map((photo) => (
+                      <button
+                        key={photo.id}
+                        type="button"
+                        onClick={() => setLightboxUrl(photo.url)}
+                        title="Ver foto"
+                        className="aspect-square overflow-hidden rounded-xl border border-[#e4e7ec] bg-[#f9fafb] hover:border-[#4f46e5] transition-all"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo.url} alt="Foto del equipo" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#98a2b3]">Sin fotos registradas.</p>
+                )}
+              </div>
+
+              {/* Historial de inspecciones */}
+              <div>
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#667085]">
+                  <History className="w-3.5 h-3.5" /> Historial de inspecciones ({history?.inspections.length ?? 0})
+                </p>
+                {history && history.inspections.length > 0 ? (
+                  <div className="space-y-2">
+                    {history.inspections.map((insp) => (
+                      <div
+                        key={insp.id}
+                        className={`flex items-center justify-between gap-2 rounded-xl border p-2.5 ${
+                          insp.id === selected.id
+                            ? "border-[#4f46e5] bg-[#eef2ff]"
+                            : "border-[#e4e7ec] bg-white"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#101828]">
+                            {resultLabel(insp.result)}
+                            {insp.grade ? ` · Grado ${insp.grade}` : ""}
+                            {insp.batteryHealth !== null ? ` · ${insp.batteryHealth}% batería` : ""}
+                          </p>
+                          <p className="truncate text-[11px] text-[#667085]">
+                            {insp.reviewerNameSnapshot}
+                            {insp.reviewedAt ? ` · ${formatDateTimeRD(insp.reviewedAt)}` : ""}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                            insp.id === selected.id
+                              ? "border-[#c7d2fe] bg-white text-[#4f46e5]"
+                              : insp.status === "SUPERSEDED"
+                              ? "border-[#e4e7ec] bg-[#fcfcfd] text-[#98a2b3]"
+                              : "border-[#e4e7ec] bg-[#fcfcfd] text-[#667085]"
+                          }`}
+                        >
+                          {insp.id === selected.id ? "Actual" : insp.status === "SUPERSEDED" ? "Reemplazada" : "Anterior"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#98a2b3]">Sin inspecciones registradas.</p>
+                )}
+              </div>
             </div>
 
             <div className="border-t border-[#eaecf0] bg-[#fcfcfd] px-6 py-4 flex items-center justify-end">
@@ -284,6 +395,27 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="Foto del equipo"
+            className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 p-2 text-white bg-slate-900/60 hover:bg-slate-900 rounded-full transition-colors"
+            aria-label="Cerrar foto"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
       )}
     </>
