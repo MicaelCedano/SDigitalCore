@@ -410,9 +410,44 @@ enum QcInspectionResult {
   UNSPECIFIED
 }
 
+enum QcBatchStatus {
+  DRAFT
+  PENDING_REVIEW
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+
+  @@map("qc_batch_status")
+}
+
 // ============================================================
 // CONTROL DE CALIDAD — Equipos individualizados e inspecciones
 // ============================================================
+
+model QcRevisionBatch {
+  id                 String        @id @default(cuid())
+  batchNumber        String        @unique @map("batch_number") @db.VarChar(60)
+  supplierId         String?       @map("supplier_id")
+  supplierName       String        @map("supplier_name") @db.VarChar(160)
+  branch             String        @db.VarChar(100)
+  receivedBy         String        @map("received_by") @db.VarChar(160)
+  status             QcBatchStatus @default(PENDING_REVIEW)
+  totalDevices       Int           @default(0) @map("total_devices")
+  reviewedDevices    Int           @default(0) @map("reviewed_devices")
+  functionalCount    Int           @default(0) @map("functional_count")
+  nonFunctionalCount Int           @default(0) @map("non_functional_count")
+  notes              String?       @db.Text
+  receivedAt         DateTime      @default(now()) @map("received_at")
+  completedAt        DateTime?     @map("completed_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  devices DeviceUnit[]
+
+  @@index([status, receivedAt])
+  @@index([supplierName, receivedAt])
+  @@map("qc_revision_batch")
+}
 
 model DeviceUnit {
   id             String                  @id @default(cuid())
@@ -423,15 +458,18 @@ model DeviceUnit {
   storageGb      Int?                    @map("storage_gb")
   color          String?                 @db.VarChar(80)
   status         DeviceOperationalStatus @default(PENDING_QC)
+  batchId        String?                 @map("batch_id")
   sourceSystem   String?                 @map("source_system") @db.VarChar(50)
   sourceRecordId String?                 @map("source_record_id") @db.VarChar(80)
   createdAt      DateTime                @default(now()) @map("created_at")
   updatedAt      DateTime                @updatedAt @map("updated_at")
 
+  batch       QcRevisionBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
   inspections QcInspection[]
 
   @@index([status, updatedAt])
   @@index([brand, model])
+  @@index([batchId])
   @@unique([sourceSystem, sourceRecordId])
   @@map("device_unit")
 }

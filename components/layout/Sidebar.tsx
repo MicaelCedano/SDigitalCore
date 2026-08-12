@@ -43,7 +43,8 @@ const navItems: NavItem[] = [
     { label: "Movimientos", href: "/almacen/movimientos", adminOnly: true },
     { label: "Solicitudes de almacén", href: "/almacen/transferencias" },
   ] },
-  { label: "Control de Calidad", href: "/qc/equipos-revisados", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
+  { label: "Control de Calidad", href: "/qc/lotes", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
+    { label: "Lotes de revisión", href: "/qc/lotes" },
     { label: "Equipos revisados", href: "/qc/equipos-revisados" },
   ] },
   { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards, section: "Comercial" },
