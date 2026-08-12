@@ -68,6 +68,7 @@ const navItems: NavItem[] = [
     { label: "Usuarios y permisos", href: "/configuracion" },
     { label: "Sucursales", href: "/configuracion/sucursales" },
     { label: "Proveedores de control de calidad", href: "/configuracion/proveedores-qc" },
+    { label: "Imágenes de QC", href: "/configuracion/imagenes-qc" },
     { label: "Migración de usuarios y wallets", href: "/configuracion/migracion-usuarios", adminOnly: true },
   ] },
 ];

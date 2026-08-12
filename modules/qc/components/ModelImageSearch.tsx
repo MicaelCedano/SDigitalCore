@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Loader2, RefreshCw, ImageOff } from "lucide-react";
-import { searchModelImageAction } from "../actions/model-image";
+import { getModelImageAction, searchModelImageAction } from "../actions/model-image";
 
 interface ModelImageSearchProps {
   brand?: string | null;
@@ -21,6 +21,24 @@ export function ModelImageSearch({ brand, model, color }: ModelImageSearchProps)
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Si el modelo tiene una imagen guardada en Configuración → Imágenes de QC,
+  // cargarla automáticamente como referencia.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getModelImageAction({ brand, model });
+      if (cancelled) return;
+      if (res.success && res.data) {
+        const saved = { url: res.data, thumbnail: res.data };
+        setImages([saved]);
+        setSelected(res.data);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [brand, model]);
 
   const search = async () => {
     setLoading(true);

@@ -534,6 +534,20 @@ model QcImeiRequest {
   @@map("qc_imei_request")
 }
 
+model QcModelImage {
+  id        String   @id @default(cuid())
+  brand     String   @db.VarChar(100)
+  model     String   @db.VarChar(150)
+  imageUrl  String?  @map("image_url") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Claves siempre normalizadas a mayúsculas (APPLE|IPHONE 13) para no
+  // duplicar por casing ("Apple" vs "APPLE").
+  @@unique([brand, model])
+  @@map("qc_model_image")
+}
+
 enum WarrantyStatus {
   RECEIVED
   IN_REPAIR

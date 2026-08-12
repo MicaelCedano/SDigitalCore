@@ -3,6 +3,7 @@
 import * as cheerio from "cheerio";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/helpers";
+import { prisma } from "@/lib/db/prisma";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36";
@@ -61,6 +62,31 @@ async function searchBingImages(query: string, limit = 8, offset = 0): Promise<I
   } catch (error) {
     console.error("Error searching Bing Images:", error);
     return [];
+  }
+}
+
+/**
+ * Imagen de referencia guardada para un modelo (configuración → Imágenes de QC).
+ * El modal de revisión la carga automáticamente si existe; si no, el QC
+ * puede buscarla en internet igual.
+ */
+export async function getModelImageAction(input: { brand?: string | null; model?: string | null }) {
+  try {
+    await requirePermission("qc.read");
+
+    const brand = (input.brand || "").trim().toUpperCase();
+    const model = (input.model || "").trim().toUpperCase();
+    if (!brand || !model) return { success: true, data: null };
+
+    const image = await prisma.qcModelImage.findUnique({
+      where: { brand_model: { brand, model } },
+      select: { imageUrl: true },
+    });
+
+    return { success: true, data: image?.imageUrl ?? null };
+  } catch (error: any) {
+    console.error("Error al consultar imagen del modelo:", error);
+    return { success: false, error: error.message || "Error al consultar la imagen del modelo", data: null };
   }
 }
 
