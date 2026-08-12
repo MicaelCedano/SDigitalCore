@@ -194,7 +194,7 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, walletBal
           {walletBalance !== null && walletBalance !== undefined ? (
             <Link
               href="/wallet"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#e4e7ec] bg-[#f8fafc] px-2.5 py-1.5 text-[11px] font-bold text-[#4338ca] transition-colors hover:border-[#c7d2fe] hover:bg-[#eef2ff]"
+              className="inline-flex h-9 items-center gap-1.5 self-center rounded-full border border-[#e4e7ec] bg-[#f8fafc] px-3 text-[11px] font-bold text-[#4338ca] transition-colors hover:border-[#c7d2fe] hover:bg-[#eef2ff]"
               title="Ver Mi Wallet"
             >
               <Wallet size={13} strokeWidth={2} />
