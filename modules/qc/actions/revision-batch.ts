@@ -10,6 +10,7 @@ import {
   createRevisionBatchSchema,
   updateRevisionBatchStatusSchema,
   reviewDeviceSchema,
+  revisionBatchDeviceSchema,
   CreateRevisionBatchInput,
   UpdateRevisionBatchStatusInput,
   ReviewDeviceInput,
@@ -400,6 +401,262 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
   } catch (error: any) {
     console.error("Error al actualizar estado del lote:", error);
     return { success: false, error: "Error al actualizar el estado del Lote de Revisión" };
+  }
+}
+
+/**
+ * Elimina una compra (Lote de Revisión) por completo. Solo ADMIN.
+ * - Equipos creados en este lote (sin historial previo): se borran con sus
+ *   inspecciones y fotos.
+ * - Equipos reingresados (con inspecciones de lotes anteriores): NO se borran —
+ *   se desvinculan del lote (batchId null, QUARANTINED) para conservar su historial.
+ * Devuelve la cantidad de equipos eliminados y desvinculados.
+ */
+export async function deleteRevisionBatchAction(input: { id: string }): Promise<Result<{ batchNumber: string; equiposEliminados: number; equiposDesvinculados: number }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede eliminar una compra." };
+    }
+    const parsed = z.object({ id: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Lote inválido." };
+
+    const batch = await prisma.qcRevisionBatch.findUnique({
+      where: { id: parsed.data.id },
+      include: {
+        devices: {
+          include: {
+            inspections: { orderBy: { createdAt: "asc" }, select: { id: true, createdAt: true } },
+          },
+        },
+      },
+    });
+    if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
+    if (batch.status === "COMPLETED") {
+      return { success: false, error: "No se puede eliminar un lote ya completado (historial pagado)." };
+    }
+
+    const batchStart = batch.createdAt;
+    let equiposEliminados = 0;
+    let equiposDesvinculados = 0;
+
+    await prisma.$transaction(async (tx) => {
+      for (const dev of batch.devices) {
+        const hasPrevHistory = dev.inspections.some((i) => i.createdAt < batchStart);
+        if (hasPrevHistory) {
+          // Reingreso con historial: desvincular sin borrar
+          await tx.deviceUnit.update({
+            where: { id: dev.id },
+            data: { batchId: null, status: "QUARANTINED" },
+          });
+          equiposDesvinculados++;
+        } else {
+          // Equipo de esta compra: borrar inspecciones (Restrict) y fotos (Cascade) primero
+          await tx.qcInspection.deleteMany({ where: { deviceId: dev.id } });
+          await tx.deviceUnit.delete({ where: { id: dev.id } });
+          equiposEliminados++;
+        }
+      }
+
+      await tx.qcRevisionBatch.delete({ where: { id: batch.id } });
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "qc_batch.delete",
+      module: "qc",
+      entityType: "qc_revision_batch",
+      entityId: batch.id,
+      beforeData: { batchNumber: batch.batchNumber, totalDevices: batch.totalDevices },
+      afterData: { equiposEliminados, equiposDesvinculados },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath("/qc/equipos-revisados");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: { batchNumber: batch.batchNumber, equiposEliminados, equiposDesvinculados },
+      message:
+        equiposDesvinculados > 0
+          ? `Compra ${batch.batchNumber} eliminada: ${equiposEliminados} equipo(s) borrados, ${equiposDesvinculados} reingresado(s) conservados con su historial.`
+          : `Compra ${batch.batchNumber} eliminada con ${equiposEliminados} equipo(s).`,
+    };
+  } catch (error: any) {
+    console.error("Error al eliminar lote:", error);
+    return { success: false, error: error.message || "Error al eliminar la compra" };
+  }
+}
+
+/**
+ * Agrega equipos a una compra (Lote de Revisión) existente. Solo ADMIN.
+ * Reutiliza la lógica del alta: IMEIs nuevos se crean en el lote; IMEIs
+ * existentes fuera de cola activa (AVAILABLE/QUARANTINED/ARCHIVED) se
+ * REINGRESAN (mismo device_unit, historial intacto); los que ya están en
+ * otro lote pendiente bloquean. Recalcula totalDevices del lote.
+ */
+export async function addDevicesToBatchAction(input: {
+  batchId: string;
+  devicesText?: string | null;
+  defaultModel?: string | null;
+  defaultBrand?: string | null;
+  devices?: { model: string; brand?: string | null; storageGb?: number | null; imei?: string | null; serialNumber?: string | null }[];
+}): Promise<Result<{ batchId: string; batchNumber: string; totalDevices: number; nuevos: number; reingresados: number }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede agregar equipos a una compra." };
+    }
+
+    const schema = z.object({
+      batchId: z.string().min(1),
+      devicesText: z.string().optional().nullable(),
+      defaultModel: z.string().optional().nullable(),
+      defaultBrand: z.string().optional().nullable(),
+      devices: z.array(revisionBatchDeviceSchema).optional().default([]),
+    });
+    const parsed = schema.safeParse(input);
+    if (!parsed.success) return { success: false, error: "Datos inválidos." };
+    const { batchId, devicesText, defaultModel, defaultBrand, devices } = parsed.data;
+
+    const batch = await prisma.qcRevisionBatch.findUnique({
+      where: { id: batchId },
+      include: { devices: { select: { imei: true, serialNumber: true } } },
+    });
+    if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
+    if (batch.status === "COMPLETED" || batch.status === "CANCELLED") {
+      return { success: false, error: "No se pueden agregar equipos a un lote completado o cancelado." };
+    }
+
+    const mdl = defaultModel?.trim() || "Modelo no especificado";
+    const brd = defaultBrand?.trim() || "Apple";
+
+    // IMEIs pegados masivamente
+    const bulkImeis = parseBulkImeisText(devicesText);
+    const devicesToCreate: { imei?: string; serialNumber?: string; brand: string; model: string; storageGb?: number }[] = [];
+    for (const rawImei of bulkImeis) {
+      const isCleanImei = /^\d{14,18}$/.test(rawImei);
+      devicesToCreate.push({
+        imei: isCleanImei ? rawImei : undefined,
+        serialNumber: !isCleanImei ? rawImei : undefined,
+        brand: brd,
+        model: mdl,
+      });
+    }
+    for (const dev of devices) {
+      if (dev.model && (dev.imei || dev.serialNumber || bulkImeis.length === 0)) {
+        devicesToCreate.push({
+          imei: dev.imei ? dev.imei.trim() : undefined,
+          serialNumber: dev.serialNumber ? dev.serialNumber.trim() : undefined,
+          brand: dev.brand || brd,
+          model: dev.model.trim(),
+          storageGb: dev.storageGb ?? undefined,
+        });
+      }
+    }
+    if (devicesToCreate.length === 0) {
+      return { success: false, error: "Debe incluir al menos un IMEI o número de serie." };
+    }
+
+    // IMEIs ya presentes en ESTE lote → duplicado dentro de la misma compra
+    const existingInBatch = new Set<string>();
+    for (const d of batch.devices) {
+      if (d.imei) existingInBatch.add(d.imei);
+      if (d.serialNumber) existingInBatch.add(d.serialNumber);
+    }
+    const dupInBatch = devicesToCreate.filter((d) => (d.imei && existingInBatch.has(d.imei)) || (d.serialNumber && existingInBatch.has(d.serialNumber)));
+    if (dupInBatch.length > 0) {
+      const list = dupInBatch.map((d) => d.imei || d.serialNumber).join(", ");
+      return { success: false, error: `Estos equipos ya están en la compra ${batch.batchNumber}: ${list}` };
+    }
+
+    // Existentes en el sistema: fuera de cola activa → reingreso; en cola activa → bloquean
+    const imeisToCheck = devicesToCreate.map((d) => d.imei).filter(Boolean) as string[];
+    const existingByImei = new Map<string, { id: string; imei: string | null; status: string }>();
+    if (imeisToCheck.length > 0) {
+      const existingUnits = await prisma.deviceUnit.findMany({
+        where: { imei: { in: imeisToCheck } },
+        select: { id: true, imei: true, status: true },
+      });
+      for (const unit of existingUnits) {
+        if (unit.imei) existingByImei.set(unit.imei, unit);
+      }
+      const activeDupes = existingUnits.filter((u) => u.status === "PENDING_QC" || u.status === "IN_QC");
+      if (activeDupes.length > 0) {
+        const dupes = activeDupes.map((u) => u.imei).join(", ");
+        return { success: false, error: `Los siguientes IMEIs ya están en un lote pendiente de revisión: ${dupes}` };
+      }
+    }
+
+    const reingresoUnits = devicesToCreate.filter((d) => d.imei && existingByImei.has(d.imei));
+    const newDevicesToCreate = devicesToCreate.filter((d) => !d.imei || !existingByImei.has(d.imei));
+
+    const updatedBatch = await prisma.$transaction(async (tx) => {
+      await tx.qcRevisionBatch.update({
+        where: { id: batch.id },
+        data: { totalDevices: batch.totalDevices + devicesToCreate.length },
+      });
+
+      if (newDevicesToCreate.length > 0) {
+        await tx.deviceUnit.createMany({
+          data: newDevicesToCreate.map((d) => ({
+            imei: d.imei || null,
+            serialNumber: d.serialNumber || null,
+            brand: d.brand,
+            model: d.model,
+            storageGb: d.storageGb || null,
+            status: "PENDING_QC",
+            batchId: batch.id,
+          })),
+        });
+      }
+
+      for (const re of reingresoUnits) {
+        const existing = existingByImei.get(re.imei!);
+        if (!existing) continue;
+        await tx.deviceUnit.update({
+          where: { id: existing.id },
+          data: { batchId: batch.id, status: "PENDING_QC", brand: re.brand, model: re.model, storageGb: re.storageGb ?? undefined },
+        });
+      }
+
+      return tx.qcRevisionBatch.findUnique({ where: { id: batch.id } });
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "qc_batch.add_devices",
+      module: "qc",
+      entityType: "qc_revision_batch",
+      entityId: batch.id,
+      afterData: { batchNumber: batch.batchNumber, nuevos: newDevicesToCreate.length, reingresados: reingresoUnits.length },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${batch.id}`);
+    revalidatePath("/qc/equipos-revisados");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      data: {
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        totalDevices: updatedBatch?.totalDevices ?? batch.totalDevices + devicesToCreate.length,
+        nuevos: newDevicesToCreate.length,
+        reingresados: reingresoUnits.length,
+      },
+      message:
+        reingresoUnits.length > 0
+          ? `${newDevicesToCreate.length} equipo(s) agregado(s) y ${reingresoUnits.length} reingresado(s) a ${batch.batchNumber}.`
+          : `${newDevicesToCreate.length} equipo(s) agregado(s) a ${batch.batchNumber}.`,
+    };
+  } catch (error: any) {
+    console.error("Error al agregar equipos al lote:", error);
+    return { success: false, error: error.message || "Error al agregar equipos al lote" };
   }
 }
 

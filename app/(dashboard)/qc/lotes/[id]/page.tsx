@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requirePermission } from "@/lib/auth/helpers";
+import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { getRevisionBatchDetailAction } from "@/modules/qc/actions/revision-batch";
 import { RevisionBatchDetailView } from "@/modules/qc/components/RevisionBatchDetailView";
 
@@ -33,5 +33,7 @@ export default async function RevisionBatchDetailPage({
     notFound();
   }
 
-  return <RevisionBatchDetailView batch={res.data} />;
+  const persisted = await getPersistedCurrentUser();
+
+  return <RevisionBatchDetailView batch={res.data} isAdmin={persisted?.roleCode === "ADMIN"} />;
 }

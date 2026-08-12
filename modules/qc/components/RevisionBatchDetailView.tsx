@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   updateRevisionBatchStatusAction,
   getRevisionBatchDetailAction,
+  deleteRevisionBatchAction,
 } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { AssignDeviceModal } from "./AssignDeviceModal";
 import { FisicoVerifierModal } from "./FisicoVerifierModal";
 import { NoFuncionalesModal } from "./NoFuncionalesModal";
+import { AddDevicesModal } from "./AddDevicesModal";
 import {
   ArrowLeft,
   Package,
@@ -29,20 +32,27 @@ import {
   ClipboardCheck,
   UserCheck,
   Fingerprint,
+  Trash2,
+  Loader2,
+  Plus,
 } from "lucide-react";
 
 interface RevisionBatchDetailViewProps {
   batch: any;
+  isAdmin?: boolean;
 }
 
-export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDetailViewProps) {
+export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }: RevisionBatchDetailViewProps) {
   const [batch, setBatch] = useState(initialBatch);
   const [loadingStatus, setLoadingStatus] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [assignDevice, setAssignDevice] = useState<any>(null);
   const [showVerifier, setShowVerifier] = useState(false);
   const [showNoFuncionales, setShowNoFuncionales] = useState(false);
+  const [showAddDevices, setShowAddDevices] = useState(false);
+  const router = useRouter();
 
   const refreshBatch = async () => {
     const res = await getRevisionBatchDetailAction(batch.id);
@@ -60,6 +70,20 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
       setBatch((prev: any) => ({ ...prev, status: res.data.status, completedAt: res.data.completedAt }));
     } else {
       alert(res.error || "No se pudo actualizar el estado del lote.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`¿Eliminar la compra ${batch.batchNumber} por completo? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    const res = await deleteRevisionBatchAction({ id: batch.id });
+    setDeleting(false);
+    if (res.success) {
+      alert(res.message ?? "Compra eliminada.");
+      router.push("/qc/lotes");
+      router.refresh();
+    } else {
+      alert(res.error || "No se pudo eliminar la compra.");
     }
   };
 
@@ -147,51 +171,73 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
           </div>
         </div>
 
-        {/* Acciones de Estado */}
+        {/* Acciones: admin gestiona la compra (verificar/recuperar/eliminar);
+            el control de calidad gestiona los estados del lote */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
-          <button
-            onClick={() => setShowVerifier(true)}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
-          >
-            <Fingerprint className="w-4 h-4" /> Verificador Físico
-          </button>
-          <button
-            onClick={() => setShowNoFuncionales(true)}
-            className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-100 flex items-center gap-2"
-          >
-            <AlertTriangle className="w-4 h-4" /> No Funcionales
-            {batch.nonFunctionalCount > 0 ? (
-              <span className="rounded-full bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-[18px] text-center">{batch.nonFunctionalCount}</span>
-            ) : null}
-          </button>
-          {batch.status !== "COMPLETED" && (
-            <button
-              onClick={() => handleStatusChange("COMPLETED")}
-              disabled={loadingStatus}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
-            >
-              <CheckCheck className="w-4 h-4" /> Marcar Lote Completado
-            </button>
-          )}
+          {isAdmin ? (
+            <>
+              <button
+                onClick={() => setShowVerifier(true)}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
+              >
+                <Fingerprint className="w-4 h-4" /> Verificador Físico
+              </button>
+              <button
+                onClick={() => setShowNoFuncionales(true)}
+                className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-100 flex items-center gap-2"
+              >
+                <AlertTriangle className="w-4 h-4" /> No Funcionales
+                {batch.nonFunctionalCount > 0 ? (
+                  <span className="rounded-full bg-rose-600 text-white text-[10px] font-black px-1.5 min-w-[18px] text-center">{batch.nonFunctionalCount}</span>
+                ) : null}
+              </button>
+              <button
+                onClick={() => setShowAddDevices(true)}
+                className="px-4 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Agregar Equipos
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || batch.status === "COMPLETED"}
+                title={batch.status === "COMPLETED" ? "No se puede eliminar un lote completado" : "Eliminar la compra por completo"}
+                className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-100 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Eliminar Compra
+              </button>
+            </>
+          ) : (
+            <>
+              {batch.status !== "COMPLETED" && (
+                <button
+                  onClick={() => handleStatusChange("COMPLETED")}
+                  disabled={loadingStatus}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
+                >
+                  <CheckCheck className="w-4 h-4" /> Marcar Lote Completado
+                </button>
+              )}
 
-          {batch.status === "PENDING_REVIEW" && (
-            <button
-              onClick={() => handleStatusChange("IN_REVIEW")}
-              disabled={loadingStatus}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
-            >
-              <Clock className="w-4 h-4" /> Iniciar Revisión
-            </button>
-          )}
+              {batch.status === "PENDING_REVIEW" && (
+                <button
+                  onClick={() => handleStatusChange("IN_REVIEW")}
+                  disabled={loadingStatus}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
+                >
+                  <Clock className="w-4 h-4" /> Iniciar Revisión
+                </button>
+              )}
 
-          {batch.status !== "CANCELLED" && (
-            <button
-              onClick={() => handleStatusChange("CANCELLED")}
-              disabled={loadingStatus}
-              className="px-3 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 font-bold text-xs rounded-xl transition-colors"
-            >
-              Anular Lote
-            </button>
+              {batch.status !== "CANCELLED" && (
+                <button
+                  onClick={() => handleStatusChange("CANCELLED")}
+                  disabled={loadingStatus}
+                  className="px-3 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 font-bold text-xs rounded-xl transition-colors"
+                >
+                  Anular Lote
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -432,6 +478,17 @@ export function RevisionBatchDetailView({ batch: initialBatch }: RevisionBatchDe
             reviewedAt: dev.inspections?.[0]?.reviewedAt ?? null,
           }))}
           onClose={() => setShowNoFuncionales(false)}
+          onChanged={() => refreshBatch()}
+        />
+      )}
+
+      {/* Agregar Equipos a la compra */}
+      {showAddDevices && (
+        <AddDevicesModal
+          batchId={batch.id}
+          batchNumber={batch.batchNumber}
+          existingModels={[]}
+          onClose={() => setShowAddDevices(false)}
           onChanged={() => refreshBatch()}
         />
       )}
