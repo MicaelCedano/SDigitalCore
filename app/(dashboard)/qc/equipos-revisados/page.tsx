@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { Prisma, QcInspectionResult } from "@prisma/client";
-import { requirePermission } from "@/lib/auth/helpers";
+import { redirect } from "next/navigation";
+import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import { ReviewedDevicesPage } from "@/modules/qc/components/ReviewedDevicesPage";
 
@@ -26,6 +27,11 @@ export default async function EquiposRevisadosPage({
   searchParams: Promise<{ q?: string; result?: string; page?: string }>;
 }) {
   await requirePermission("qc.read");
+  // En SDigitalSystem esto es inventario: lo maneja el admin, no el QC.
+  const persisted = await getPersistedCurrentUser();
+  if (persisted?.roleCode !== "ADMIN") {
+    redirect("/qc");
+  }
 
   const params = await searchParams;
   const query = (params.q ?? "").trim().slice(0, 120);
