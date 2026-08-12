@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, Landmark, PiggyBank, WalletCards } from "lucide-react";
 import { getCurrentWallet } from "@/modules/wallet/data";
+import { WithdrawalPanel } from "@/modules/wallet/components/WithdrawalPanel";
 
 function money(value: string) {
   return new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(Number(value));
@@ -15,6 +16,7 @@ export default async function WalletPage() {
     return <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-black text-slate-950">Mi Wallet</h1><p className="mt-3 text-slate-600">El módulo está preparado y mostrará saldo RD$ 0.00 cuando se aplique la migración de base de datos.</p></div>;
   }
   const wallet = data.wallet;
+  const principal = wallet?.accounts.find((account) => account.kind === "PRIMARY");
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header><p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">Finanzas personales</p><h1 className="mt-2 text-3xl font-black text-slate-950">Mi Wallet</h1></header>
@@ -52,6 +54,13 @@ export default async function WalletPage() {
           </div>
         )}
       </section>
+      {wallet && principal ? (
+        <WithdrawalPanel
+          balance={Number(principal.balance)}
+          ownerName={wallet.owner}
+          onWithdrawn={() => window.location.reload()}
+        />
+      ) : null}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4"><h2 className="font-bold text-slate-950">Movimientos</h2><p className="mt-1 text-xs text-slate-500">El historial anterior se conserva separado y no duplica este saldo.</p></div>
         {!wallet || wallet.entries.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">Todavía no hay movimientos en esta wallet.</div> : (
