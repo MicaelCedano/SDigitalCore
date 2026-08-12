@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toJpeg } from "html-to-image";
-import { Loader2, Landmark, Download, CheckCircle2, AlertTriangle, X, ReceiptText } from "lucide-react";
+import { Loader2, Landmark, Download, CheckCircle2, AlertTriangle, X, ReceiptText, Share2 } from "lucide-react";
 import { requestWithdrawalAction } from "@/modules/wallet/actions/withdrawals";
 
 interface WithdrawalResult {
@@ -28,6 +28,7 @@ export function WithdrawalPanel({
   const [result, setResult] = useState<WithdrawalResult | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const baucherRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -62,6 +63,32 @@ export function WithdrawalPanel({
       link.click();
     } finally {
       setDownloading(false);
+    }
+  }
+
+  async function handleShare() {
+    if (!baucherRef.current || !result) return;
+    setSharing(true);
+    try {
+      const dataUrl = await toJpeg(baucherRef.current, { quality: 0.95, backgroundColor: "#ffffff", style: { borderRadius: "0px" } });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], `baucher-${result.baucherCode}.jpg`, { type: "image/jpeg" });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Baucher de Pago",
+          text: `Baucher de pago por RD$ ${result.amount.toLocaleString("es-DO")} — ${result.baucherCode}`,
+        });
+      } else {
+        // Fallback: descargar (como System)
+        const link = document.createElement("a");
+        link.download = `baucher-${result.baucherCode}.jpg`;
+        link.href = dataUrl;
+        link.click();
+      }
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -131,12 +158,21 @@ export function WithdrawalPanel({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                onClick={handleShare}
+                disabled={sharing}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+                {sharing ? "Generando..." : "Compartir"}
+              </button>
+              <button
+                type="button"
                 onClick={handleDownload}
                 disabled={downloading}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#5750f1] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 transition hover:bg-[#463ec5] disabled:opacity-50"
               >
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                {downloading ? "Generando..." : "Descargar baucher (JPG)"}
+                {downloading ? "Generando..." : "Descargar (JPG)"}
               </button>
               <button
                 type="button"
