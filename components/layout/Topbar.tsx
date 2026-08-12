@@ -226,20 +226,6 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, walletBal
               <div className="border-b border-[#f0f1f3] px-3 py-2.5">
                 <p className="truncate text-sm font-semibold text-[#101828]">{userName ?? "Usuario"}</p>
                 <p className="truncate text-xs text-[#667085]">{userEmail ?? ""}</p>
-                {walletBalance !== null && walletBalance !== undefined ? (
-                  <Link
-                    href="/wallet"
-                    onClick={() => setDropdownOpen(false)}
-                    className="mt-2 flex items-center gap-2 rounded-lg border border-[#e4e7ec] bg-[#f8fafc] px-2.5 py-2 transition-colors hover:bg-[#eef2ff]"
-                    role="menuitem"
-                  >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#eef2ff] text-[#4338ca]"><Wallet size={14} /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#667085]">Mi Wallet</span>
-                      <span className="block font-mono text-[13px] font-bold text-[#101828]">RD$ {Number(walletBalance).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </span>
-                  </Link>
-                ) : null}
               </div>
               <div className="py-1">
                 <Link href="/perfil" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-[#344054] hover:bg-[#f8fafc]" role="menuitem">
