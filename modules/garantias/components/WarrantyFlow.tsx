@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, ClipboardPaste, ListChecks, Search, ShieldCheck, UserRound, X } from "lucide-react";
+import { CheckSquare, ClipboardPaste, ListChecks, Scan, Search, ShieldCheck, UserRound, X } from "lucide-react";
 import { assignCasesToTechnician, deliverCasesToCustomer, getWarrantyDocument, markWarrantyCreditNote, receiveCasesFromSupplier, receiveCasesFromTechnician, sendCasesToSupplier } from "@/modules/garantias/actions/warranty";
 import { WarrantyDocumentPreviewModal } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
 
@@ -28,6 +28,9 @@ export function WarrantyFlow({ operation, cases, embedded = false }: { operation
   const [search, setSearch] = useState("");
   const [bulkInput, setBulkInput] = useState("");
   const [bulkMessage, setBulkMessage] = useState("");
+  const [scanInput, setScanInput] = useState("");
+  const [scanMessage, setScanMessage] = useState("");
+  const scanInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -97,6 +100,12 @@ export function WarrantyFlow({ operation, cases, embedded = false }: { operation
     }
   }, [cases, operation, counterparty]);
 
+  useEffect(() => {
+    if (operation === "sendSupplier" && counterparty.trim() && selected.length === 0) {
+      scanInputRef.current?.focus();
+    }
+  }, [counterparty, operation, selected.length]);
+
   function validateBeforeConfirm() {
     if (selected.length === 0) return setMessage("Selecciona al menos un equipo.");
     if (operation !== "credit" && !counterparty.trim()) return setMessage(`Indica el ${label.toLowerCase()}.`);
@@ -135,6 +144,27 @@ export function WarrantyFlow({ operation, cases, embedded = false }: { operation
     setBulkMessage(matches.length > 0 ? `${matches.length} equipo(s) agregado(s)${unmatched.length > 0 ? ` · ${unmatched.length} no elegible(s) o no encontrado(s)` : ""}.` : "No coincidió ningún IMEI o código elegible.");
   }
 
+  function addScannedCase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const cleanImei = scanInput.trim();
+    if (!counterparty.trim()) {
+      setScanMessage("Indica primero la marca o suplidor de destino.");
+      return;
+    }
+    if (!cleanImei) return;
+    const match = cases.find((item) => item.imei === cleanImei);
+    if (!match) {
+      setScanMessage(`No se encontró un equipo elegible con el IMEI ${cleanImei}.`);
+    } else if (selected.includes(match.caseCode)) {
+      setScanMessage(`El equipo ${match.caseCode} ya está en la lista de envío.`);
+    } else {
+      setSelected((current) => [...current, match.caseCode]);
+      setScanMessage(`${match.caseCode} agregado · ${match.model}. Listo para escanear el siguiente.`);
+    }
+    setScanInput("");
+    window.setTimeout(() => scanInputRef.current?.focus(), 0);
+  }
+
   function selectCase(item: WarrantyFlowCase, checked: boolean) {
     setSelected((current) => checked ? [...new Set([...current, item.caseCode])] : current.filter((code) => code !== item.caseCode));
     if (!checked || counterparty.trim()) return;
@@ -149,6 +179,7 @@ export function WarrantyFlow({ operation, cases, embedded = false }: { operation
         <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-slate-500"><span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">{selected.length} seleccionado(s)</span><span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">Documento con identidad roja</span></div>
       </div>}
       {operation !== "credit" && <div className="grid gap-4 border-b border-slate-200 p-5 sm:grid-cols-2 sm:p-6"><label className="text-sm font-semibold text-slate-700">{label}<input value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder={operation === "assign" ? "Ej. Sahul" : "Nombre o empresa"} className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-3 outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></label>{operation === "receiveTech" && <label className="flex items-center gap-3 self-end pb-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={repaired} onChange={(event) => setRepaired(event.target.checked)} className="h-4 w-4 accent-[#5750f1]" /> Equipo reparado</label>}</div>}
+      {operation === "sendSupplier" && <div className="border-b border-slate-200 bg-[#5750f1]/[0.03] p-5 sm:p-6"><form onSubmit={addScannedCase} className="flex flex-col gap-2 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-sm font-semibold text-slate-700"><span className="flex items-center gap-2"><Scan size={16} className="text-[#5750f1]" /> Escanear o escribir IMEI</span><input ref={scanInputRef} value={scanInput} onChange={(event) => { setScanInput(event.target.value.replace(/\D/g, "").slice(0, 15)); setScanMessage(""); }} placeholder="El lector puede enviar Enter automáticamente..." inputMode="numeric" autoComplete="off" disabled={busy || loadingDocument} className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 font-mono text-sm outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 disabled:opacity-60" /></label><button type="submit" disabled={busy || loadingDocument || !scanInput} className="h-12 rounded-xl bg-slate-800 px-5 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Agregar equipo</button></form><p className="mt-2 text-xs text-slate-500">Cada IMEI válido se agrega a la lista de despacho. Luego puedes escanear el siguiente sin buscarlo manualmente.</p>{scanMessage && <p role="status" className="mt-2 text-xs font-semibold text-[#5750f1]">{scanMessage}</p>}</div>}
       {needsReason && <div className="border-b border-slate-200 p-5 sm:p-6"><label className="text-sm font-semibold text-slate-700">{reasonLabel} <span className="text-xs font-normal text-slate-400">(Opcional)</span><textarea maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={operation === "deliver" ? "Indica cómo se resolvió y la conformidad de entrega (opcional)" : operation === "credit" ? "Explica por qué se cierra mediante nota de crédito (opcional)" : "Describe el trabajo realizado, resultado o condición de retorno (opcional)"} className="mt-2 min-h-20 w-full rounded-xl border border-slate-300 p-3 text-sm outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></label><p className="mt-1 text-right text-[11px] text-slate-400">{reason.length}/1000</p></div>}
       <div className="border-b border-slate-200 bg-white p-4 sm:p-5"><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar o escanear por IMEI, caso o cliente..." className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></div><div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>{visibleCases.length} equipos elegibles · {selected.length} seleccionados</span><button type="button" onClick={toggleAll} className="inline-flex items-center gap-1 font-bold text-[#5750f1] hover:underline"><CheckSquare size={14} /> {allVisibleSelected ? "Quitar selección" : search.trim() ? `Seleccionar resultados (${visibleCases.length})` : `Seleccionar todos (${visibleCases.length})`}</button></div><div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3"><div className="flex items-center gap-2 text-xs font-bold text-slate-700"><ClipboardPaste size={15} className="text-[#5750f1]" /> Pegar lote de IMEIs o códigos</div><div className="mt-2 flex flex-col gap-2 sm:flex-row"><textarea value={bulkInput} onChange={(event) => { setBulkInput(event.target.value); setBulkMessage(""); }} rows={2} placeholder="Pega varios IMEIs o códigos, uno por línea, espacio, coma o punto y coma..." className="min-h-11 flex-1 resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /><button type="button" onClick={selectBulk} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 text-xs font-bold text-white hover:bg-slate-700"><ListChecks size={15} /> Agregar lote</button></div>{bulkMessage && <p role="status" className="mt-2 text-[11px] font-semibold text-slate-600">{bulkMessage}</p>}</div></div>
       <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">{visibleCases.map((item) => <label key={item.id} className={`flex cursor-pointer items-center gap-3 p-4 transition hover:bg-[#5750f1]/5 ${selected.includes(item.caseCode) ? "bg-[#5750f1]/10" : ""}`}><input type="checkbox" checked={selected.includes(item.caseCode)} onChange={(event) => selectCase(item, event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#5750f1]" /><span className="min-w-0 flex-1"><span className="font-mono text-xs font-bold text-[#5750f1]">{item.caseCode}</span><span className="ml-2 text-sm font-semibold text-slate-700">{item.clientName} · {item.model}</span><span className="mt-1 block font-mono text-xs text-slate-500">IMEI {item.imei}</span>{operation === "receiveTech" && item.assignedTechnicianName && <span className="mt-1 block text-[11px] text-violet-600">Asignado a {item.assignedTechnicianName}</span>}{operation === "receiveSupplier" && item.currentSupplierName && <span className="mt-1 block text-[11px] text-orange-600">Enviado a {item.currentSupplierName}</span>}</span><UserRound size={17} className="text-slate-400" /></label>)}{visibleCases.length === 0 && <p className="p-10 text-center text-sm text-slate-500">No hay casos elegibles para este flujo.</p>}</div>
