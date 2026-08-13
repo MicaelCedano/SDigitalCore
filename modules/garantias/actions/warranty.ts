@@ -391,6 +391,12 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
     const rule = flowRules[operation];
     let counterpartyName = normalizeName(data.counterpartyName);
     const reason = data.reason?.trim();
+    const caseObservations = data.caseObservations ?? {};
+
+    if (operation === "receive-unrepaired") {
+      const missingObservation = data.caseCodes.find((caseCode) => !caseObservations[caseCode]?.trim());
+      if (missingObservation) return { success: false, error: `La observación del caso ${missingObservation} es obligatoria.` };
+    }
 
     // "Enviar a Reparaciones": si viene technicianId real, resolver el usuario y
     // usar su nombre como contraparte (assignedTechnicianName snapshot) + enlazar ID.
@@ -454,7 +460,8 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
           },
         });
         if (update.count !== 1) throw new WarrantyActionError(`El caso ${item.caseCode} fue actualizado por otra persona. Recarga e inténtalo nuevamente.`);
-        await createEvent(tx, item.id, actor, rule.eventType, { fromStatus: item.status, toStatus: rule.toStatus, counterpartyName: counterpartyName || item.clientName, reason });
+        const itemReason = operation === "receive-unrepaired" ? caseObservations[item.caseCode]?.trim() : reason;
+        await createEvent(tx, item.id, actor, rule.eventType, { fromStatus: item.status, toStatus: rule.toStatus, counterpartyName: counterpartyName || item.clientName, reason: itemReason });
       }
       const document = await createDocument(tx, actor.id, rule.documentType, counterpartyName || cases[0].clientName, cases.map((item) => item.id), reason);
       await tx.auditLog.create({

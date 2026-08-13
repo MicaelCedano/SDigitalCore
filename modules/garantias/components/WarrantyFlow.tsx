@@ -27,6 +27,7 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
   const [selected, setSelected] = useState<string[]>([]);
   const [counterparty, setCounterparty] = useState(defaultCounterparty);
   const [reason, setReason] = useState("");
+  const [caseObservations, setCaseObservations] = useState<Record<string, string>>({});
   const [repaired, setRepaired] = useState(true);
   const [search, setSearch] = useState("");
   const [scanInput, setScanInput] = useState("");
@@ -40,7 +41,7 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
   const [document, setDocument] = useState<Document | null>(null);
   const [loadingDocument, setLoadingDocument] = useState(false);
   const [title, label, hint, actionLabel] = config[operation];
-  const needsReason = operation === "receiveTech" || operation === "receiveSupplier" || operation === "deliver" || operation === "credit";
+  const needsReason = operation === "receiveSupplier" || operation === "deliver" || operation === "credit";
   const reasonLabel = operation === "deliver" || operation === "credit" ? "Resolución del caso" : "Resultado / observación";
   const visibleCases = useMemo(() => cases.filter((item) => `${item.caseCode} ${item.clientName} ${item.model} ${item.imei}`.toLowerCase().includes(search.toLowerCase())), [cases, search]);
   const selectedCases = useMemo(() => selected.map((code) => cases.find((item) => item.caseCode === code)).filter((item): item is WarrantyFlowCase => Boolean(item)), [cases, selected]);
@@ -107,18 +108,23 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
   function validateBeforeConfirm() {
     if (selected.length === 0) return setMessage("Selecciona al menos un equipo.");
     if (operation !== "credit" && !counterparty.trim()) return setMessage(`Indica el ${label.toLowerCase()}.`);
+    if (operation === "receiveTech" && !repaired) {
+      const missing = selected.some((caseCode) => !caseObservations[caseCode]?.trim());
+      if (missing) return setMessage("Escribe una observación para cada equipo no reparado.");
+    }
     setMessage("");
     setConfirmOpen(true);
   }
 
   async function submit() {
     setConfirmOpen(false); setBusy(true); setMessage("");
-    const input = { caseCodes: selected, counterpartyName: counterparty, reason };
+    const input = { caseCodes: selected, counterpartyName: counterparty, reason, caseObservations: operation === "receiveTech" && !repaired ? caseObservations : undefined };
     const result = operation === "assign" ? await assignCasesToTechnician(input) : operation === "receiveTech" ? await receiveCasesFromTechnician(input, repaired) : operation === "sendSupplier" ? await sendCasesToSupplier(input) : operation === "receiveSupplier" ? await receiveCasesFromSupplier(input) : operation === "deliver" ? await deliverCasesToCustomer(input) : await markWarrantyCreditNote(input);
     setBusy(false);
     if (!result.success) return setMessage(result.error);
     setSelected([]);
     setReason("");
+    setCaseObservations({});
     if (SCAN_FLOW_OPERATIONS.includes(operation)) {
       setCounterparty("");
       setSupplierLocked(false);
@@ -182,6 +188,26 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
       {SCAN_FLOW_OPERATIONS.includes(operation) ? <div className="border-b border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><span className="text-sm font-bold text-slate-700">Equipos en esta operación</span><span className="rounded-full bg-[#5750f1]/10 px-3 py-1 text-xs font-bold text-[#5750f1]">{selectedCases.length}</span></div>{selectedCases.length === 0 ? <p className="mt-6 rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">Escanea un IMEI para agregarlo a esta lista.</p> : <div className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">{selectedCases.map((item) => <div key={item.id} className="flex items-center gap-3 px-4 py-3"><span className="min-w-0 flex-1"><span className="font-mono text-xs font-bold text-[#5750f1]">{item.caseCode}</span><span className="ml-2 text-sm font-semibold text-slate-700">{item.model}</span><span className="mt-1 block font-mono text-xs text-slate-500">IMEI {item.imei}</span></span><button type="button" onClick={() => setSelected((current) => current.filter((code) => code !== item.caseCode))} className="text-xs font-bold text-red-600 hover:underline">Quitar</button></div>)}</div>}</div> : <><div className="border-b border-slate-200 bg-white p-4 sm:p-5"><div className="relative"><Search size={16} className="absolute left-3 top-3 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar o escanear por IMEI, caso o cliente..." className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></div><div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>{visibleCases.length} equipos elegibles · {selected.length} seleccionados</span><button type="button" onClick={toggleAll} className="inline-flex items-center gap-1 font-bold text-[#5750f1] hover:underline"><CheckSquare size={14} /> {allVisibleSelected ? "Quitar selección" : search.trim() ? `Seleccionar resultados (${visibleCases.length})` : `Seleccionar todos (${visibleCases.length})`}</button></div></div><div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">{visibleCases.map((item) => <label key={item.id} className={`flex cursor-pointer items-center gap-3 p-4 transition hover:bg-[#5750f1]/5 ${selected.includes(item.caseCode) ? "bg-[#5750f1]/10" : ""}`}><input type="checkbox" checked={selected.includes(item.caseCode)} onChange={(event) => selectCase(item, event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#5750f1]" /><span className="min-w-0 flex-1"><span className="font-mono text-xs font-bold text-[#5750f1]">{item.caseCode}</span><span className="ml-2 text-sm font-semibold text-slate-700">{item.clientName} · {item.model}</span><span className="mt-1 block font-mono text-xs text-slate-500">IMEI {item.imei}</span>{operation === "receiveTech" && item.assignedTechnicianName && <span className="mt-1 block text-[11px] text-violet-600">Asignado a {item.assignedTechnicianName}</span>}{operation === "receiveSupplier" && item.currentSupplierName && <span className="mt-1 block text-[11px] text-orange-600">Enviado a {item.currentSupplierName}</span>}</span><UserRound size={17} className="text-slate-400" /></label>)}{visibleCases.length === 0 && <p className="p-10 text-center text-sm text-slate-500">No hay casos elegibles para este flujo.</p>}</div></>}
       <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"><span className="text-xs text-slate-500">Puedes revisar los datos antes de confirmar.</span><button type="button" disabled={busy || loadingDocument || selected.length === 0} onClick={validateBeforeConfirm} className="rounded-xl bg-[#5750f1] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#5750f1]/20 transition hover:bg-[#463ec5] disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Procesando..." : loadingDocument ? "Abriendo documento..." : actionLabel}</button></div>
       {message && <p role="status" className="m-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{message}</p>}
+      {operation === "receiveTech" && !repaired && selectedCases.length > 0 && (
+        <div className="border-t border-amber-200 bg-amber-50/50 p-5 sm:p-6">
+          <p className="text-sm font-bold text-slate-700">Observación individual de cada equipo no reparado</p>
+          <p className="mt-1 text-xs text-slate-500">Es obligatoria para cada equipo marcado como no reparado.</p>
+          <div className="mt-3 space-y-3">
+            {selectedCases.map((item) => (
+              <label key={item.caseCode} className="block text-sm font-semibold text-slate-700">
+                <span>{item.caseCode} · IMEI {item.imei}</span>
+                <textarea
+                  value={caseObservations[item.caseCode] ?? ""}
+                  onChange={(event) => setCaseObservations((current) => ({ ...current, [item.caseCode]: event.target.value }))}
+                  maxLength={1000}
+                  placeholder="Indica la falla o por qué no fue reparado..."
+                  className="mt-1.5 min-h-20 w-full rounded-xl border border-amber-200 bg-white p-3 text-sm font-normal outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
     {confirmOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#5750f1]">Revisión antes de confirmar</p><h2 className="mt-2 text-xl font-black text-slate-800">¿Confirmar {title.toLowerCase()}?</h2></div><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar"><X size={19} /></button></div><div className="mt-5 rounded-xl border border-[#5750f1]/20 bg-[#5750f1]/10 p-4 text-sm text-slate-700"><p><strong>{selected.length}</strong> equipo(s) seleccionado(s)</p>{operation !== "credit" && <p className="mt-1">{label}: <strong>{counterparty}</strong></p>}{needsReason && <p className="mt-1">{reasonLabel}: <strong>{reason}</strong></p>}</div><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Volver</button><button type="button" onClick={submit} disabled={busy} className="rounded-xl bg-[#5750f1] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#463ec5] disabled:opacity-50">Confirmar y generar documento</button></div></div></div>}
     {document && <WarrantyDocumentPreviewModal document={document} onClose={() => setDocument(null)} />}
