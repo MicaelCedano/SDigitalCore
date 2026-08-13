@@ -15,6 +15,7 @@ import { AssignDeviceModal } from "./AssignDeviceModal";
 import { FisicoVerifierModal } from "./FisicoVerifierModal";
 import { NoFuncionalesModal } from "./NoFuncionalesModal";
 import { AddDevicesModal } from "./AddDevicesModal";
+import { exportRevisionBatchToExcel } from "../lib/excel-export";
 import {
   ArrowLeft,
   Package,
@@ -87,6 +88,17 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
     } else {
       alert(res.error || "No se pudo eliminar la compra.");
     }
+  };
+
+  const handleExportExcel = () => {
+    exportRevisionBatchToExcel({
+      batchNumber: batch.batchNumber,
+      supplierName: batch.supplierName,
+      branch: batch.branch,
+      receivedAt: batch.receivedAt || batch.createdAt,
+      status: batch.status,
+      devices: batch.devices || [],
+    });
   };
 
   const handleSubmitBatch = async () => {
@@ -358,6 +370,14 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
         <div className="text-xs text-slate-500 font-medium">
           Mostrando <span className="font-bold text-slate-800">{devices.length}</span> de {batch.totalDevices} equipos
         </div>
+        <button
+          type="button"
+          onClick={handleExportExcel}
+          disabled={!batch.devices?.length}
+          className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Exportar Excel
+        </button>
       </div>
 
       {/* Tabla de Equipos del Lote */}
