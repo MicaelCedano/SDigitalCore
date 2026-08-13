@@ -30,6 +30,11 @@ export const updateRevisionBatchStatusSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+export const updateRevisionBatchBranchSchema = z.object({
+  id: z.string().min(1, "ID del lote requerido"),
+  branch: z.string().trim().min(1, "La sucursal es obligatoria"),
+});
+
 export const assignRevisionBatchSchema = z.object({
   id: z.string().min(1, "ID del lote requerido"),
   assignedToId: z.string().nullable(),
@@ -49,5 +54,6 @@ export const reviewDeviceSchema = z.object({
 export type RevisionBatchDeviceInput = z.infer<typeof revisionBatchDeviceSchema>;
 export type CreateRevisionBatchInput = z.infer<typeof createRevisionBatchSchema>;
 export type UpdateRevisionBatchStatusInput = z.infer<typeof updateRevisionBatchStatusSchema>;
+export type UpdateRevisionBatchBranchInput = z.infer<typeof updateRevisionBatchBranchSchema>;
 export type ReviewDeviceInput = z.infer<typeof reviewDeviceSchema>;
 export type AssignRevisionBatchInput = z.infer<typeof assignRevisionBatchSchema>;

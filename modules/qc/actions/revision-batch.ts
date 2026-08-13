@@ -9,11 +9,13 @@ import { payReviewersForBatch, QC_REVIEW_RATE } from "../lib/batch-payment";
 import {
   createRevisionBatchSchema,
   updateRevisionBatchStatusSchema,
+  updateRevisionBatchBranchSchema,
   reviewDeviceSchema,
   revisionBatchDeviceSchema,
   CreateRevisionBatchInput,
   UpdateRevisionBatchStatusInput,
   ReviewDeviceInput,
+  UpdateRevisionBatchBranchInput,
 } from "@/lib/validation/revision-batch";
 import type { QcBatchStatus } from "@prisma/client";
 import { z } from "zod";
@@ -399,6 +401,53 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
   } catch (error: any) {
     console.error("Error al actualizar estado del lote:", error);
     return { success: false, error: "Error al actualizar el estado del Lote de Revisión" };
+  }
+}
+
+/** Cambia la sucursal receptora de una compra QC, solo para administradores. */
+export async function updateRevisionBatchBranchAction(input: UpdateRevisionBatchBranchInput) {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede cambiar la sucursal." };
+    }
+
+    const validated = updateRevisionBatchBranchSchema.parse(input);
+    const branch = await prisma.branch.findFirst({
+      where: { name: validated.branch, status: "ACTIVE" },
+      select: { name: true },
+    });
+    if (!branch) return { success: false, error: "La sucursal seleccionada no existe o está inactiva." };
+
+    const existing = await prisma.qcRevisionBatch.findUnique({
+      where: { id: validated.id },
+      select: { id: true, batchNumber: true, branch: true },
+    });
+    if (!existing) return { success: false, error: "Lote de Revisión no encontrado." };
+
+    const updated = await prisma.qcRevisionBatch.update({
+      where: { id: existing.id },
+      data: { branch: branch.name },
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "qc_batch.update_branch",
+      module: "qc",
+      entityType: "qc_revision_batch",
+      entityId: updated.id,
+      beforeData: { batchNumber: existing.batchNumber, branch: existing.branch },
+      afterData: { batchNumber: updated.batchNumber, branch: updated.branch },
+    });
+
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${updated.id}`);
+    revalidatePath("/dashboard");
+    return { success: true, data: updated, message: `Sucursal actualizada a ${updated.branch}.` };
+  } catch (error: any) {
+    console.error("Error al cambiar la sucursal del lote:", error);
+    return { success: false, error: error.message || "Error al cambiar la sucursal del lote." };
   }
 }
 
