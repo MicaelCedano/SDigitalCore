@@ -22,10 +22,10 @@ const config: Record<WarrantyFlowOperation, [string, string, string, string]> = 
 const SUPPLIER_SUGGESTIONS = ["Blu", "Sunelan", "Samsung", "Apple", "Xiaomi", "Motorola", "Oppo", "Realme", "Huawei", "ZTE"];
 const SCAN_FLOW_OPERATIONS: WarrantyFlowOperation[] = ["assign", "receiveTech", "sendSupplier", "receiveSupplier", "deliver"];
 
-export function WarrantyFlow({ operation, cases, embedded = false }: { operation: WarrantyFlowOperation; cases: WarrantyFlowCase[]; embedded?: boolean }) {
+export function WarrantyFlow({ operation, cases, embedded = false, defaultCounterparty = "" }: { operation: WarrantyFlowOperation; cases: WarrantyFlowCase[]; embedded?: boolean; defaultCounterparty?: string }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
-  const [counterparty, setCounterparty] = useState("");
+  const [counterparty, setCounterparty] = useState(defaultCounterparty);
   const [reason, setReason] = useState("");
   const [repaired, setRepaired] = useState(true);
   const [search, setSearch] = useState("");
