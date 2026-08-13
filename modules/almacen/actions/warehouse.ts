@@ -455,23 +455,7 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
       orderBy: { createdAt: "desc" },
     });
 
-    const requestsWithVisibleColors = requests.map((request) => ({
-      ...request,
-      items: request.items.map((item) => ({
-        ...item,
-        product: item.product
-          ? {
-              ...item.product,
-              capacity: item.product.color
-                ? `${item.product.capacity ?? ""} ${item.product.color}`.trim()
-                : item.product.capacity,
-              color: null,
-            }
-          : item.product,
-      })),
-    }));
-
-    return { success: true, data: requestsWithVisibleColors };
+    return { success: true, data: requests };
   } catch (error: any) {
     return { success: false, error: "Error al cargar solicitudes", data: [] };
   }

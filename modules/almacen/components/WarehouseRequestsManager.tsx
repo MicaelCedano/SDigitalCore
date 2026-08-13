@@ -142,10 +142,15 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     return attributes.join(" · ");
   };
 
+  const formatProductLabel = (product: any, fallback = "Producto") => {
+    return [product?.brand, product?.name ?? fallback, formatProductVariant(product)]
+      .filter(Boolean)
+      .join(" ");
+  };
+
   const voucherText = (request: any) => {
     const lines = (request.items ?? []).map((item: any) => {
-      const variant = formatProductVariant(item.product);
-      return `${item.product?.name ?? item.productId}${variant ? ` · ${variant}` : ""}: ${item.unitsCount} uds`;
+      return `${formatProductLabel(item.product, item.productId)}: ${item.unitsCount} uds`;
     }).join("\n");
     return `BOUCHER DE SOLICITUD ${request.requestCode}\n${request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}\nSucursal: ${request.branch}\nSolicitante: ${request.requestedBy}\nProductos:\n${lines}\nEstado: ${request.status === "PENDING" ? "Pendiente de aprobación" : request.status === "APPROVED" ? "Aprobada" : "Rechazada"}`;
   };
@@ -154,8 +159,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     const width = 900;
     const items = request.items ?? [];
     const lines = items.flatMap((item: any) => {
-      const variant = formatProductVariant(item.product);
-      const label = `${item.product?.code ?? item.productId} · ${item.product?.name ?? "Producto"}${variant ? ` · ${variant}` : ""}`;
+      const label = `${item.product?.code ?? item.productId} · ${formatProductLabel(item.product)}`;
       const words = label.split(" ");
       const wrapped: string[] = [];
       let current = "";
@@ -273,6 +277,6 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
         <button type="button" onClick={() => setDetailRequest(null)} className="rounded-xl bg-[#5750f1] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 transition hover:bg-[#463ec5]">Entendido</button>
       </div>
     </div></div>; })()}
-    {voucherRequest && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between border-b border-slate-200 pb-4"><div><p className={`text-xs font-bold ${voucherRequest.type === "ENTRY" ? "text-emerald-600" : "text-rose-600"}`}>BOUCHER DE SOLICITUD</p><h2 className="text-xl font-black text-slate-900">{voucherRequest.requestCode}</h2><p className="mt-1 text-xs text-slate-500">{voucherRequest.branch} · {voucherRequest.requestedBy}</p></div><button type="button" onClick={() => setVoucherRequest(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></div><div className="space-y-2 py-4">{(voucherRequest.items ?? []).map((item: any) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span><strong>{item.product?.code}</strong> · {item.product?.name ?? item.productId}{item.product?.capacity ? <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-700"><Cpu className="h-3 w-3 text-emerald-600" />{item.product.capacity}</span> : null}</span><strong>{item.unitsCount} uds</strong></div>)}</div><div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-black"><span>{voucherRequest.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span><span>{voucherRequest.status === "PENDING" ? "Esperando aprobación" : voucherRequest.status === "APPROVED" ? "Aprobada" : "Rechazada"}</span></div><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700"><Printer className="h-4 w-4" />Imprimir / PDF</button><button type="button" disabled={sharingVoucher} onClick={() => void shareVoucherImage(voucherRequest)} className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{sharingVoucher ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}{sharingVoucher ? "Preparando imagen..." : "Enviar imagen por WhatsApp"}</button></div></div></div>}
+    {voucherRequest && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between border-b border-slate-200 pb-4"><div><p className={`text-xs font-bold ${voucherRequest.type === "ENTRY" ? "text-emerald-600" : "text-rose-600"}`}>BOUCHER DE SOLICITUD</p><h2 className="text-xl font-black text-slate-900">{voucherRequest.requestCode}</h2><p className="mt-1 text-xs text-slate-500">{voucherRequest.branch} · {voucherRequest.requestedBy}</p></div><button type="button" onClick={() => setVoucherRequest(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></div><div className="space-y-2 py-4">{(voucherRequest.items ?? []).map((item: any) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span><strong>{item.product?.code}</strong> · {formatProductLabel(item.product, item.productId)}</span><strong>{item.unitsCount} uds</strong></div>)}</div><div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-black"><span>{voucherRequest.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span><span>{voucherRequest.status === "PENDING" ? "Esperando aprobación" : voucherRequest.status === "APPROVED" ? "Aprobada" : "Rechazada"}</span></div><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700"><Printer className="h-4 w-4" />Imprimir / PDF</button><button type="button" disabled={sharingVoucher} onClick={() => void shareVoucherImage(voucherRequest)} className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{sharingVoucher ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}{sharingVoucher ? "Preparando imagen..." : "Enviar imagen por WhatsApp"}</button></div></div></div>}
   </div>;
 }
