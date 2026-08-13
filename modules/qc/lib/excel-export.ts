@@ -42,21 +42,18 @@ export function exportRevisionBatchToExcel(batch: ExportBatch) {
       const reviewed = inspection?.status === "COMPLETED";
       const result = reviewed ? resultLabels[inspection?.result || ""] || inspection?.result || "" : "PENDIENTE";
       const resultColor = result === "FUNCIONAL" ? "#16a34a" : result === "DEFECTUOSO" ? "#dc2626" : "#ca8a04";
-      const identifier = device.imei || device.serialNumber || "-";
+      const identifier = String(device.imei || device.serialNumber || "-");
       const model = `${device.brand || ""} ${device.model}`.trim();
 
       return `
         <tr>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${index + 1}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left; font-family:monospace;">${escapeXml(identifier)}</td>
+          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left; font-family:monospace; mso-number-format:'\\@';">${escapeXml(identifier)}</td>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:left; font-weight:bold;">${escapeXml(model)}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left;">${escapeXml(device.color || "-")}</td>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${device.storageGb ?? "-"}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${escapeXml(device.status || "-")}</td>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; font-weight:bold; color:${resultColor};">${escapeXml(result)}</td>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${reviewed ? escapeXml(inspection?.grade || "-") : "-"}</td>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${reviewed && inspection?.batteryHealth != null ? `${inspection.batteryHealth}%` : "-"}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left;">${reviewed ? escapeXml(inspection?.reviewerNameSnapshot || "-") : "-"}</td>
           <td style="border:1px solid #cbd5e1; padding:8px; text-align:left;">${reviewed ? escapeXml(inspection?.functionalityNotes || inspection?.physicalNotes || "-") : "-"}</td>
         </tr>
       `;
@@ -89,30 +86,28 @@ export function exportRevisionBatchToExcel(batch: ExportBatch) {
             <td style="font-weight:bold; background-color:#f1f5f9;">Estado:</td><td colspan="3">${escapeXml(batch.status || "-")}</td>
             <td style="font-weight:bold; background-color:#f1f5f9;">Total:</td><td colspan="4">${batch.devices.length}</td>
           </tr>
-          <tr><td colspan="11"></td></tr>
+          <tr><td colspan="8"></td></tr>
           <thead>
             <tr style="background-color:#0f172a; color:#ffffff; font-weight:bold;">
               <th style="padding:10px; border:1px solid #0f172a;">#</th>
               <th style="padding:10px; border:1px solid #0f172a;">IMEI / Serie</th>
               <th style="padding:10px; border:1px solid #0f172a;">Modelo</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Color</th>
               <th style="padding:10px; border:1px solid #0f172a;">Capacidad (GB)</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Estado operativo</th>
               <th style="padding:10px; border:1px solid #0f172a;">Resultado QC</th>
               <th style="padding:10px; border:1px solid #0f172a;">Grado</th>
               <th style="padding:10px; border:1px solid #0f172a;">BaterÃ­a</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Revisor QC</th>
               <th style="padding:10px; border:1px solid #0f172a;">Observaciones</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
           <tfoot>
             <tr style="background-color:#f8fafc; font-weight:bold;">
-              <td colspan="5" style="border:1px solid #cbd5e1; padding:8px; text-align:right;">TOTALES:</td>
+              <td colspan="3" style="border:1px solid #cbd5e1; padding:8px; text-align:right;">TOTALES:</td>
               <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${batch.devices.length}</td>
               <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${reviewedCount} revisados</td>
-              <td colspan="2" style="border:1px solid #cbd5e1; padding:8px; text-align:center; color:#16a34a;">${functionalCount} funcionales</td>
-              <td colspan="2" style="border:1px solid #cbd5e1; padding:8px; text-align:center; color:#dc2626;">${nonFunctionalCount} defectuosos</td>
+              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; color:#16a34a;">${functionalCount} funcionales</td>
+              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">-</td>
+              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; color:#dc2626;">${nonFunctionalCount} defectuosos</td>
             </tr>
           </tfoot>
         </table>
@@ -120,7 +115,8 @@ export function exportRevisionBatchToExcel(batch: ExportBatch) {
     </html>
   `;
 
-  downloadBlob(htmlContent, `Compra_QC_${batch.batchNumber}.xls`, "application/vnd.ms-excel;charset=utf-8");
+  const normalizedHtmlContent = htmlContent.replace(/colspan="11"/g, 'colspan="8"');
+  downloadBlob(normalizedHtmlContent, `Compra_QC_${batch.batchNumber}.xls`, "application/vnd.ms-excel;charset=utf-8");
 }
 
 function escapeXml(value: string): string {
