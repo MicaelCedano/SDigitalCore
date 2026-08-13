@@ -463,7 +463,7 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
           ? {
               ...item.product,
               capacity: item.product.color
-                ? `${item.product.capacity ?? ""} · Color: ${item.product.color}`.trim()
+                ? `${item.product.capacity ?? ""} ${item.product.color}`.trim()
                 : item.product.capacity,
               color: null,
             }

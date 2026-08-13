@@ -136,8 +136,8 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
   const formatProductVariant = (product: any) => {
     const attributes = [
-      product?.capacity ? `Capacidad: ${product.capacity}` : null,
-      product?.color ? `Color: ${product.color}` : null,
+      product?.capacity,
+      product?.color,
     ].filter(Boolean);
     return attributes.join(" · ");
   };
