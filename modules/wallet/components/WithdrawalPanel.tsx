@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toJpeg } from "html-to-image";
 import { Loader2, Landmark, Download, CheckCircle2, AlertTriangle, X, ReceiptText, Share2 } from "lucide-react";
-import { requestWithdrawalAction } from "@/modules/wallet/actions/withdrawals";
+import { requestWithdrawalAction, getWalletBreakdownAction } from "@/modules/wallet/actions/withdrawals";
+import { BaucherBreakdown, type WalletBreakdown } from "@/modules/wallet/components/BaucherBreakdown";
 
 interface WithdrawalResult {
   amount: number;
@@ -29,8 +30,21 @@ export function WithdrawalPanel({
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [breakdown, setBreakdown] = useState<WalletBreakdown | null>(null);
   const baucherRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  // Desglose por concepto para el baucher (por qué se paga ese dinero)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getWalletBreakdownAction();
+      if (!cancelled && res.success) setBreakdown(res.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const parsed = amount === "" ? NaN : Number(amount);
   const adjusted = Number.isFinite(parsed) ? Math.floor(parsed / 100) * 100 : 0;
@@ -147,6 +161,14 @@ export function WithdrawalPanel({
                   <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Estado</span><span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black tracking-wider text-emerald-600 uppercase">Pendiente de Canje</span></div>
                   <div className="flex justify-between text-sm border-t border-slate-100 pt-3"><span className="font-bold text-slate-500">Nuevo saldo Principal</span><span className="font-black text-slate-900">RD$ {result.newBalance.toLocaleString("es-DO")}</span></div>
                 </div>
+
+                {breakdown ? (
+                  <BaucherBreakdown breakdown={breakdown} />
+                ) : (
+                  <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 p-3 text-[10px] font-bold text-slate-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando desglose...
+                  </div>
+                )}
 
                 <div className="mt-5 text-center">
                   <p className="mb-1 text-[9px] font-black tracking-widest text-slate-400 uppercase">Token de Seguridad Unívoco</p>

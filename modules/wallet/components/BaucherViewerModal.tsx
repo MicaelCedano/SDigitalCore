@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toJpeg } from "html-to-image";
 import { Loader2, Download, Share2, X, ReceiptText, CheckCircle2 } from "lucide-react";
+import { getWalletBreakdownAction } from "@/modules/wallet/actions/withdrawals";
+import { BaucherBreakdown, type WalletBreakdown } from "@/modules/wallet/components/BaucherBreakdown";
 
 interface BaucherEntry {
   id: string;
@@ -22,6 +24,19 @@ export function BaucherViewerModal({ entry, onClose }: { entry: BaucherEntry; on
   const baucherRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [breakdown, setBreakdown] = useState<WalletBreakdown | null>(null);
+
+  // Desglose por concepto (por qué se paga ese dinero) — por usuario, no por entry
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getWalletBreakdownAction();
+      if (!cancelled && res.success) setBreakdown(res.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const baucherCode = entry.description?.replace("Retiro de efectivo ", "") ?? `B-${entry.id.slice(-6).toUpperCase()}`;
   const amount = Number(entry.amount);
@@ -107,6 +122,14 @@ export function BaucherViewerModal({ entry, onClose }: { entry: BaucherEntry; on
                 <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Fecha</span><span className="font-black text-slate-800">{new Date(entry.occurredAt).toLocaleString("es-DO", { timeZone: "America/Santo_Domingo", dateStyle: "medium", timeStyle: "short" })}</span></div>
                 <div className="flex justify-between text-sm"><span className="font-bold text-slate-500">Estado</span><span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black tracking-wider text-emerald-600 uppercase">Pendiente de Canje</span></div>
               </div>
+
+              {breakdown ? (
+                <BaucherBreakdown breakdown={breakdown} />
+              ) : (
+                <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 p-3 text-[10px] font-bold text-slate-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando desglose...
+                </div>
+              )}
 
               <div className="mt-5 text-center">
                 <p className="mb-1 text-[9px] font-black tracking-widest text-slate-400 uppercase">Token de Seguridad Unívoco</p>

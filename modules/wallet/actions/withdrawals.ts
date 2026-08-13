@@ -279,3 +279,58 @@ export async function cancelWithdrawalAction(input: unknown): Promise<Result<{ i
     return fail(error);
   }
 }
+
+/**
+ * Desglose de ingresos del usuario por concepto — para el baucher de pago.
+ * Suma los CREDITs POSTED del wallet agrupados por tipo de trabajo
+ * (desbloqueos, revisión de teléfonos QC, reparaciones) y "otros" (apertura
+ * legacy, transferencias, anulaciones). Sirve para saber POR QUÉ se le paga.
+ */
+export async function getWalletBreakdownAction(): Promise<Result<{
+  desbloqueos: { count: number; amount: number };
+  revisiones: { count: number; amount: number };
+  reparaciones: { count: number; amount: number };
+  otros: { count: number; amount: number };
+  total: number;
+}>> {
+  try {
+    const actor = await requirePermission("wallet.read");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+
+    const entries = await prisma.walletLedgerEntry.findMany({
+      where: { wallet: { userId: actor.id }, type: "CREDIT", status: "POSTED", reversalOfId: null },
+      select: { amount: true, description: true },
+    });
+
+    const breakdown = {
+      desbloqueos: { count: 0, amount: 0 },
+      revisiones: { count: 0, amount: 0 },
+      reparaciones: { count: 0, amount: 0 },
+      otros: { count: 0, amount: 0 },
+    };
+
+    for (const entry of entries) {
+      const desc = entry.description ?? "";
+      const amount = Number(entry.amount) || 0;
+      if (desc.startsWith("Pago por Desbloqueos")) {
+        breakdown.desbloqueos.count += 1;
+        breakdown.desbloqueos.amount += amount;
+      } else if (desc.startsWith("Pago por Lote QC")) {
+        breakdown.revisiones.count += 1;
+        breakdown.revisiones.amount += amount;
+      } else if (desc.startsWith("Pago por Reparaciones")) {
+        breakdown.reparaciones.count += 1;
+        breakdown.reparaciones.amount += amount;
+      } else {
+        breakdown.otros.count += 1;
+        breakdown.otros.amount += amount;
+      }
+    }
+
+    const total = breakdown.desbloqueos.amount + breakdown.revisiones.amount + breakdown.reparaciones.amount + breakdown.otros.amount;
+
+    return ok({ ...breakdown, total });
+  } catch (error) {
+    return fail(error);
+  }
+}
