@@ -64,7 +64,7 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
     timeZone: "America/Santo_Domingo",
   });
   const isConduce = invoice.type === "CONDUCE";
-  const displayBranch = isConduce ? COMPANY_LABEL : invoice.branch;
+  const displayBranch = COMPANY_LABEL;
   const itemCount = Array.isArray(invoice.items) ? invoice.items.length : 0;
   const printDensity = itemCount >= 16
     ? "invoice-print-density-tight"
