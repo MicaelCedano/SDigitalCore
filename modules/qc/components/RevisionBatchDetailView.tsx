@@ -9,7 +9,6 @@ import {
   deleteRevisionBatchAction,
   submitRevisionBatchAction,
   approveRevisionBatchAction,
-  updateRevisionBatchBranchAction,
 } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { AssignDeviceModal } from "./AssignDeviceModal";
@@ -20,7 +19,6 @@ import { exportRevisionBatchToExcel } from "../lib/excel-export";
 import {
   ArrowLeft,
   Package,
-  Building2,
   Calendar,
   Layers,
   CheckCircle2,
@@ -102,19 +100,6 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
     });
   };
 
-  const handleChangeBranch = async () => {
-    const branch = window.prompt("Sucursal activa para esta compra:", batch.branch);
-    if (!branch || branch.trim() === batch.branch) return;
-    setLoadingStatus(true);
-    const res = await updateRevisionBatchBranchAction({ id: batch.id, branch: branch.trim() });
-    setLoadingStatus(false);
-    if (res.success && res.data) {
-      setBatch((prev: any) => ({ ...prev, branch: res.data.branch }));
-      alert(res.message ?? "Sucursal actualizada.");
-    } else {
-      alert(res.error || "No se pudo cambiar la sucursal.");
-    }
-  };
   const handleSubmitBatch = async () => {
     if (!confirm(`¿Enviar el Lote ${batch.batchNumber} para aprobación del administrador? El pago se acreditará cuando lo acepte.`)) return;
     setLoadingStatus(true);
@@ -258,13 +243,6 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
               >
                 <Fingerprint className="w-4 h-4" /> Verificador Físico
-              </button>
-              <button
-                onClick={handleChangeBranch}
-                disabled={loadingStatus}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-2 disabled:opacity-50"
-              >
-                <Building2 className="w-4 h-4" /> Cambiar sucursal
               </button>
               <button
                 onClick={() => setShowNoFuncionales(true)}
