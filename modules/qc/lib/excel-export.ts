@@ -1,3 +1,5 @@
+import ExcelJS from "exceljs";
+
 type ExportBatch = {
   batchNumber: string;
   supplierName?: string | null;
@@ -9,9 +11,7 @@ type ExportBatch = {
     serialNumber?: string | null;
     brand?: string | null;
     model: string;
-    color?: string | null;
     storageGb?: number | null;
-    status?: string | null;
     inspections?: Array<{
       status?: string | null;
       result?: string | null;
@@ -19,8 +19,6 @@ type ExportBatch = {
       batteryHealth?: number | null;
       functionalityNotes?: string | null;
       physicalNotes?: string | null;
-      reviewerNameSnapshot?: string | null;
-      reviewedAt?: string | Date | null;
     }>;
   }>;
 };
@@ -30,107 +28,141 @@ const resultLabels: Record<string, string> = {
   NON_FUNCTIONAL: "DEFECTUOSO",
 };
 
-/** Exporta una compra QC con el mismo formato .xls del exportador de conteos. */
-export function exportRevisionBatchToExcel(batch: ExportBatch) {
+/** Descarga una compra QC como un libro XLSX real, compatible con Excel. */
+export async function exportRevisionBatchToExcel(batch: ExportBatch) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SDigitalCore";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Informe QC", {
+    views: [{ state: "frozen", ySplit: 6 }],
+  });
+  sheet.columns = [
+    { header: "#", key: "index", width: 7 },
+    { header: "IMEI / Serie", key: "identifier", width: 23 },
+    { header: "Modelo", key: "model", width: 30 },
+    { header: "Capacidad (GB)", key: "storage", width: 16 },
+    { header: "Resultado QC", key: "result", width: 18 },
+    { header: "Grado", key: "grade", width: 12 },
+    { header: "Batería", key: "battery", width: 12 },
+    { header: "Observaciones", key: "notes", width: 42 },
+  ];
+
+  sheet.mergeCells("A1:H1");
+  sheet.getCell("A1").value = "INFORME DE CONTROL DE CALIDAD — SDigitalCore";
+  sheet.getCell("A1").font = { bold: true, size: 16, color: { argb: "FF1E293B" } };
+  sheet.getCell("A1").alignment = { vertical: "middle" };
+  sheet.getRow(1).height = 26;
+
   const formattedDate = batch.receivedAt
     ? new Date(batch.receivedAt).toLocaleString("es-DO", { dateStyle: "medium", timeStyle: "short" })
     : "";
+  addMetadataRow(sheet, 2, "Folio:", batch.batchNumber, "Proveedor:", batch.supplierName || "-", "Fecha:", formattedDate);
+  addMetadataRow(sheet, 3, "Sucursal:", batch.branch || "-", "Estado:", batch.status || "-", "Total:", batch.devices.length);
+  sheet.getRow(4).height = 8;
 
-  const rows = batch.devices
-    .map((device, index) => {
-      const inspection = device.inspections?.[0];
-      const reviewed = inspection?.status === "COMPLETED";
-      const result = reviewed ? resultLabels[inspection?.result || ""] || inspection?.result || "" : "PENDIENTE";
-      const resultColor = result === "FUNCIONAL" ? "#16a34a" : result === "DEFECTUOSO" ? "#dc2626" : "#ca8a04";
-      const identifier = String(device.imei || device.serialNumber || "-");
-      const model = `${device.brand || ""} ${device.model}`.trim();
+  const headerRow = sheet.getRow(6);
+  headerRow.values = ["#", "IMEI / Serie", "Modelo", "Capacidad (GB)", "Resultado QC", "Grado", "Batería", "Observaciones"];
+  headerRow.height = 28;
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    cell.border = thinBorder("FF0F172A");
+  });
 
-      return `
-        <tr>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${index + 1}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left; font-family:monospace; mso-number-format:'\\@';">${escapeXml(identifier)}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left; font-weight:bold;">${escapeXml(model)}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${device.storageGb ?? "-"}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; font-weight:bold; color:${resultColor};">${escapeXml(result)}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${reviewed ? escapeXml(inspection?.grade || "-") : "-"}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${reviewed && inspection?.batteryHealth != null ? `${inspection.batteryHealth}%` : "-"}</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:left;">${reviewed ? escapeXml(inspection?.functionalityNotes || inspection?.physicalNotes || "-") : "-"}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  let reviewedCount = 0;
+  let functionalCount = 0;
+  let nonFunctionalCount = 0;
 
-  const reviewedCount = batch.devices.filter((device) => device.inspections?.[0]?.status === "COMPLETED").length;
-  const functionalCount = batch.devices.filter((device) => device.inspections?.[0]?.status === "COMPLETED" && device.inspections?.[0]?.result === "FUNCTIONAL").length;
-  const nonFunctionalCount = batch.devices.filter((device) => device.inspections?.[0]?.status === "COMPLETED" && device.inspections?.[0]?.result === "NON_FUNCTIONAL").length;
+  batch.devices.forEach((device, index) => {
+    const inspection = device.inspections?.[0];
+    const reviewed = inspection?.status === "COMPLETED";
+    const result = reviewed ? resultLabels[inspection?.result || ""] || inspection?.result || "" : "PENDIENTE";
+    if (reviewed) reviewedCount += 1;
+    if (inspection?.result === "FUNCTIONAL" && reviewed) functionalCount += 1;
+    if (inspection?.result === "NON_FUNCTIONAL" && reviewed) nonFunctionalCount += 1;
 
-  const htmlContent = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body { font-family: Arial, sans-serif; font-size: 13px; }
-          .header-title { font-size: 20px; font-weight: bold; color: #1e293b; }
-        </style>
-      </head>
-      <body>
-        <table>
-          <tr><td colspan="11" class="header-title" style="padding-bottom:10px;">INFORME DE CONTROL DE CALIDAD â€” SDigitalCore</td></tr>
-          <tr>
-            <td style="font-weight:bold; background-color:#f1f5f9;">Folio:</td><td style="font-weight:bold; color:#5750f1;">${escapeXml(batch.batchNumber)}</td>
-            <td style="font-weight:bold; background-color:#f1f5f9;">Proveedor:</td><td colspan="3">${escapeXml(batch.supplierName || "-")}</td>
-            <td style="font-weight:bold; background-color:#f1f5f9;">Fecha:</td><td colspan="4">${escapeXml(formattedDate)}</td>
-          </tr>
-          <tr>
-            <td style="font-weight:bold; background-color:#f1f5f9;">Sucursal:</td><td>${escapeXml(batch.branch || "-")}</td>
-            <td style="font-weight:bold; background-color:#f1f5f9;">Estado:</td><td colspan="3">${escapeXml(batch.status || "-")}</td>
-            <td style="font-weight:bold; background-color:#f1f5f9;">Total:</td><td colspan="4">${batch.devices.length}</td>
-          </tr>
-          <tr><td colspan="8"></td></tr>
-          <thead>
-            <tr style="background-color:#0f172a; color:#ffffff; font-weight:bold;">
-              <th style="padding:10px; border:1px solid #0f172a;">#</th>
-              <th style="padding:10px; border:1px solid #0f172a;">IMEI / Serie</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Modelo</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Capacidad (GB)</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Resultado QC</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Grado</th>
-              <th style="padding:10px; border:1px solid #0f172a;">BaterÃ­a</th>
-              <th style="padding:10px; border:1px solid #0f172a;">Observaciones</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-          <tfoot>
-            <tr style="background-color:#f8fafc; font-weight:bold;">
-              <td colspan="3" style="border:1px solid #cbd5e1; padding:8px; text-align:right;">TOTALES:</td>
-              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${batch.devices.length}</td>
-              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">${reviewedCount} revisados</td>
-              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; color:#16a34a;">${functionalCount} funcionales</td>
-              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center;">-</td>
-              <td style="border:1px solid #cbd5e1; padding:8px; text-align:center; color:#dc2626;">${nonFunctionalCount} defectuosos</td>
-            </tr>
-          </tfoot>
-        </table>
-      </body>
-    </html>
-  `;
+    const row = sheet.addRow({
+      index: index + 1,
+      // Los IMEI son identificadores: se escriben como texto para evitar notación científica.
+      identifier: String(device.imei || device.serialNumber || "-"),
+      model: `${device.brand || ""} ${device.model}`.trim(),
+      storage: device.storageGb ?? "-",
+      result,
+      grade: reviewed ? inspection?.grade || "-" : "-",
+      battery: reviewed && inspection?.batteryHealth != null ? `${inspection.batteryHealth}%` : "-",
+      notes: reviewed ? inspection?.functionalityNotes || inspection?.physicalNotes || "-" : "-",
+    });
+    row.eachCell((cell, columnNumber) => {
+      cell.border = thinBorder("FFCBD5E1");
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: columnNumber === 1 || (columnNumber >= 4 && columnNumber <= 7) ? "center" : "left",
+        wrapText: columnNumber === 8,
+      };
+    });
+    row.getCell(2).numFmt = "@";
+    row.getCell(5).font = {
+      bold: true,
+      color: { argb: result === "FUNCIONAL" ? "FF16A34A" : result === "DEFECTUOSO" ? "FFDC2626" : "FFCA8A04" },
+    };
+  });
 
-  const normalizedHtmlContent = htmlContent.replace(/colspan="11"/g, 'colspan="8"');
-  downloadBlob(normalizedHtmlContent, `Compra_QC_${batch.batchNumber}.xls`, "application/vnd.ms-excel;charset=utf-8");
-}
+  const totalRow = sheet.addRow([
+    "",
+    "",
+    "TOTALES:",
+    batch.devices.length,
+    `${reviewedCount} revisados`,
+    `${functionalCount} funcionales`,
+    "",
+    `${nonFunctionalCount} defectuosos`,
+  ]);
+  totalRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+    cell.border = thinBorder("FFCBD5E1");
+    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+  });
 
-function escapeXml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-}
-
-function downloadBlob(content: string, filename: string, mimeType: string) {
-  const blob = new Blob(["\ufeff" + content], { type: mimeType });
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = filename;
+  anchor.download = `Compra_QC_${batch.batchNumber}.xlsx`;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+function addMetadataRow(
+  sheet: ExcelJS.Worksheet,
+  rowNumber: number,
+  label1: string,
+  value1: string | number,
+  label2: string,
+  value2: string | number,
+  label3: string,
+  value3: string | number,
+) {
+  const row = sheet.getRow(rowNumber);
+  row.values = [label1, value1, label2, value2, label3, value3];
+  [1, 3, 5].forEach((columnNumber) => {
+    const cell = row.getCell(columnNumber);
+    cell.font = { bold: true, color: { argb: "FF1E293B" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+  });
+}
+
+function thinBorder(color: string): ExcelJS.Borders {
+  return {
+    diagonal: {},
+    top: { style: "thin", color: { argb: color } },
+    left: { style: "thin", color: { argb: color } },
+    bottom: { style: "thin", color: { argb: color } },
+    right: { style: "thin", color: { argb: color } },
+  };
 }
