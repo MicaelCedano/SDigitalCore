@@ -403,6 +403,23 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       if (!technician) return { success: false, error: "El técnico indicado no existe o no está activo." };
       technicianId = technician.id;
       counterpartyName = normalizeName(counterpartyName || technician.name || technician.username || "");
+    } else if (operation === "assign" && counterpartyName) {
+      const technician = await prisma.user.findFirst({
+        where: {
+          status: "ACTIVE",
+          roleCode: "TECNICO",
+          allowedModules: { has: "reparaciones" },
+          OR: [
+            { username: { equals: counterpartyName, mode: "insensitive" } },
+            { name: { equals: counterpartyName, mode: "insensitive" } },
+            { name: { contains: counterpartyName, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, name: true, username: true },
+      });
+      if (!technician) return { success: false, error: "Selecciona un técnico activo con acceso a Reparaciones." };
+      technicianId = technician.id;
+      counterpartyName = normalizeName(technician.name || technician.username || counterpartyName);
     }
 
     if (rule.needsCounterparty && !counterpartyName) return { success: false, error: "La contraparte es obligatoria." };
