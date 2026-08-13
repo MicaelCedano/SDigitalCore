@@ -494,6 +494,12 @@ export async function approveRevisionBatchAction(input: { id: string; reject?: b
       });
       if (!parsed.data.reject) {
         paidReviewers = await payReviewersForBatch(batch.id, tx);
+        // Lote entregado y pagado: liberar la asignación de los equipos
+        // (el panel del QC se limpia; un reingreso futuro queda sin asignar).
+        await tx.deviceUnit.updateMany({
+          where: { batchId: batch.id, assignedToId: { not: null } },
+          data: { assignedToId: null },
+        });
       }
       return u;
     });
@@ -1148,7 +1154,7 @@ export async function getQcDashboardAction() {
 
     const [devices, hoyInspecciones, myRequests, wallet] = await Promise.all([
       prisma.deviceUnit.findMany({
-        where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
+        where: { assignedToId: persisted.id, batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } } },
         orderBy: { updatedAt: "desc" },
         take: 100,
         include: {
