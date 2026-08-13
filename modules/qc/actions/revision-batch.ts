@@ -1267,6 +1267,17 @@ export async function getQcPaymentsAction(): Promise<
       estimatedAmount: number;
       completedAt: Date | null;
     }>;
+    payments: Array<{
+      id: string;
+      batchId: string;
+      batchNumber: string;
+      reviewerName: string;
+      reviewerId: string | null;
+      reviewedDevices: number;
+      amount: number;
+      paidAt: Date;
+      description: string | null;
+    }>;
   }>
 > {
   try {
@@ -1276,7 +1287,7 @@ export async function getQcPaymentsAction(): Promise<
       return { success: false, error: "Solo el administrador puede gestionar los pagos de QC." };
     }
 
-    const [pending, history, audits] = await Promise.all([
+    const [pending, history, audits, paymentEntries] = await Promise.all([
       // Lotes enviados esperando aceptación
       prisma.qcRevisionBatch.findMany({
         where: { status: "SUBMITTED" },
@@ -1321,6 +1332,20 @@ export async function getQcPaymentsAction(): Promise<
           user: { select: { name: true, username: true } },
         },
       }),
+      prisma.walletLedgerEntry.findMany({
+        where: { externalKey: { startsWith: "qc-payment:" }, type: "CREDIT", status: "POSTED" },
+        orderBy: { occurredAt: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          externalKey: true,
+          amount: true,
+          description: true,
+          occurredAt: true,
+          actorId: true,
+          wallet: { select: { user: { select: { name: true, username: true, email: true } } } },
+        },
+      }),
     ]);
 
     const submitterByBatch = new Map<string, { name: string | null; submittedAt: Date }>();
@@ -1347,10 +1372,35 @@ export async function getQcPaymentsAction(): Promise<
       ...b,
       estimatedAmount: b.reviewedDevices * RATE,
     }));
+    const paymentBatchIds = paymentEntries
+      .map((entry) => entry.externalKey.split(":")[1])
+      .filter((id): id is string => Boolean(id));
+    const paymentBatches = await prisma.qcRevisionBatch.findMany({
+      where: { id: { in: paymentBatchIds } },
+      select: { id: true, batchNumber: true },
+    });
+    const batchNumberById = new Map(paymentBatches.map((batch) => [batch.id, batch.batchNumber]));
+    const payments = paymentEntries.flatMap((entry) => {
+      const [, batchId] = entry.externalKey.split(":");
+      const batchNumber = batchId ? batchNumberById.get(batchId) : undefined;
+      if (!batchId || !batchNumber) return [];
+      const reviewer = entry.wallet.user;
+      return [{
+        id: entry.id,
+        batchId,
+        batchNumber,
+        reviewerName: reviewer.name ?? reviewer.username ?? reviewer.email,
+        reviewerId: entry.actorId,
+        reviewedDevices: Math.round(Number(entry.amount) / RATE),
+        amount: Number(entry.amount),
+        paidAt: entry.occurredAt,
+        description: entry.description,
+      }];
+    });
 
     return {
       success: true,
-      data: { pending: mapPending, history: mapHistory },
+      data: { pending: mapPending, history: mapHistory, payments },
     };
   } catch (error: any) {
     console.error("Error al cargar pagos QC:", error);

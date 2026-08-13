@@ -74,6 +74,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
       .includes(term);
   });
   const history = data?.history || [];
+  const payments = data?.payments || [];
 
   const totalPendingAmount = (data?.pending || []).reduce(
     (acc: number, b: any) => acc + (b.estimatedAmount || 0),
@@ -294,7 +295,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
           </div>
         </div>
 
-        {history.length === 0 ? (
+        {payments.length === 0 ? (
           <div className="p-12 text-center text-xs text-slate-500">
             Aún no hay lotes completados con pago acreditado.
           </div>
@@ -303,36 +304,35 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
                 <tr>
+                  <th className="px-5 py-3.5">Revisor QC</th>
                   <th className="px-5 py-3.5">Lote (Compra)</th>
-                  <th className="px-5 py-3.5">Proveedor</th>
-                  <th className="px-5 py-3.5 text-center">Equipos</th>
-                  <th className="px-5 py-3.5 text-center">Funcionales</th>
-                  <th className="px-5 py-3.5 text-center">Defectuosos</th>
-                  <th className="px-5 py-3.5">Completado</th>
+                  <th className="px-5 py-3.5 text-center">Equipos pagados</th>
+                  <th className="px-5 py-3.5">Fecha de pago</th>
                   <th className="px-5 py-3.5 text-right">Pago acreditado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {history.map((b: any) => (
-                  <tr key={b.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3.5 font-mono font-bold text-slate-800">{b.batchNumber}</td>
-                    <td className="px-5 py-3.5 font-semibold">{b.supplierName || "—"}</td>
-                    <td className="px-5 py-3.5 text-center font-bold">{b.reviewedDevices}/{b.totalDevices}</td>
+                {payments.map((payment: any) => (
+                  <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5 font-semibold text-slate-800">{payment.reviewerName}</td>
+                    <td className="px-5 py-3.5 font-mono font-bold text-slate-800">{payment.batchNumber}</td>
+                    <td className="px-5 py-3.5 text-center font-bold">{payment.reviewedDevices}</td>
+                    <td className="px-5 py-3.5 text-center font-bold">{payment.reviewedDevices}</td>
                     <td className="px-5 py-3.5 text-center">
                       <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                        {b.functionalCount}
+                        {payment.reviewedDevices}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold">
-                        {b.nonFunctionalCount}
+                        {payment.reviewedDevices}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5">{formatDate(b.completedAt)}</td>
+                    <td className="px-5 py-3.5">{formatDate(payment.paidAt)}</td>
                     <td className="px-5 py-3.5 text-right font-black text-emerald-700">
                       <span className="inline-flex items-center gap-1">
                         <BadgeCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        {money(b.estimatedAmount)}
+                        {money(payment.amount)}
                       </span>
                     </td>
                   </tr>
