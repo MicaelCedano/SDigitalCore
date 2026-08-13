@@ -103,12 +103,6 @@ export function WarrantyFlow({ operation, cases, embedded = false }: { operation
     }
   }, [cases, operation, counterparty]);
 
-  useEffect(() => {
-    if (operation === "sendSupplier" && counterparty.trim() && selected.length === 0) {
-      scanInputRef.current?.focus();
-    }
-  }, [counterparty, operation, selected.length]);
-
   function validateBeforeConfirm() {
     if (selected.length === 0) return setMessage("Selecciona al menos un equipo.");
     if (operation !== "credit" && !counterparty.trim()) return setMessage(`Indica el ${label.toLowerCase()}.`);
