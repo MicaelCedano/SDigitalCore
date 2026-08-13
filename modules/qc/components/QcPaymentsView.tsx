@@ -317,17 +317,6 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                     <td className="px-5 py-3.5 font-semibold text-slate-800">{payment.reviewerName}</td>
                     <td className="px-5 py-3.5 font-mono font-bold text-slate-800">{payment.batchNumber}</td>
                     <td className="px-5 py-3.5 text-center font-bold">{payment.reviewedDevices}</td>
-                    <td className="px-5 py-3.5 text-center font-bold">{payment.reviewedDevices}</td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                        {payment.reviewedDevices}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold">
-                        {payment.reviewedDevices}
-                      </span>
-                    </td>
                     <td className="px-5 py-3.5">{formatDate(payment.paidAt)}</td>
                     <td className="px-5 py-3.5 text-right font-black text-emerald-700">
                       <span className="inline-flex items-center gap-1">
