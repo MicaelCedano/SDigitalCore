@@ -134,8 +134,19 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     return `${item.unitsCount} uds sueltas`;
   };
 
+  const formatProductVariant = (product: any) => {
+    const attributes = [
+      product?.capacity ? `Capacidad: ${product.capacity}` : null,
+      product?.color ? `Color: ${product.color}` : null,
+    ].filter(Boolean);
+    return attributes.join(" · ");
+  };
+
   const voucherText = (request: any) => {
-    const lines = (request.items ?? []).map((item: any) => `${item.product?.name ?? item.productId}: ${item.unitsCount} uds`).join("\n");
+    const lines = (request.items ?? []).map((item: any) => {
+      const variant = formatProductVariant(item.product);
+      return `${item.product?.name ?? item.productId}${variant ? ` · ${variant}` : ""}: ${item.unitsCount} uds`;
+    }).join("\n");
     return `BOUCHER DE SOLICITUD ${request.requestCode}\n${request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}\nSucursal: ${request.branch}\nSolicitante: ${request.requestedBy}\nProductos:\n${lines}\nEstado: ${request.status === "PENDING" ? "Pendiente de aprobación" : request.status === "APPROVED" ? "Aprobada" : "Rechazada"}`;
   };
 
@@ -143,7 +154,8 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     const width = 900;
     const items = request.items ?? [];
     const lines = items.flatMap((item: any) => {
-      const label = `${item.product?.code ?? item.productId} · ${item.product?.name ?? "Producto"}${item.product?.capacity ? ` ${item.product.capacity}` : ""}`;
+      const variant = formatProductVariant(item.product);
+      const label = `${item.product?.code ?? item.productId} · ${item.product?.name ?? "Producto"}${variant ? ` · ${variant}` : ""}`;
       const words = label.split(" ");
       const wrapped: string[] = [];
       let current = "";
