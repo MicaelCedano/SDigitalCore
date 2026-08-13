@@ -432,7 +432,8 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       if (operation === "deliver" && cases.some((item) => comparableName(item.clientName) !== comparableName(counterpartyName))) {
         throw new WarrantyActionError("Para entregar, todos los casos deben pertenecer al cliente indicado.");
       }
-      if (operation.startsWith("receive-") && operation !== "receive-supplier" && cases.some((item) => comparableName(item.assignedTechnicianName) !== comparableName(counterpartyName))) {
+      // La recepción desde técnico no compara el nombre: puede existir una diferencia de escritura histórica.
+      if (false && operation.startsWith("receive-") && operation !== "receive-supplier" && cases.some((item) => comparableName(item.assignedTechnicianName) !== comparableName(counterpartyName))) {
         throw new WarrantyActionError("El técnico indicado no coincide con el técnico asignado en uno o más casos.");
       }
       if (operation === "receive-supplier" && cases.some((item) => comparableName(item.currentSupplierName) !== comparableName(counterpartyName))) {
