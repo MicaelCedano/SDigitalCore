@@ -8,6 +8,7 @@ import {
   CheckCheck,
   CircleDollarSign,
   Hash,
+  History,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -500,16 +501,39 @@ export function PenaltiesManager({ initialData }: PenaltiesManagerProps) {
                     <span
                       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
                         p.status === "ACTIVE"
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          ? p.sourceSystem
+                            ? "border-slate-300 bg-slate-100 text-slate-600"
+                            : "border-rose-200 bg-rose-50 text-rose-700"
                           : "border-slate-200 bg-slate-50 text-slate-500"
                       }`}
                     >
-                      {p.status === "ACTIVE" ? <AlertTriangle className="w-3 h-3" /> : <BadgeCheck className="w-3 h-3" />}
-                      {p.status === "ACTIVE" ? "Activa" : "Revertida"}
+                      {p.status === "ACTIVE" ? (
+                        p.sourceSystem ? (
+                          <>
+                            <History className="w-3 h-3" />
+                            Histórica
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-3 h-3" />
+                            Activa
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <BadgeCheck className="w-3 h-3" />
+                          Revertida
+                        </>
+                      )}
                     </span>
+                    {p.sourceSystem && (
+                      <span className="ml-1.5 inline-flex items-center rounded-full border border-[#5750f1]/20 bg-[#5750f1]/10 px-2 py-1 text-[10px] font-black text-[#5750f1] uppercase tracking-wider">
+                        Legacy
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 text-right">
-                    {p.status === "ACTIVE" && (
+                    {p.status === "ACTIVE" && !p.sourceSystem && (
                       <button
                         onClick={() => openRevertConfirm(p)}
                         disabled={processing}

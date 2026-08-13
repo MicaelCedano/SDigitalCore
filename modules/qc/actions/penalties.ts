@@ -288,6 +288,11 @@ export async function revertPenaltyAction(input: z.input<typeof revertSchema>): 
       });
       if (!record) throw new Error("Penalidad no encontrada.");
       if (record.status !== "ACTIVE") throw new Error("Esta penalidad ya fue revertida.");
+      if (record.sourceSystem) {
+        throw new Error(
+          "Esta penalidad es histórica de SDigitalSystem: su descuento ya está incluido en el saldo migrado y no se puede revertir desde Core.",
+        );
+      }
       if (!record.ledgerEntry) throw new Error("La penalidad no tiene asiento de wallet asociado.");
       if (record.ledgerEntry.status === "VOID") throw new Error("El asiento de la penalidad ya fue anulado.");
 
@@ -385,6 +390,7 @@ export async function getPenaltiesAction(): Promise<
           motivo: true,
           deviceImei: true,
           deviceModel: true,
+          sourceSystem: true,
           createdAt: true,
           technician: { select: { name: true, username: true } },
           admin: { select: { name: true, username: true } },
@@ -407,7 +413,7 @@ export async function getPenaltiesAction(): Promise<
             select: { id: true },
           },
           penaltiesReceived: {
-            where: { status: "ACTIVE" },
+            where: { status: "ACTIVE", sourceSystem: null },
             select: { id: true },
           },
         },

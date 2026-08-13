@@ -428,6 +428,7 @@ model Penalty {
   status        PenaltyStatus @default(ACTIVE)
   adminId       String        @map("admin_id")
   ledgerEntryId String?       @unique @map("ledger_entry_id")
+  sourceSystem  String?       @map("source_system") @db.VarChar(50)
   createdAt     DateTime      @default(now()) @map("created_at")
 
   technician  User               @relation("PenaltyTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
