@@ -53,7 +53,10 @@ export default async function WalletPage() {
           <div className="divide-y divide-slate-100">{wallet.entries.map((entry) => {
             const positive = Number(entry.amount) > 0;
             const Icon = positive ? ArrowDownLeft : ArrowUpRight;
-            const isWithdrawal = entry.secureToken !== null && entry.secureToken !== undefined && !positive;
+            // Retiro con token: el DEBIT se guarda con amount POSITIVO (la
+            // dirección la da entry.type), así que el botón "Ver baucher"
+            // depende de type==="DEBIT" + secureToken, NO del signo.
+            const isWithdrawal = entry.type === "DEBIT" && entry.secureToken != null;
             return <div key={entry.id} className="flex items-center gap-4 px-5 py-4"><span className={`flex h-10 w-10 items-center justify-center rounded-full ${positive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}><Icon className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-900">{entry.description ?? entry.type.replaceAll("_", " ")}</p><p className="mt-1 text-xs text-slate-500">{entry.accountName} · {date(entry.occurredAt)}</p></div>{isWithdrawal && wallet ? <BaucherEntryButton entry={{ id: entry.id, description: entry.description ?? "", accountName: entry.accountName, amount: entry.amount, occurredAt: entry.occurredAt, secureToken: entry.secureToken }} ownerName={wallet.owner} /> : null}<p className={`font-black ${positive ? "text-emerald-600" : "text-rose-600"}`}>{money(entry.amount)}</p></div>;
           })}</div>
         )}
