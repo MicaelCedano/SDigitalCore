@@ -20,7 +20,7 @@ const config: Record<WarrantyFlowOperation, [string, string, string, string]> = 
 };
 
 const SUPPLIER_SUGGESTIONS = ["Blu", "Sunelan", "Samsung", "Apple", "Xiaomi", "Motorola", "Oppo", "Realme", "Huawei", "ZTE"];
-const SCAN_FLOW_OPERATIONS: WarrantyFlowOperation[] = ["assign", "receiveTech", "sendSupplier", "receiveSupplier"];
+const SCAN_FLOW_OPERATIONS: WarrantyFlowOperation[] = ["assign", "receiveTech", "sendSupplier", "receiveSupplier", "deliver"];
 
 export function WarrantyFlow({ operation, cases, embedded = false }: { operation: WarrantyFlowOperation; cases: WarrantyFlowCase[]; embedded?: boolean }) {
   const router = useRouter();
@@ -141,19 +141,22 @@ export function WarrantyFlow({ operation, cases, embedded = false }: { operation
   function addScannedCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanImei = scanInput.trim();
-    if (!counterparty.trim()) {
+    if (operation !== "deliver" && !counterparty.trim()) {
       setScanMessage(`Indica primero el ${label.toLowerCase()}.`);
       return;
     }
     if (!cleanImei) return;
     const match = cases.find((item) => item.imei === cleanImei);
-    if (!match) {
+    if (match && operation === "deliver" && counterparty.trim() && match.clientName.trim().toLocaleLowerCase() !== counterparty.trim().toLocaleLowerCase()) {
+      setScanMessage(`Equipo rechazado: pertenece a ${match.clientName}, no a ${counterparty}.`);
+    } else if (!match) {
       setScanMessage(`No se encontró un equipo elegible con el IMEI ${cleanImei}.`);
     } else if (selected.includes(match.caseCode)) {
       setScanMessage(`El equipo ${match.caseCode} ya está en la lista de envío.`);
     } else {
       setSelected((current) => [...current, match.caseCode]);
       setSupplierLocked(true);
+      if (operation === "deliver" && !counterparty.trim()) setCounterparty(match.clientName.trim());
       setScanMessage(`${match.caseCode} agregado · ${match.model}. Listo para escanear el siguiente.`);
     }
     setScanInput("");
