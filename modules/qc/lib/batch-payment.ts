@@ -76,7 +76,10 @@ export async function payReviewersForBatch(batchId: string, tx: Prisma.Transacti
         description: `Pago por Lote QC: ${batch.batchNumber} (${count} equipo(s) × RD$${QC_REVIEW_RATE})`,
         externalKey,
         actorId: reviewerId,
-        batchId: batch.id,
+        // OJO: NO usar batch_id aquí — el FK wallet_ledger_entry_batch_id_fkey
+        // apunta a legacy_migration_batch, no a qc_revision_batch. El lote QC
+        // queda trazado en externalKey (`qc-payment:{batchId}:{reviewerId}`)
+        // y en description (batchNumber).
       },
     });
     await tx.walletAccount.update({
