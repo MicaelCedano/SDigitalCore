@@ -40,7 +40,7 @@ export const createWarrantySchema = z.object({
   });
 });
 
-export const caseCodesSchema = z.object({ caseCodes: z.array(text("Código", 40)).min(1).max(100) }).superRefine((input, ctx) => {
+export const caseCodesSchema = z.object({ caseCodes: z.array(text("Código", 40)).min(1).max(500) }).superRefine((input, ctx) => {
   if (new Set(input.caseCodes).size !== input.caseCodes.length) ctx.addIssue({ code: "custom", path: ["caseCodes"], message: "Hay casos repetidos." });
 });
 
