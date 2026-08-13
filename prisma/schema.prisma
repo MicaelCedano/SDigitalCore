@@ -37,6 +37,8 @@ model User {
   legacyIdentitiesLinked LegacyUserIdentity[] @relation("LegacyIdentityLinkedBy")
   walletLedgerEntries WalletLedgerEntry[] @relation("WalletLedgerActor")
   redeemedWithdrawals WalletLedgerEntry[] @relation("WalletLedgerRedeemer")
+  penaltiesReceived Penalty[] @relation("PenaltyTechnician")
+  penaltiesApplied Penalty[] @relation("PenaltyAdmin")
 
   warrantiesCreated WarrantyCase[] @relation("WarrantyCreatedBy")
   warrantiesUpdated WarrantyCase[] @relation("WarrantyUpdatedBy")
@@ -217,6 +219,20 @@ enum WalletLedgerEntryStatus {
   @@map("wallet_ledger_entry_status")
 }
 
+enum PenaltyType {
+  INTERNAL
+  EXTERNAL
+
+  @@map("penalty_type")
+}
+
+enum PenaltyStatus {
+  ACTIVE
+  REVERSED
+
+  @@map("penalty_status")
+}
+
 // ============================================================
 // MIGRACION DE IDENTIDAD Y WALLET LEGACY
 // ============================================================
@@ -392,11 +408,37 @@ model WalletLedgerEntry {
   batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
   reversalOf WalletLedgerEntry? @relation("WalletLedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversedBy WalletLedgerEntry? @relation("WalletLedgerReversal")
+  penalty    Penalty?
 
   @@index([walletId, occurredAt])
   @@index([accountId, occurredAt])
   @@index([batchId])
   @@map("wallet_ledger_entry")
+}
+
+model Penalty {
+  id            String        @id @default(cuid())
+  type          PenaltyType
+  deviceImei    String?       @map("device_imei") @db.VarChar(20)
+  deviceModel   String?       @map("device_model") @db.VarChar(200)
+  deviceId      String?       @map("device_id")
+  technicianId  String        @map("technician_id")
+  motivo        String        @db.Text
+  monto         Decimal       @db.Decimal(14, 2)
+  status        PenaltyStatus @default(ACTIVE)
+  adminId       String        @map("admin_id")
+  ledgerEntryId String?       @unique @map("ledger_entry_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  technician  User               @relation("PenaltyTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
+  admin       User               @relation("PenaltyAdmin", fields: [adminId], references: [id], onDelete: Restrict)
+  device      DeviceUnit?        @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  ledgerEntry WalletLedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+
+  @@index([technicianId, createdAt])
+  @@index([adminId, createdAt])
+  @@index([status, createdAt])
+  @@map("penalty")
 }
 
 enum GoodsReceiptStatus {
@@ -490,6 +532,7 @@ model DeviceUnit {
   assignedTo  User?            @relation("QcDeviceAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   inspections QcInspection[]
   photos      DevicePhoto[]    @relation("DevicePhotos")
+  penalties   Penalty[]
 
   @@index([status, updatedAt])
   @@index([brand, model])
