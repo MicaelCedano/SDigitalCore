@@ -1,6 +1,6 @@
 "use server";
 
-import { getPersistedCurrentUser, requirePermission, requireUser } from "@/lib/auth/helpers";
+import { requirePermission } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import {
   archiveWarrantySchema,
@@ -384,21 +384,13 @@ const flowRules: Record<FlowOperation, {
 
 async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode: string; status: WarrantyStatus }>> {
   try {
-    const persistedActor = await getPersistedCurrentUser();
-    const technicianReceiving =
-      (operation === "receive-repaired" || operation === "receive-unrepaired") &&
-      persistedActor?.status === "ACTIVE" &&
-      persistedActor.roleCode === "TECNICO";
-    const actorUser = technicianReceiving ? await requireUser() : await requirePermission("warranties.transition");
-    if (!actorUser.id) throw new WarrantyActionError("La sesión no tiene un usuario identificable.");
-    const actor = { id: actorUser.id, name: actorUser.name, email: actorUser.email };
+    const actor = await requirePermission("warranties.transition");
     const parsed = flowSchema.safeParse(input);
     if (!parsed.success) return { success: false, error: "Revisa los datos del flujo." };
     const data = parsed.data;
     const rule = flowRules[operation];
     let counterpartyName = normalizeName(data.counterpartyName);
     const reason = data.reason?.trim();
-    if (technicianReceiving) counterpartyName = normalizeName(actor.name || actor.email || "Técnico");
 
     // "Enviar a Reparaciones": si viene technicianId real, resolver el usuario y
     // usar su nombre como contraparte (assignedTechnicianName snapshot) + enlazar ID.
@@ -423,7 +415,7 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       if (operation === "deliver" && cases.some((item) => comparableName(item.clientName) !== comparableName(counterpartyName))) {
         throw new WarrantyActionError("Para entregar, todos los casos deben pertenecer al cliente indicado.");
       }
-      if (!technicianReceiving && operation.startsWith("receive-") && operation !== "receive-supplier" && cases.some((item) => comparableName(item.assignedTechnicianName) !== comparableName(counterpartyName))) {
+      if (operation.startsWith("receive-") && operation !== "receive-supplier" && cases.some((item) => comparableName(item.assignedTechnicianName) !== comparableName(counterpartyName))) {
         throw new WarrantyActionError("El técnico indicado no coincide con el técnico asignado en uno o más casos.");
       }
       if (operation === "receive-supplier" && cases.some((item) => comparableName(item.currentSupplierName) !== comparableName(counterpartyName))) {
