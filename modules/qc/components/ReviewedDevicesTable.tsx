@@ -14,9 +14,13 @@ import {
   StickyNote,
   Camera,
   History,
+  Pencil,
+  Loader2,
 } from "lucide-react";
 import { formatDateTimeRD } from "@/lib/utils/format";
 import { getDeviceHistoryAction } from "../actions/device-history";
+import { updateDeviceAction } from "../actions/device-edit";
+import { useRouter } from "next/navigation";
 
 export type ReviewedInspection = {
   id: string;
@@ -110,9 +114,67 @@ type DeviceHistory = {
 };
 
 export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedInspection[] }) {
+  const router = useRouter();
   const [selected, setSelected] = useState<ReviewedInspection | null>(null);
   const [history, setHistory] = useState<DeviceHistory | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Edición del equipo (admin)
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({ brand: "", model: "", storageGb: "", color: "" });
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const showToast = (type: "success" | "error", text: string) => {
+    setToast({ type, text });
+    window.setTimeout(() => setToast(null), 4000);
+  };
+
+  const openEdit = () => {
+    if (!selected) return;
+    setEditForm({
+      brand: selected.device.brand ?? "",
+      model: selected.device.model ?? "",
+      storageGb: selected.device.storageGb ? String(selected.device.storageGb) : "",
+      color: selected.device.color ?? "",
+    });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!selected) return;
+    if (!editForm.model.trim()) return showToast("error", "El modelo es obligatorio.");
+    const storageGb = editForm.storageGb.trim() ? Number(editForm.storageGb) : null;
+    if (editForm.storageGb.trim() && (!Number.isInteger(storageGb) || (storageGb as number) < 1)) {
+      return showToast("error", "Almacenamiento inválido.");
+    }
+    setSaving(true);
+    const res = await updateDeviceAction({
+      deviceId: selected.device.id,
+      brand: editForm.brand.trim() || undefined,
+      model: editForm.model.trim(),
+      storageGb,
+      color: editForm.color.trim() || undefined,
+    });
+    setSaving(false);
+    if (res.success) {
+      setSelected({
+        ...selected,
+        device: {
+          ...selected.device,
+          brand: editForm.brand.trim() || null,
+          model: editForm.model.trim(),
+          storageGb,
+          color: editForm.color.trim() || null,
+        },
+      });
+      setEditing(false);
+      showToast("success", res.message ?? "Equipo actualizado.");
+      router.refresh();
+    } else {
+      showToast("error", res.error || "No se pudo actualizar el equipo.");
+    }
+  };
 
   useEffect(() => {
     if (!selected) return;
@@ -219,13 +281,23 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setSelected(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
-                aria-label="Cerrar"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={openEdit}
+                  className="flex items-center gap-1.5 p-1.5 text-xs font-bold text-slate-400 hover:text-[#4f46e5] rounded-lg hover:bg-[#eef2ff] transition-colors"
+                  aria-label="Editar equipo"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Editar
+                </button>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-5 flex-1 overflow-y-auto">
@@ -398,6 +470,108 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
         </div>
       )}
 
+      {editing && selected && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto"
+          onClick={() => !saving && setEditing(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-[#e4e7ec] w-full max-w-md flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#eaecf0] flex items-center justify-between bg-[#fcfcfd]">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef2ff] text-[#4f46e5]">
+                  <Pencil size={20} />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold tracking-tight text-[#101828]">Editar equipo</h2>
+                  <p className="font-mono text-xs text-[#667085]">
+                    {selected.device.imei ?? selected.device.serialNumber ?? "Sin identificador"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => !saving && setEditing(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                aria-label="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">Marca</label>
+                <input
+                  type="text"
+                  value={editForm.brand}
+                  onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                  placeholder="Ej: Apple"
+                  className="mt-1.5 w-full rounded-xl border border-[#d0d5dd] bg-white px-3.5 py-2.5 text-sm text-[#101828] outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">Modelo *</label>
+                <input
+                  type="text"
+                  value={editForm.model}
+                  onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
+                  placeholder="Ej: iPhone 13"
+                  className="mt-1.5 w-full rounded-xl border border-[#d0d5dd] bg-white px-3.5 py-2.5 text-sm text-[#101828] outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">Almacenamiento (GB)</label>
+                  <input
+                    type="number"
+                    value={editForm.storageGb}
+                    onChange={(e) => setEditForm({ ...editForm, storageGb: e.target.value })}
+                    placeholder="128"
+                    min={1}
+                    className="mt-1.5 w-full rounded-xl border border-[#d0d5dd] bg-white px-3.5 py-2.5 text-sm text-[#101828] outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">Color</label>
+                  <input
+                    type="text"
+                    value={editForm.color}
+                    onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+                    placeholder="Ej: Negro"
+                    className="mt-1.5 w-full rounded-xl border border-[#d0d5dd] bg-white px-3.5 py-2.5 text-sm text-[#101828] outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-[#98a2b3]">
+                El IMEI y el estado no se editan aquí: el estado lo define el flujo de revisión.
+              </p>
+            </div>
+
+            <div className="border-t border-[#eaecf0] bg-[#fcfcfd] px-6 py-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-xl border border-[#d0d5dd] bg-white text-xs font-bold text-[#344054] hover:bg-[#f2f4f7] transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={saving}
+                className="px-4 py-2.5 rounded-xl bg-[#4f46e5] hover:bg-[#4338ca] text-white text-xs font-bold shadow-md shadow-[#4f46e5]/20 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5" />}
+                Guardar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {lightboxUrl && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4"
@@ -416,6 +590,16 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className={`fixed bottom-5 right-5 z-[70] rounded-2xl px-5 py-3.5 shadow-2xl text-sm font-bold text-white animate-in slide-in-from-bottom-4 duration-300 ${
+            toast.type === "success" ? "bg-emerald-600" : "bg-rose-600"
+          }`}
+        >
+          {toast.text}
         </div>
       )}
     </>
