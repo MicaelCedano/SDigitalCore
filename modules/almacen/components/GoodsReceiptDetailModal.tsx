@@ -54,6 +54,7 @@ type ColorImeiSummary = {
   key: string;
   color: string;
   imeis: string[];
+  quantity: number;
 };
 
 interface GoodsReceiptDetailModalProps {
@@ -86,13 +87,12 @@ function getItemColorImeis(item: ReceiptItem): ColorImeiSummary[] {
     const color = variant.color?.trim() || "General";
     const key = color.toLocaleLowerCase("es-DO");
     const imeis = parseImeis(variant.imeis);
-    if (imeis.length === 0) continue;
-
     const current = groupedVariants.get(key);
     if (current) {
       current.imeis = [...new Set([...current.imeis, ...imeis])];
+      current.quantity += variant.quantity || 1;
     } else {
-      groupedVariants.set(key, { key, color, imeis: [...new Set(imeis)] });
+      groupedVariants.set(key, { key, color, imeis: [...new Set(imeis)], quantity: variant.quantity || 1 });
     }
   }
 
@@ -102,7 +102,7 @@ function getItemColorImeis(item: ReceiptItem): ColorImeiSummary[] {
 
   const legacyImeis = parseImeis(item.imeiOrSerial);
   return legacyImeis.length > 0
-    ? [{ key: "general", color: "General", imeis: [...new Set(legacyImeis)] }]
+    ? [{ key: "general", color: "General", imeis: [...new Set(legacyImeis)], quantity: item.quantity || legacyImeis.length }]
     : [];
 }
 
@@ -323,7 +323,7 @@ export function GoodsReceiptDetailModal({
 
           <div className="space-y-3">
             <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-800">
-              <Layers className="h-4 w-4 text-[#5750f1]" /> IMEIs por modelo y color
+              <Layers className="h-4 w-4 text-[#5750f1]" /> Identificación por modelo y color
             </h3>
 
             <div className="space-y-3">
@@ -346,25 +346,29 @@ export function GoodsReceiptDetailModal({
                           <div>
                             <p className="text-xs font-bold text-slate-800">{color.color}</p>
                             <p className="text-[11px] font-medium text-slate-500">
-                              {color.imeis.length} {color.imeis.length === 1 ? "IMEI" : "IMEIs"}
+                              {color.imeis.length > 0
+                                ? `${color.imeis.length} ${color.imeis.length === 1 ? "IMEI / serie" : "IMEIs / series"}`
+                                : `${color.quantity} ${color.quantity === 1 ? "unidad" : "unidades"} · sin IMEI / serie`}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void copyText(
-                                color.imeis.join("\n"),
-                                `color-${model.key}-${color.key}`,
-                              )
-                            }
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-50"
-                          >
-                            {copiedKey === `color-${model.key}-${color.key}` ? (
-                              <><Check className="h-3.5 w-3.5" /> Copiados</>
-                            ) : (
-                              <><Copy className="h-3.5 w-3.5" /> Copiar IMEIs</>
-                            )}
-                          </button>
+                          {color.imeis.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void copyText(
+                                  color.imeis.join("\n"),
+                                  `color-${model.key}-${color.key}`,
+                                )
+                              }
+                              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-50"
+                            >
+                              {copiedKey === `color-${model.key}-${color.key}` ? (
+                                <><Check className="h-3.5 w-3.5" /> Copiados</>
+                              ) : (
+                                <><Copy className="h-3.5 w-3.5" /> Copiar IMEIs</>
+                              )}
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>

@@ -92,15 +92,10 @@ export default function PerfilPage() {
       // Conservamos esos formatos como Data URL para que sigan reproduciéndose.
       const preservesAnimation = file.type === "image/gif" || file.type === "image/webp";
       if (preservesAnimation) {
-        if (file.size > 1_500_000) {
-          setNotice("El GIF o WebP debe pesar 1.5 MB o menos.");
-          return;
-        }
-
         const reader = new FileReader();
         reader.onloadend = () => {
           setAvatarUrl(reader.result as string);
-          setNotice("Imagen animada preparada. Guarda los cambios para actualizarla.");
+          setNotice("Imagen animada preparada. Se comprimirá al guardar si supera 1.5 MB.");
           setTimeout(() => setNotice(null), 3000);
         };
         reader.readAsDataURL(file);
@@ -156,7 +151,9 @@ export default function PerfilPage() {
       setTimeout(() => setNotice(null), 4000);
       return;
     }
-    setProfileUser({ ...profileUser, name, email, username, phone, avatarUrl });
+    const savedAvatarUrl = result.data?.image ?? "";
+    setAvatarUrl(savedAvatarUrl);
+    setProfileUser({ ...profileUser, name, email, username, phone, avatarUrl: savedAvatarUrl });
     setNotice(result.requiresRelogin ? "Perfil guardado. Cierra sesión y vuelve a entrar para activar el nuevo correo." : "¡Perfil actualizado con éxito!");
     setTimeout(() => setNotice(null), 3500);
   }

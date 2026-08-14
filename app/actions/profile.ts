@@ -7,6 +7,7 @@ import { profileSchema, type ProfileInput } from "@/lib/validation/profile";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
 import { z } from "zod";
+import { fitAnimatedProfileImage } from "@/lib/profile-image";
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "La contraseña actual es requerida"),
@@ -32,6 +33,7 @@ export async function updateProfileAction(input: ProfileInput) {
   try {
     const sessionUser = await requireUser();
     const validated = profileSchema.parse(input);
+    const avatarUrl = await fitAnimatedProfileImage(validated.avatarUrl);
     const userId = sessionUser.id;
     if (!userId) return { success: false, error: "La sesión no tiene un usuario identificable." };
 
@@ -56,7 +58,7 @@ export async function updateProfileAction(input: ProfileInput) {
         email: validated.email.toLowerCase(),
         username: validated.username.toLowerCase(),
         phone: validated.phone || null,
-        image: validated.avatarUrl || null,
+        image: avatarUrl || null,
       },
       select: { id: true, name: true, email: true, username: true, phone: true, image: true, roleCode: true },
     });

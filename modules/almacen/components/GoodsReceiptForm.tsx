@@ -41,6 +41,7 @@ const emptyColorVariant = {
   quantity: 1,
   unitPrice: undefined,
   imeis: "",
+  withoutIdentifier: true,
 };
 
 const emptyItem = {
@@ -74,8 +75,11 @@ export function GoodsReceiptForm({
           ...item,
           colorVariants:
             item.colorVariants && item.colorVariants.length > 0
-              ? item.colorVariants
-              : [{ ...emptyColorVariant, imeis: item.imeiOrSerial || "" }],
+              ? item.colorVariants.map((variant: any) => ({
+                  ...variant,
+                  withoutIdentifier: variant.withoutIdentifier ?? !variant.imeis,
+                }))
+              : [{ ...emptyColorVariant, imeis: item.imeiOrSerial || "", withoutIdentifier: !item.imeiOrSerial }],
         }))
       : [{ ...emptyItem }]
   );
@@ -179,8 +183,11 @@ export function GoodsReceiptForm({
             ...i,
             colorVariants:
               i.colorVariants && i.colorVariants.length > 0
-                ? i.colorVariants
-                : [{ ...emptyColorVariant, imeis: i.imeiOrSerial || "" }],
+                ? i.colorVariants.map((variant: any) => ({
+                    ...variant,
+                    withoutIdentifier: variant.withoutIdentifier ?? !variant.imeis,
+                  }))
+                : [{ ...emptyColorVariant, imeis: i.imeiOrSerial || "", withoutIdentifier: !i.imeiOrSerial }],
           }))
         );
       }
@@ -267,10 +274,15 @@ export function GoodsReceiptForm({
         [field]: value,
       };
 
+      if (field === "withoutIdentifier" && value === true) {
+        updatedVariant.imeis = "";
+      }
+
       if (field === "imeis") {
         const imeiCount = countValidImeis(value);
         if (imeiCount > 0) {
           updatedVariant.quantity = imeiCount;
+          updatedVariant.withoutIdentifier = false;
         }
       }
 
@@ -415,7 +427,7 @@ export function GoodsReceiptForm({
                 {initialData ? "Editar Recibo de Mercancía" : "Nuevo Recibo de Mercancía"}
               </h2>
               <p className="text-xs text-slate-500">
-                Ingresa modelos, múltiples colores e IMEIs separados por variante
+                Registra la cantidad directamente cuando el equipo no tenga IMEI ni número de serie
               </p>
             </div>
           </div>
@@ -707,7 +719,7 @@ export function GoodsReceiptForm({
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center justify-between bg-slate-100/80 px-3 py-1.5 rounded-lg border border-slate-200">
                         <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                          <Palette className="w-3.5 h-3.5 text-[#5750f1]" /> Variantes de Color e IMEIs para este Modelo
+                          <Palette className="w-3.5 h-3.5 text-[#5750f1]" /> Variantes de color e identificación
                         </span>
                         <button
                           type="button"
@@ -756,6 +768,19 @@ export function GoodsReceiptForm({
                                 />
                               </div>
 
+                              <label className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold text-amber-800 sm:col-span-2">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(v.withoutIdentifier)}
+                                  onChange={(e) =>
+                                    handleColorVariantChange(itemIdx, vIdx, "withoutIdentifier", e.target.checked)
+                                  }
+                                  className="h-3.5 w-3.5 accent-amber-600"
+                                />
+                                Este producto no tiene IMEI ni número de serie
+                                <span className="font-normal text-amber-700">(TV, bocina, cargador, etc.)</span>
+                              </label>
+
                               <div>
                                 <label className="block text-[10px] font-semibold text-slate-600 mb-0.5 flex items-center justify-between">
                                   <span>Cantidad</span>
@@ -799,8 +824,9 @@ export function GoodsReceiptForm({
                                   onChange={(e) =>
                                     handleColorVariantChange(itemIdx, vIdx, "imeis", e.target.value)
                                   }
-                                  placeholder="Pegar o escanear IMEIs (uno por línea o separados por comas)"
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs font-mono text-emerald-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                                  placeholder={v.withoutIdentifier ? "No aplica: registra la cantidad arriba" : "Pegar o escanear IMEIs (uno por línea o separados por comas)"}
+                                  disabled={Boolean(v.withoutIdentifier)}
+                                  className={`w-full border rounded-md px-2.5 py-1 text-xs font-mono placeholder-slate-400 focus:outline-none focus:border-emerald-500 ${v.withoutIdentifier ? "cursor-not-allowed border-amber-200 bg-amber-50 text-amber-700" : "bg-slate-50 border-slate-200 text-emerald-800"}`}
                                 />
                               </div>
                             </div>
