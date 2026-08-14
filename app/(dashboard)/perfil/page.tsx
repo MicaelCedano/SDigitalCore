@@ -88,6 +88,25 @@ export default function PerfilPage() {
     }
 
     try {
+      // Canvas convierte GIF/WebP a una sola imagen y elimina la animación.
+      // Conservamos esos formatos como Data URL para que sigan reproduciéndose.
+      const preservesAnimation = file.type === "image/gif" || file.type === "image/webp";
+      if (preservesAnimation) {
+        if (file.size > 1_500_000) {
+          setNotice("El GIF o WebP debe pesar 1.5 MB o menos.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAvatarUrl(reader.result as string);
+          setNotice("Imagen animada preparada. Guarda los cambios para actualizarla.");
+          setTimeout(() => setNotice(null), 3000);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
       const bitmap = await createImageBitmap(file);
       const maxDimension = 640;
       const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
@@ -214,6 +233,7 @@ export default function PerfilPage() {
                   alt={name}
                   fill
                   className="object-cover"
+                  unoptimized
                 />
               ) : (
                 <span>{getInitials(name)}</span>
