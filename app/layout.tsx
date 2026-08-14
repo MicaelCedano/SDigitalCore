@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ServiceWorkerRegistration } from "./ServiceWorkerRegistration";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
   },
   description:
     "Sistema integral de gestión para inventario, ventas, taller, RMA y más.",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",
@@ -26,6 +28,10 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -33,7 +39,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={inter.variable} suppressHydrationWarning>
-      <body className="antialiased" suppressHydrationWarning>{children}</body>
+      <body className="antialiased" suppressHydrationWarning>
+        <ServiceWorkerRegistration />
+        {children}
+      </body>
     </html>
   );
 }
