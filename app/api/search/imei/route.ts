@@ -109,6 +109,7 @@ export async function GET(request: Request) {
             reviewerNameSnapshot: true,
             device: {
               select: {
+                id: true,
                 imei: true,
                 model: true,
                 brand: true,
@@ -152,6 +153,14 @@ export async function GET(request: Request) {
         })
       : Promise.resolve([]),
   ]);
+
+  // Las correcciones y reinspecciones se conservan como historial, pero el
+  // rastreo global debe representar una sola vez cada equipo: la última.
+  const latestQcByDevice = new Map<string, (typeof qcInspections)[number]>();
+  for (const inspection of qcInspections) {
+    if (!latestQcByDevice.has(inspection.device.id)) latestQcByDevice.set(inspection.device.id, inspection);
+  }
+  const latestQcInspections = Array.from(latestQcByDevice.values());
 
   const results: GlobalImeiResult[] = [
     ...warranties.map((item) => ({
@@ -202,7 +211,7 @@ export async function GET(request: Request) {
       date: item.invoice.createdAt.toISOString(),
       href: "/facturas",
     })),
-    ...qcInspections.map((item) => ({
+    ...latestQcInspections.map((item) => ({
       id: `qc-${item.id}`,
       source: "qc" as const,
       sourceLabel: "Control de calidad",
