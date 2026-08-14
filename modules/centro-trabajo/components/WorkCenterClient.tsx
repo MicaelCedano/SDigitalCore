@@ -24,7 +24,7 @@ export function WorkCenterClient({ tasks: initialTasks, activeUsers, metrics, cu
   const [modalOpen, setModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
-  const visible = tab === "Mis pendientes" ? tasks.filter((task) => task.assignee?.id === currentUserId && !["COMPLETED", "CANCELLED"].includes(task.status)) : tab === "Mis tareas" ? tasks.filter((task) => task.assignee?.id === currentUserId) : tasks;
+  const visible = tab === "Mis pendientes" ? tasks.filter((task) => (!task.assignee || task.assignee.id === currentUserId) && !["COMPLETED", "CANCELLED"].includes(task.status)) : tab === "Mis tareas" ? tasks.filter((task) => !task.assignee || task.assignee.id === currentUserId) : tasks;
   const boardStatuses = ["PENDING", "IN_PROGRESS", "WAITING", "COMPLETED"];
 
   function updateStatus(taskId: string, status: string) { setError(""); startTransition(async () => { try { await updateWorkTaskStatusAction(taskId, status); setTasks((current) => current.map((task) => task.id === taskId ? { ...task, status } : task)); } catch (e) { setError(e instanceof Error ? e.message : "No se pudo actualizar la tarea."); } }); }

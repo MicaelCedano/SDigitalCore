@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireUser } from "@/lib/auth/helpers";
+import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
 
 export async function getWorkCenterData() {
   const sessionUser = await requireUser();
   if (!sessionUser.id) throw new Error("La sesión no tiene un usuario persistido.");
   const user = await prisma.user.findUnique({ where: { id: sessionUser.id }, select: { id: true, roleCode: true, allowedModules: true } });
   if (!user) throw new Error("Usuario no encontrado.");
+  await syncQcWorkTasks(user.id);
   const scope = user.roleCode === "ADMIN" ? {} : { OR: [{ creatorId: user.id }, { assigneeId: user.id }, { sourceModule: { in: user.allowedModules } }] };
   const tasks = await prisma.workTask.findMany({
     where: scope,
