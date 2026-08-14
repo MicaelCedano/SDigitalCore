@@ -63,6 +63,8 @@ model User {
   workTasksCreated WorkTask[] @relation("WorkTaskCreator")
   workTasksAssigned WorkTask[] @relation("WorkTaskAssignee")
   workTaskEvents WorkTaskEvent[]
+  workTaskAssignments WorkTaskAssignee[] @relation("WorkTaskAssignmentUser")
+  workTaskAssignmentsCreated WorkTaskAssignee[] @relation("WorkTaskAssignmentCreator")
 
   @@map("user")
 }
@@ -161,11 +163,28 @@ model WorkTask {
   creator  User           @relation("WorkTaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
   assignee User?          @relation("WorkTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   events   WorkTaskEvent[]
+  assignees WorkTaskAssignee[]
 
   @@index([assigneeId, status, dueAt])
   @@index([sourceModule, status, dueAt])
   @@index([creatorId, createdAt])
   @@map("work_task")
+}
+
+model WorkTaskAssignee {
+  id         String   @id @default(cuid())
+  taskId     String   @map("task_id")
+  userId     String   @map("user_id")
+  assignedById String? @map("assigned_by_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  task       WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User     @relation("WorkTaskAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User?    @relation("WorkTaskAssignmentCreator", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, userId])
+  @@index([userId, assignedAt])
+  @@map("work_task_assignee")
 }
 
 model WorkTaskEvent {

@@ -15,6 +15,7 @@ const taskSchema = z.object({
   sourceCode: z.string().trim().max(120).optional().or(z.literal("")),
   sourceUrl: z.string().trim().max(300).optional().or(z.literal("")),
   assigneeId: z.string().trim().max(40).optional().or(z.literal("")),
+  assigneeIds: z.string().optional().or(z.literal("")),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   dueAt: z.string().optional().or(z.literal("")),
   progressTotal: z.coerce.number().int().min(1).max(1000000).optional().or(z.literal("")),
@@ -40,6 +41,13 @@ export async function createWorkTaskAction(input: unknown) {
   if (user.roleCode !== "ADMIN" && !user.allowedModules.includes(parsed.sourceModule)) throw new Error("No tienes acceso al módulo relacionado.");
   const dueAt = parsed.dueAt ? new Date(parsed.dueAt) : null;
   if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("La fecha límite no es válida.");
+  let requestedAssigneeIds = parsed.assigneeIds ? z.array(z.string().min(1).max(40)).parse(JSON.parse(parsed.assigneeIds)) : parsed.assigneeId ? [parsed.assigneeId] : [];
+  requestedAssigneeIds = [...new Set(requestedAssigneeIds)];
+  if (user.roleCode !== "ADMIN") requestedAssigneeIds = [user.id];
+  if (requestedAssigneeIds.length > 0) {
+    const eligibleUsers = await prisma.user.findMany({ where: { id: { in: requestedAssigneeIds }, status: "ACTIVE", allowedModules: { has: "centro-trabajo" } }, select: { id: true } });
+    if (eligibleUsers.length !== requestedAssigneeIds.length) throw new Error("Solo puedes asignar la tarea a usuarios activos con Centro de trabajo habilitado.");
+  }
   const created = await prisma.workTask.create({
     data: {
       title: parsed.title,
@@ -50,10 +58,11 @@ export async function createWorkTaskAction(input: unknown) {
       sourceCode: parsed.sourceCode || null,
       sourceUrl: parsed.sourceUrl || null,
       creatorId: user.id,
-      assigneeId: parsed.assigneeId || user.id,
+      assigneeId: requestedAssigneeIds[0] ?? null,
       priority: parsed.priority,
       dueAt,
       progressTotal: parsed.progressTotal === "" || parsed.progressTotal === undefined ? null : Number(parsed.progressTotal),
+      assignees: { create: requestedAssigneeIds.map((userId) => ({ userId, assignedById: user.id })) },
       events: { create: { actorId: user.id, type: "CREATED", afterData: { title: parsed.title, sourceModule: parsed.sourceModule } } },
     },
   });
