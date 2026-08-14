@@ -46,12 +46,20 @@ async function parseEligibleAssignees(raw: string | undefined, actorId: string, 
   return ids;
 }
 
+function parseDueDate(value: string | undefined) {
+  if (!value) return null;
+  const dateOnly = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) throw new Error("La fecha límite no es válida.");
+  const parsed = new Date(`${dateOnly}T23:59:59.999-04:00`);
+  if (Number.isNaN(parsed.getTime())) throw new Error("La fecha límite no es válida.");
+  return parsed;
+}
+
 export async function createWorkTaskAction(input: unknown) {
   const user = await actor();
   const parsed = taskSchema.parse(input);
   if (user.roleCode !== "ADMIN" && !user.allowedModules.includes(parsed.sourceModule)) throw new Error("No tienes acceso al módulo relacionado.");
-  const dueAt = parsed.dueAt ? new Date(parsed.dueAt) : null;
-  if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("La fecha límite no es válida.");
+  const dueAt = parseDueDate(parsed.dueAt);
   const requestedAssigneeIds = parsed.assigneeIds ? await parseEligibleAssignees(parsed.assigneeIds, user.id, user.roleCode) : await parseEligibleAssignees(parsed.assigneeId ? JSON.stringify([parsed.assigneeId]) : undefined, user.id, user.roleCode);
   const created = await prisma.workTask.create({
     data: {
@@ -83,8 +91,7 @@ export async function updateWorkTaskAction(taskId: string, input: unknown) {
   if (!existing || user.roleCode !== "ADMIN") throw new Error("Solo el administrador puede editar esta tarea.");
   if (existing.kind === "AUTOMATIC") throw new Error("Las tareas automáticas se actualizan desde su módulo de origen.");
   if (!user.allowedModules.includes(parsed.sourceModule) && user.roleCode !== "ADMIN") throw new Error("No tienes acceso al módulo relacionado.");
-  const dueAt = parsed.dueAt ? new Date(parsed.dueAt) : null;
-  if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("La fecha límite no es válida.");
+  const dueAt = parseDueDate(parsed.dueAt);
   const assigneeIds = await parseEligibleAssignees(parsed.assigneeIds, user.id, user.roleCode);
   const updated = await prisma.$transaction(async (tx) => {
     const task = await tx.workTask.update({ where: { id: taskId }, data: { title: parsed.title, description: parsed.description || null, sourceModule: parsed.sourceModule, sourceType: parsed.sourceType || null, sourceId: parsed.sourceId || null, sourceCode: parsed.sourceCode || null, sourceUrl: parsed.sourceUrl || null, priority: parsed.priority, dueAt, progressTotal: parsed.progressTotal === "" || parsed.progressTotal === undefined ? null : Number(parsed.progressTotal), assigneeId: assigneeIds[0] ?? null, assignees: { deleteMany: {}, create: assigneeIds.map((userId) => ({ userId, assignedById: user.id })) }, events: { create: { actorId: user.id, type: "ASSIGNED", note: "Tarea editada por el administrador.", beforeData: { title: existing.title, priority: existing.priority, assigneeIds: existing.assignees.map((assignment) => assignment.userId) }, afterData: { title: parsed.title, priority: parsed.priority, assigneeIds } } } } });
