@@ -70,11 +70,12 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
   { key: "garantias", label: "Gestión de Garantías", permission: "warranties.read", description: "Casos, flujos y documentos" },
   { key: "reparaciones", label: "Reparaciones", permission: "reparaciones.read", description: "Cola de reparaciones y pago a técnicos" },
   { key: "desbloqueos", label: "Desbloqueos", permission: "desbloqueos.read", description: "Solicitudes de desbloqueo y pago a técnicos" },
+  { key: "centro-trabajo", label: "Centro de trabajo", permission: "centro-trabajo.read", description: "Pendientes, tareas y actividad operativa" },
   { key: "configuracion", label: "Configuración", permission: "settings.read", description: "Usuarios y roles" },
 ];
 
 export const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
-  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "reparaciones", "desbloqueos", "configuracion"],
+  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "reparaciones", "desbloqueos", "centro-trabajo", "configuracion"],
   ALMACEN: ["almacen"],
   VENTAS: ["precios", "facturas"],
   TECNICO: ["reparaciones", "desbloqueos", "wallet"],

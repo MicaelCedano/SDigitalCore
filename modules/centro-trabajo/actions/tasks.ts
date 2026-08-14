@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
-import { requireUser } from "@/lib/auth/helpers";
+import { requirePermission } from "@/lib/auth/helpers";
 
 const taskSchema = z.object({
   title: z.string().trim().min(3, "Escribe un título más descriptivo.").max(160),
@@ -23,7 +23,7 @@ const taskSchema = z.object({
 const statusSchema = z.enum(["PENDING", "IN_PROGRESS", "IN_REVIEW", "WAITING", "COMPLETED", "CANCELLED"]);
 
 async function actor() {
-  const user = await requireUser();
+  const user = await requirePermission("centro-trabajo.write");
   if (!user.id) throw new Error("La sesión no tiene un usuario persistido.");
   const persisted = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, roleCode: true, allowedModules: true, status: true } });
   if (!persisted || persisted.status !== "ACTIVE") throw new Error("El usuario no está activo.");
