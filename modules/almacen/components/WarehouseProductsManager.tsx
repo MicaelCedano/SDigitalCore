@@ -270,12 +270,15 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
         ) : (
           <>
           <div className="md:hidden divide-y divide-slate-100">
-            {visibleProducts.map((p) => (
-              <article key={p.id} className="p-4 space-y-3">
+            {visibleProducts.map((p) => {
+              const isOutOfStock = (p.totalUnits || 0) <= 0;
+
+              return (
+              <article key={p.id} className={`p-4 space-y-3 ${isOutOfStock ? "bg-red-50/70" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <span className="font-mono text-xs font-bold text-[#5750f1]">#{p.code}</span>
-                    <h2 className="mt-1 break-words text-base font-bold leading-tight text-slate-800">{p.name}</h2>
+                    <h2 className={`mt-1 break-words text-base font-bold leading-tight ${isOutOfStock ? "text-red-800" : "text-slate-800"}`}>{p.name}</h2>
                     {p.brand && (
                       <p className="mt-1 flex items-start gap-1.5 text-xs font-semibold text-slate-500">
                         <Tag className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -308,9 +311,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                     <span className="block font-semibold text-amber-700">Cajas</span>
                     <strong className="mt-0.5 block text-sm text-amber-800">{p.boxes || 0}</strong>
                   </div>
-                  <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-                    <span className="block font-semibold text-indigo-700">Total unidades</span>
-                    <strong className="mt-0.5 block text-sm text-[#5750f1]">{p.totalUnits || 0}</strong>
+                  <div className={`rounded-lg border px-3 py-2 ${isOutOfStock ? "border-red-200 bg-red-100" : "border-indigo-200 bg-indigo-50"}`}>
+                    <span className={`block font-semibold ${isOutOfStock ? "text-red-700" : "text-indigo-700"}`}>Total unidades</span>
+                    <strong className={`mt-0.5 block text-sm ${isOutOfStock ? "text-red-700" : "text-[#5750f1]"}`}>{p.totalUnits || 0}</strong>
                   </div>
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-slate-600">
                     <span className="block font-semibold">Por caja</span>
@@ -322,7 +325,8 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           <div className="hidden overflow-x-auto md:block">
@@ -340,9 +344,12 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visibleProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-4 py-3.5 font-mono font-bold text-[#5750f1]">
+                {visibleProducts.map((p) => {
+                  const isOutOfStock = (p.totalUnits || 0) <= 0;
+
+                  return (
+                  <tr key={p.id} className={`transition-colors ${isOutOfStock ? "bg-red-50/70 hover:bg-red-100/80" : "hover:bg-slate-50/80"}`}>
+                    <td className={`px-4 py-3.5 font-mono font-bold ${isOutOfStock ? "text-red-700" : "text-[#5750f1]"}`}>
                       {p.code}
                     </td>
                     <td className="px-4 py-3.5">
@@ -374,7 +381,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <span className="font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                      <span className={`font-black px-2.5 py-1 rounded-lg border ${isOutOfStock ? "text-red-700 bg-red-100 border-red-200" : "text-amber-700 bg-amber-50 border-amber-200"}`}>
                         {p.boxes} cajas
                       </span>
                     </td>
@@ -385,7 +392,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                       {p.looseUnits || 0} uds
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <span className="font-extrabold text-[#5750f1] bg-[#5750f1]/10 px-2.5 py-1 rounded-lg border border-[#5750f1]/20">
+                      <span className={`font-extrabold px-2.5 py-1 rounded-lg border ${isOutOfStock ? "text-red-700 bg-red-100 border-red-200" : "text-[#5750f1] bg-[#5750f1]/10 border-[#5750f1]/20"}`}>
                         {p.totalUnits} uds
                       </span>
                     </td>
@@ -410,7 +417,8 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
