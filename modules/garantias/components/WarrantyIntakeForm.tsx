@@ -182,7 +182,7 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
         )}
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
-          <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="border-b border-slate-200 p-5 sm:p-6">
             <div>
               <h2 className="font-semibold text-slate-800">
                 Equipos a recibir{" "}
@@ -194,14 +194,6 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
                 Al escribir un IMEI de 15 dígitos se autocompleta el cliente y modelo detectados.
               </p>
             </div>
-            <button
-              type="button"
-              disabled={devices.length >= 100}
-              onClick={() => setDevices((current) => [...current, emptyDevice()])}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#5750f1]/20 bg-white px-3 text-sm font-semibold text-[#5750f1] hover:bg-[#5750f1]/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Plus size={16} /> Agregar equipo
-            </button>
           </div>
 
           <div className="divide-y divide-slate-100">
@@ -288,6 +280,17 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50 p-4 sm:p-5">
+            <button
+              type="button"
+              disabled={devices.length >= 100}
+              onClick={() => setDevices((current) => [...current, emptyDevice()])}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#5750f1]/20 bg-white px-3 text-sm font-semibold text-[#5750f1] hover:bg-[#5750f1]/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Plus size={16} /> Agregar otro equipo
+            </button>
           </div>
         </section>
 
