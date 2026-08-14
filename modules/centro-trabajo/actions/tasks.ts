@@ -102,6 +102,27 @@ export async function updateWorkTaskAction(taskId: string, input: unknown) {
   return { success: true };
 }
 
+export async function deleteWorkTaskAction(taskId: string) {
+  const user = await actor();
+  if (user.roleCode !== "ADMIN") throw new Error("Solo el administrador puede eliminar tareas.");
+
+  const task = await prisma.workTask.findUnique({ where: { id: taskId } });
+  if (!task) throw new Error("La tarea ya no existe.");
+  if (task.kind === "AUTOMATIC") throw new Error("Las tareas automáticas de QC no se pueden eliminar desde aquí.");
+
+  await prisma.workTask.delete({ where: { id: taskId } });
+  await logAudit({
+    userId: user.id,
+    action: "work_task.delete",
+    module: "centro-trabajo",
+    entityType: "work_task",
+    entityId: task.id,
+    beforeData: { title: task.title, sourceModule: task.sourceModule, priority: task.priority },
+  });
+  revalidatePath("/centro-trabajo");
+  return { success: true };
+}
+
 export async function updateWorkTaskStatusAction(taskId: string, nextStatus: string) {
   const user = await actor();
   const status = statusSchema.parse(nextStatus);
