@@ -39,6 +39,8 @@ export const goodsReceiptWarehouseImportLineSchema = z.object({
   itemId: z.string().min(1),
   code: z.string().trim().min(1, "El código Kaptas es requerido"),
   name: z.string().trim().min(1, "El modelo es requerido"),
+  brand: z.string().trim().optional().default(""),
+  capacity: z.string().trim().optional().default(""),
   color: z.string().trim().min(1).default("General"),
   quantity: z.number().int().min(1, "La cantidad debe venir del recibo"),
   unitsPerBox: z.number().int().min(1, "Indica cuántas unidades trae una caja"),

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { importGoodsReceiptToWarehouseAction } from "../actions/goods-receipt";
 import type { GoodsReceiptWarehouseImportInput } from "@/lib/validation/goods-receipt";
-import { AlertCircle, CheckCircle2, PackagePlus, X } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, LockKeyhole, PackagePlus, Send, ShieldCheck, X } from "lucide-react";
 
 type ImportReceipt = {
   id: string;
@@ -12,10 +12,21 @@ type ImportReceipt = {
 };
 type ImportLine = GoodsReceiptWarehouseImportInput["lines"][number];
 
+function splitProductDescription(description: string | null | undefined) {
+  const source = description?.trim() || "Modelo sin nombre";
+  const capacityMatch = source.match(/\b(\d+\s*(?:\+|x|\/)\s*\d+\s*(?:GB|TB)?|\d+\s*(?:GB|TB))\b/i);
+  const capacity = capacityMatch?.[1]?.replace(/\s+/g, "").toUpperCase() || "";
+  const withoutCapacity = (capacityMatch ? source.replace(capacityMatch[0], "") : source).replace(/\s+/g, " ").trim();
+  const [brand = "", ...modelParts] = withoutCapacity.split(" ");
+  const model = modelParts.join(" ").trim() || brand || source;
+  return { brand, model, capacity };
+}
+
 function buildLines(receipt: ImportReceipt): ImportLine[] {
   return (receipt.items || []).flatMap((item) => {
     const variants = item.colorVariants && item.colorVariants.length > 0 ? item.colorVariants : [{ color: "General", quantity: item.quantity || 1 }];
-    return variants.map((variant) => ({ itemId: item.id || "", code: item.code || "", name: item.description?.trim() || "Modelo sin nombre", color: variant.color?.trim() || "General", quantity: Number(variant.quantity) || Number(item.quantity) || 1, unitsPerBox: 1 }));
+    const parsed = splitProductDescription(item.description);
+    return variants.map((variant) => ({ itemId: item.id || "", code: item.code || "", name: parsed.model, brand: parsed.brand, capacity: parsed.capacity, color: variant.color?.trim() || "General", quantity: Number(variant.quantity) || Number(item.quantity) || 1, unitsPerBox: 1 }));
   });
 }
 
@@ -23,17 +34,25 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
   const [lines, setLines] = useState<ImportLine[]>(() => buildLines(receipt));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const totalUnits = useMemo(() => lines.reduce((sum, line) => sum + line.quantity, 0), [lines]);
 
   const updateLine = (index: number, field: "code" | "unitsPerBox", value: string) => {
     setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: field === "unitsPerBox" ? Math.max(1, Number(value) || 1) : value } : line));
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const updateIdentity = (index: number, field: "brand" | "name" | "capacity" | "color", value: string) => {
+    setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
-    const confirmed = window.confirm(`Confirmar envío del recibo ${receipt.receiptNumber} al almacén?\n\nSe enviarán ${totalUnits} unidades y el recibo quedará bloqueado para no enviarlo dos veces.`);
-    if (!confirmed) return;
+    setConfirmOpen(true);
+  };
+
+  const confirmImport = async () => {
+    setConfirmOpen(false);
     setSaving(true);
     const result = await importGoodsReceiptToWarehouseAction({ receiptId: receipt.id, lines });
     setSaving(false);
@@ -52,11 +71,39 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
           <div className="overflow-y-auto p-4 sm:p-6">
             <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-3 text-xs text-indigo-900">Completa el código Kaptas y las unidades que trae una caja. La cantidad recibida está bloqueada y se distribuirá automáticamente entre cajas y unidades sueltas.</div>
             {error && <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
-            <div className="space-y-3">{lines.map((line, index) => { const boxes = Math.floor(line.quantity / line.unitsPerBox); const looseUnits = line.quantity % line.unitsPerBox; return <div key={`${line.itemId}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs"><div className="grid gap-3 md:grid-cols-[1.4fr_1fr_0.7fr_0.7fr] md:items-end"><div><p className="text-sm font-bold text-slate-800">{line.name}</p><p className="mt-1 text-xs font-semibold text-indigo-600">Color: {line.color}</p></div><label className="text-xs font-semibold text-slate-700">Código Kaptas<input required value={line.code} onChange={(event) => updateLine(index, "code", event.target.value)} placeholder="Ej. SAM-A16-AZ" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Unidades por caja<input required type="number" min={1} value={line.unitsPerBox} onChange={(event) => updateLine(index, "unitsPerBox", event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><div className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="block text-[10px] font-semibold uppercase text-slate-500">Recibido</span><strong className="text-slate-800">{line.quantity} uds</strong><span className="block text-[10px] text-slate-500">{boxes} cajas · {looseUnits} sueltas</span></div></div></div>; })}</div>
+            <div className="space-y-3">{lines.map((line, index) => { const boxes = Math.floor(line.quantity / line.unitsPerBox); const looseUnits = line.quantity % line.unitsPerBox; return <div key={`${line.itemId}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs"><div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-500">Producto identificado</p><p className="mt-1 text-sm font-bold text-slate-800">{line.brand || "Marca pendiente"} {line.name} {line.capacity && <span className="font-semibold text-slate-500">{line.capacity}</span>}</p></div><span className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{line.color}</span></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-semibold text-slate-700">Marca<input required value={line.brand} onChange={(event) => updateIdentity(index, "brand", event.target.value)} placeholder="Ej. Oukitel" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Modelo<input required value={line.name} onChange={(event) => updateIdentity(index, "name", event.target.value)} placeholder="Ej. WP210" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">RAM y almacenamiento<input value={line.capacity} onChange={(event) => updateIdentity(index, "capacity", event.target.value)} placeholder="Ej. 12+512GB" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Color<input required value={line.color} onChange={(event) => updateIdentity(index, "color", event.target.value)} placeholder="Ej. Black" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700 sm:col-span-2 lg:col-span-1">Código Kaptas<input required value={line.code} onChange={(event) => updateLine(index, "code", event.target.value)} placeholder="Ej. SAM-A16-AZ" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Unidades por caja<input required type="number" min={1} value={line.unitsPerBox} onChange={(event) => updateLine(index, "unitsPerBox", event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><div className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="block text-[10px] font-semibold uppercase text-slate-500">Recibido</span><strong className="text-slate-800">{line.quantity} uds</strong><span className="block text-[10px] text-slate-500">{boxes} cajas · {looseUnits} sueltas</span></div></div></div>; })}</div>
           </div>
           <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end sm:px-6"><button type="button" onClick={onClose} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Cancelar</button><button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#5750f1] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 disabled:opacity-50">{saving ? "Importando..." : <><CheckCircle2 className="h-4 w-4" /> Crear productos y agregar cantidades</>}</button></div>
         </form>
       </div>
+      {confirmOpen && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation">
+          <div role="dialog" aria-modal="true" aria-labelledby="warehouse-confirm-title" className="w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.55)]">
+            <div className="bg-gradient-to-br from-indigo-600 via-[#5750f1] to-violet-600 px-6 pb-7 pt-6 text-white">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25"><Send className="h-6 w-6" /></div>
+                <button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl p-2 text-white/75 transition hover:bg-white/15 hover:text-white" aria-label="Cerrar confirmación"><X className="h-5 w-5" /></button>
+              </div>
+              <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-indigo-100">Enviar al almacén</p>
+              <h3 id="warehouse-confirm-title" className="mt-1 text-xl font-black tracking-tight">¿Confirmar este movimiento?</h3>
+              <p className="mt-2 text-sm leading-6 text-indigo-100">El recibo quedará registrado y no podrá enviarse nuevamente.</p>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div><p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Recibo</p><p className="mt-1 font-mono text-sm font-bold text-slate-800">{receipt.receiptNumber}</p></div>
+                <ArrowRight className="h-4 w-4 text-slate-300" />
+                <div className="text-right"><p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Cantidad</p><p className="mt-1 text-lg font-black text-indigo-600">{totalUnits.toLocaleString("es-DO")} <span className="text-xs font-bold text-slate-500">uds.</span></p></div>
+              </div>
+              <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <div><p className="text-sm font-bold">Esta acción es definitiva</p><p className="mt-1 text-xs leading-5 text-amber-800">Se crearán los productos y se bloqueará el recibo para evitar duplicados.</p></div>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Revisa que las cantidades y códigos estén correctos.</div>
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end"><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50">Volver a revisar</button><button type="button" onClick={() => void confirmImport()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700"><Send className="h-4 w-4" /> Confirmar envío</button></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

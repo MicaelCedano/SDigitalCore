@@ -269,8 +269,8 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
         const boxes = Math.floor(line.quantity / unitsPerBox);
         const looseUnits = line.quantity % unitsPerBox;
         const product = existing
-          ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
-          : await tx.warehouseProduct.create({ data: { code, name: line.name, color: line.color, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
+          ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color, boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
+          : await tx.warehouseProduct.create({ data: { code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
         await tx.warehouseMovement.create({ data: { productId: product.id, type: "ENTRY", boxesCount: boxes, totalUnits: line.quantity, reason: `Importación recibo ${receipt.receiptNumber}`, createdBy: actor.id } });
         await tx.goodsReceiptItem.update({ where: { id: line.itemId }, data: { code } });
         products.push(product);
