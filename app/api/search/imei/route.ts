@@ -9,7 +9,7 @@ const searchSchema = z.object({
 
 type GlobalImeiResult = {
   id: string;
-  source: "warranty" | "receipt" | "stock-count" | "invoice";
+  source: "warranty" | "receipt" | "stock-count" | "invoice" | "qc" | "repair" | "unlock";
   sourceLabel: string;
   documentNumber: string;
   imei: string;
@@ -43,8 +43,11 @@ export async function GET(request: Request) {
   const canSearchWarranties = isAdmin || modules.has("garantias");
   const canSearchWarehouse = isAdmin || modules.has("almacen");
   const canSearchInvoices = isAdmin || modules.has("facturas");
+  const canSearchQc = isAdmin || modules.has("qc");
+  const canSearchRepairs = isAdmin || modules.has("reparaciones");
+  const canSearchUnlocks = isAdmin || modules.has("desbloqueos");
 
-  const [warranties, receiptItems, countItems, invoiceItems] = await Promise.all([
+  const [warranties, receiptItems, countItems, invoiceItems, qcInspections, repairItems, unlockRecords] = await Promise.all([
     canSearchWarranties
       ? prisma.warrantyCase.findMany({
           where: { imei: { contains: query } },
@@ -89,6 +92,62 @@ export async function GET(request: Request) {
             invoice: { select: { invoiceNumber: true, type: true, clientName: true, branch: true, status: true, createdAt: true } },
           },
           orderBy: { invoice: { createdAt: "desc" } },
+          take: 6,
+        })
+      : Promise.resolve([]),
+    canSearchQc
+      ? prisma.qcInspection.findMany({
+          where: {
+            status: "COMPLETED",
+            device: { imei: { contains: query, mode: "insensitive" } },
+          },
+          select: {
+            id: true,
+            result: true,
+            reviewedAt: true,
+            createdAt: true,
+            reviewerNameSnapshot: true,
+            device: {
+              select: {
+                imei: true,
+                model: true,
+                brand: true,
+                batch: { select: { batchNumber: true, supplierName: true } },
+              },
+            },
+          },
+          orderBy: { reviewedAt: "desc" },
+          take: 6,
+        })
+      : Promise.resolve([]),
+    canSearchRepairs
+      ? prisma.repairJobItem.findMany({
+          where: { imei: { contains: query, mode: "insensitive" } },
+          select: {
+            id: true,
+            imei: true,
+            marca: true,
+            modelo: true,
+            cliente: true,
+            problema: true,
+            createdAt: true,
+            job: { select: { jobCode: true, status: true, createdAt: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+        })
+      : Promise.resolve([]),
+    canSearchUnlocks
+      ? prisma.unlockRecord.findMany({
+          where: { imei: { contains: query, mode: "insensitive" } },
+          select: {
+            id: true,
+            imei: true,
+            model: true,
+            paidAt: true,
+            request: { select: { requestCode: true, status: true } },
+          },
+          orderBy: { paidAt: "desc" },
           take: 6,
         })
       : Promise.resolve([]),
@@ -143,9 +202,47 @@ export async function GET(request: Request) {
       date: item.invoice.createdAt.toISOString(),
       href: "/facturas",
     })),
+    ...qcInspections.map((item) => ({
+      id: `qc-${item.id}`,
+      source: "qc" as const,
+      sourceLabel: "Control de calidad",
+      documentNumber: item.device.batch?.batchNumber ?? "Equipo revisado",
+      imei: item.device.imei ?? query,
+      title: `${item.device.brand ? `${item.device.brand} ` : ""}${item.device.model}`,
+      detail: `${item.device.batch?.supplierName ?? "Sin suplidor"} · ${item.reviewerNameSnapshot}`,
+      status: item.result ?? "COMPLETED",
+      date: (item.reviewedAt ?? item.createdAt).toISOString(),
+      href: `/qc/equipos-revisados?q=${encodeURIComponent(item.device.imei ?? query)}`,
+    })),
+    ...repairItems.map((item) => ({
+      id: `repair-${item.id}`,
+      source: "repair" as const,
+      sourceLabel: "Reparaciones",
+      documentNumber: item.job.jobCode,
+      imei: item.imei,
+      title: item.modelo || item.marca || "Equipo en reparación",
+      detail: `${item.cliente} · ${item.problema}`,
+      status: item.job.status,
+      date: item.createdAt.toISOString(),
+      href: "/reparaciones/pagos",
+    })),
+    ...unlockRecords.map((item) => ({
+      id: `unlock-${item.id}`,
+      source: "unlock" as const,
+      sourceLabel: "Desbloqueos",
+      documentNumber: item.request.requestCode,
+      imei: item.imei,
+      title: item.model,
+      detail: "IMEI desbloqueado y pagado",
+      status: item.request.status,
+      date: item.paidAt.toISOString(),
+      href: "/desbloqueos/pagos",
+    })),
   ]
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-    .slice(0, 18);
+    // Cada módulo aporta hasta seis coincidencias; no recortar a 18 ocultando
+    // módulos completos cuando el mismo IMEI aparece en varios flujos.
+    .slice(0, 50);
 
   return NextResponse.json({ query, results }, { headers: { "Cache-Control": "no-store" } });
 }
