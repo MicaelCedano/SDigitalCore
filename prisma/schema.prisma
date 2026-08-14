@@ -111,6 +111,11 @@ enum WorkTaskKind {
   AUTOMATIC
 }
 
+enum WorkTaskAssignmentMode {
+  SINGLE
+  MULTIPLE
+}
+
 enum WorkTaskStatus {
   PENDING
   IN_PROGRESS
@@ -143,6 +148,7 @@ model WorkTask {
   title          String
   description    String?         @db.Text
   kind           WorkTaskKind    @default(MANUAL)
+  assignmentMode WorkTaskAssignmentMode @default(SINGLE) @map("assignment_mode")
   status         WorkTaskStatus  @default(PENDING)
   priority       WorkTaskPriority @default(NORMAL)
   sourceModule   String          @map("source_module")

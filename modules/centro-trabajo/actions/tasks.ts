@@ -16,6 +16,7 @@ const taskSchema = z.object({
   sourceUrl: z.string().trim().max(300).optional().or(z.literal("")),
   assigneeId: z.string().trim().max(40).optional().or(z.literal("")),
   assigneeIds: z.string().optional().or(z.literal("")),
+  assignmentMode: z.enum(["SINGLE", "MULTIPLE"]).default("SINGLE"),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   dueAt: z.string().optional().or(z.literal("")),
   progressTotal: z.coerce.number().int().min(1).max(1000000).optional().or(z.literal("")),
@@ -71,6 +72,7 @@ export async function createWorkTaskAction(input: unknown) {
       sourceCode: parsed.sourceCode || null,
       sourceUrl: parsed.sourceUrl || null,
       creatorId: user.id,
+      assignmentMode: parsed.assignmentMode,
       assigneeId: requestedAssigneeIds[0] ?? null,
       priority: parsed.priority,
       dueAt,
@@ -93,8 +95,9 @@ export async function updateWorkTaskAction(taskId: string, input: unknown) {
   if (!user.allowedModules.includes(parsed.sourceModule) && user.roleCode !== "ADMIN") throw new Error("No tienes acceso al módulo relacionado.");
   const dueAt = parseDueDate(parsed.dueAt);
   const assigneeIds = await parseEligibleAssignees(parsed.assigneeIds, user.id, user.roleCode);
+  const assignmentMode = existing.assignmentMode === "MULTIPLE" && parsed.assignmentMode === "SINGLE" ? existing.assignmentMode : parsed.assignmentMode;
   const updated = await prisma.$transaction(async (tx) => {
-    const task = await tx.workTask.update({ where: { id: taskId }, data: { title: parsed.title, description: parsed.description || null, sourceModule: parsed.sourceModule, sourceType: parsed.sourceType || null, sourceId: parsed.sourceId || null, sourceCode: parsed.sourceCode || null, sourceUrl: parsed.sourceUrl || null, priority: parsed.priority, dueAt, progressTotal: parsed.progressTotal === "" || parsed.progressTotal === undefined ? null : Number(parsed.progressTotal), assigneeId: assigneeIds[0] ?? null, assignees: { deleteMany: {}, create: assigneeIds.map((userId) => ({ userId, assignedById: user.id })) }, events: { create: { actorId: user.id, type: "ASSIGNED", note: "Tarea editada por el administrador.", beforeData: { title: existing.title, priority: existing.priority, assigneeIds: existing.assignees.map((assignment) => assignment.userId) }, afterData: { title: parsed.title, priority: parsed.priority, assigneeIds } } } } });
+    const task = await tx.workTask.update({ where: { id: taskId }, data: { title: parsed.title, description: parsed.description || null, sourceModule: parsed.sourceModule, sourceType: parsed.sourceType || null, sourceId: parsed.sourceId || null, sourceCode: parsed.sourceCode || null, sourceUrl: parsed.sourceUrl || null, priority: parsed.priority, assignmentMode, dueAt, progressTotal: parsed.progressTotal === "" || parsed.progressTotal === undefined ? null : Number(parsed.progressTotal), assigneeId: assigneeIds[0] ?? null, assignees: { deleteMany: {}, create: assigneeIds.map((userId) => ({ userId, assignedById: user.id })) }, events: { create: { actorId: user.id, type: "ASSIGNED", note: "Tarea editada por el administrador.", beforeData: { title: existing.title, priority: existing.priority, assigneeIds: existing.assignees.map((assignment) => assignment.userId) }, afterData: { title: parsed.title, priority: parsed.priority, assignmentMode, assigneeIds } } } } });
     return task;
   });
   await logAudit({ userId: user.id, action: "work_task.update", module: "centro-trabajo", entityType: "work_task", entityId: updated.id, beforeData: { title: existing.title, priority: existing.priority, assigneeIds: existing.assignees.map((assignment) => assignment.userId) }, afterData: { title: updated.title, priority: updated.priority, assigneeIds } });
@@ -131,6 +134,23 @@ export async function updateWorkTaskStatusAction(taskId: string, nextStatus: str
   const completedAt = status === "COMPLETED" ? new Date() : null;
   const updated = await prisma.workTask.update({ where: { id: taskId }, data: { status, completedAt, events: { create: { actorId: user.id, type: status === "COMPLETED" ? "COMPLETED" : "STATUS_CHANGED", beforeData: { status: task.status }, afterData: { status }, } } } });
   await logAudit({ userId: user.id, action: "work_task.status.update", module: "centro-trabajo", entityType: "work_task", entityId: task.id, beforeData: { status: task.status }, afterData: { status: updated.status } });
+  revalidatePath("/centro-trabajo");
+  return { success: true };
+}
+
+export async function claimWorkTaskAction(taskId: string) {
+  const user = await actor();
+  const task = await prisma.workTask.findUnique({ where: { id: taskId }, include: { assignees: true } });
+  if (!task || !user.allowedModules.includes(task.sourceModule) && user.roleCode !== "ADMIN") throw new Error("No puedes coger esta tarea.");
+  if (["COMPLETED", "CANCELLED"].includes(task.status)) throw new Error("Esta tarea ya no está disponible.");
+  if (task.assignees.some((assignment) => assignment.userId === user.id)) return { success: true };
+  if (task.assignmentMode === "SINGLE" && task.assignees.length > 0) throw new Error("Esta tarea ya fue cogida por otra persona.");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workTaskAssignee.create({ data: { taskId, userId: user.id, assignedById: user.id } });
+    await tx.workTask.update({ where: { id: taskId }, data: { assigneeId: task.assigneeId ?? user.id, status: task.status === "PENDING" ? "IN_PROGRESS" : undefined, events: { create: { actorId: user.id, type: "ASSIGNED", note: task.assignmentMode === "MULTIPLE" ? "La tarea fue cogida por un integrante del equipo." : "La tarea fue cogida.", afterData: { userId: user.id, assignmentMode: task.assignmentMode } } } } });
+  });
+  await logAudit({ userId: user.id, action: "work_task.claim", module: "centro-trabajo", entityType: "work_task", entityId: task.id, afterData: { assignmentMode: task.assignmentMode } });
   revalidatePath("/centro-trabajo");
   return { success: true };
 }
