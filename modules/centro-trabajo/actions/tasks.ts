@@ -61,7 +61,8 @@ export async function createWorkTaskAction(input: unknown) {
   const parsed = taskSchema.parse(input);
   if (user.roleCode !== "ADMIN" && !user.allowedModules.includes(parsed.sourceModule)) throw new Error("No tienes acceso al módulo relacionado.");
   const dueAt = parseDueDate(parsed.dueAt);
-  const requestedAssigneeIds = parsed.assigneeIds ? await parseEligibleAssignees(parsed.assigneeIds, user.id, user.roleCode) : await parseEligibleAssignees(parsed.assigneeId ? JSON.stringify([parsed.assigneeId]) : undefined, user.id, user.roleCode);
+  // Las tareas manuales nuevas siempre nacen disponibles; los responsables las toman desde la lista.
+  const requestedAssigneeIds: string[] = [];
   const created = await prisma.workTask.create({
     data: {
       title: parsed.title,
