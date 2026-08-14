@@ -22,7 +22,7 @@ const taskSchema = z.object({
   progressTotal: z.coerce.number().int().min(1).max(1000000).optional().or(z.literal("")),
 });
 
-const statusSchema = z.enum(["PENDING", "IN_PROGRESS", "IN_REVIEW", "WAITING", "COMPLETED", "CANCELLED"]);
+const statusSchema = z.enum(["PENDING", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "CANCELLED"]);
 
 async function actor() {
   const user = await requirePermission("centro-trabajo.write");

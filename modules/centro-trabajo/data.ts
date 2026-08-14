@@ -6,7 +6,7 @@ function emptyWorkCenterData(userId: string, roleCode: string) {
   return {
     tasks: [],
     activeUsers: [],
-    metrics: { action: 0, completedToday: 0, waiting: 0, overdue: 0 },
+    metrics: { action: 0, completedToday: 0, overdue: 0 },
     currentUserId: userId,
     roleCode,
     schemaReady: false,
@@ -56,7 +56,7 @@ export async function getWorkCenterData() {
       take: 100,
     });
 
-    const [activeUsers, completedToday, waiting] = await Promise.all([
+    const [activeUsers, completedToday] = await Promise.all([
       prisma.user.findMany({
         where: { status: "ACTIVE", allowedModules: { has: "centro-trabajo" } },
         select: { id: true, name: true, email: true, image: true },
@@ -70,7 +70,6 @@ export async function getWorkCenterData() {
           completedAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
         },
       }),
-      prisma.workTask.count({ where: { ...scope, status: "WAITING" } }),
     ]);
 
     const now = new Date();
@@ -84,7 +83,6 @@ export async function getWorkCenterData() {
       metrics: {
         action: tasks.filter((task) => ["PENDING", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)).length,
         completedToday,
-        waiting,
         overdue,
       },
       currentUserId: user.id,
