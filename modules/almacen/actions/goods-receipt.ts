@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import {
   goodsReceiptSchema,
   GoodsReceiptInput,
+  goodsReceiptWarehouseImportSchema,
+  GoodsReceiptWarehouseImportInput,
 } from "@/lib/validation/goods-receipt";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 
@@ -232,6 +234,58 @@ export async function getGoodsReceiptByIdAction(id: string) {
     return { success: true, data: receipt };
   } catch (error: any) {
     return { success: false, error: "Error al cargar el recibo" };
+  }
+}
+
+export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWarehouseImportInput) {
+  try {
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
+    if (persisted?.roleCode !== "ADMIN") return { success: false, error: "Solo un administrador puede importar productos al almacén." };
+
+    const validated = goodsReceiptWarehouseImportSchema.parse(input);
+    const receipt = await prisma.goodsReceipt.findUnique({ where: { id: validated.receiptId }, include: { items: true } });
+    if (!receipt) return { success: false, error: "Recibo no encontrado." };
+    if (receipt.status !== "COMPLETED") return { success: false, error: "Solo puedes importar recibos completados." };
+    if (receipt.warehouseImportedAt) return { success: false, error: `El recibo ${receipt.receiptNumber} ya fue enviado al almacén y no puede enviarse otra vez.` };
+    const receiptItemIds = new Set(receipt.items.map((item) => item.id));
+    if (validated.lines.some((line) => !receiptItemIds.has(line.itemId))) return { success: false, error: "Una de las líneas no pertenece a este recibo." };
+
+    const codes = validated.lines.map((line) => line.code.toUpperCase());
+    if (new Set(codes).size !== codes.length) return { success: false, error: "Cada modelo/color debe tener un código Kaptas diferente." };
+    const created = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.goodsReceipt.updateMany({
+        where: { id: receipt.id, status: "COMPLETED", warehouseImportedAt: null },
+        data: { warehouseImportedAt: new Date(), warehouseImportedBy: actor.id },
+      });
+      if (claimed.count !== 1) throw new Error(`El recibo ${receipt.receiptNumber} ya fue enviado al almacén y no puede enviarse otra vez.`);
+
+      const products = [];
+      for (const line of validated.lines) {
+        const code = line.code.toUpperCase();
+        const existing = await tx.warehouseProduct.findUnique({ where: { code } });
+        const unitsPerBox = existing?.unitsPerBox || line.unitsPerBox;
+        const boxes = Math.floor(line.quantity / unitsPerBox);
+        const looseUnits = line.quantity % unitsPerBox;
+        const product = existing
+          ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
+          : await tx.warehouseProduct.create({ data: { code, name: line.name, color: line.color, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
+        await tx.warehouseMovement.create({ data: { productId: product.id, type: "ENTRY", boxesCount: boxes, totalUnits: line.quantity, reason: `Importación recibo ${receipt.receiptNumber}`, createdBy: actor.id } });
+        await tx.goodsReceiptItem.update({ where: { id: line.itemId }, data: { code } });
+        products.push(product);
+      }
+      return products;
+    });
+
+    await logAudit({ userId: actor.id, action: "goods_receipt.import_to_warehouse", module: "almacen", entityType: "goods_receipt", entityId: receipt.id, afterData: { receiptNumber: receipt.receiptNumber, productIds: created.map((product) => product.id), lineCount: created.length } });
+    revalidatePath("/almacen");
+    revalidatePath("/almacen/recibos");
+    revalidatePath("/dashboard");
+    return { success: true, data: created, message: `${created.length} producto(s) enviado(s) al almacén. Los códigos quedaron guardados en el recibo.` };
+  } catch (error: any) {
+    console.error("Error al importar recibo al almacén:", error);
+    return { success: false, error: error.message || "No se pudo importar el recibo al almacén." };
   }
 }
 

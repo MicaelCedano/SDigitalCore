@@ -7,6 +7,7 @@ import {
 } from "../actions/goods-receipt";
 import { GoodsReceiptForm } from "./GoodsReceiptForm";
 import { GoodsReceiptDetailModal } from "./GoodsReceiptDetailModal";
+import { GoodsReceiptWarehouseImportModal } from "./GoodsReceiptWarehouseImportModal";
 import { exportReceiptListToExcel } from "@/lib/utils/excel-export";
 import {
   Plus,
@@ -37,6 +38,7 @@ export function GoodsReceiptsList() {
   const [showFormModal, setShowFormModal] = useState(false);
   const [selectedReceiptForEdit, setSelectedReceiptForEdit] = useState<any | null>(null);
   const [selectedReceiptForDetail, setSelectedReceiptForDetail] = useState<any | null>(null);
+  const [selectedReceiptForImport, setSelectedReceiptForImport] = useState<any | null>(null);
 
   const fetchReceipts = async () => {
     setLoading(true);
@@ -393,6 +395,18 @@ export function GoodsReceiptsList() {
             setSelectedReceiptForDetail(null);
             setSelectedReceiptForEdit(r);
             setShowFormModal(true);
+          }}
+          onImportToWarehouse={(r) => setSelectedReceiptForImport(r)}
+        />
+      )}
+
+      {selectedReceiptForImport && (
+        <GoodsReceiptWarehouseImportModal
+          receipt={selectedReceiptForImport}
+          onClose={() => setSelectedReceiptForImport(null)}
+          onSuccess={() => {
+            setSelectedReceiptForImport(null);
+            fetchReceipts();
           }}
         />
       )}

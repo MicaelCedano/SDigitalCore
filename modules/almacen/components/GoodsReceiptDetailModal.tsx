@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Layers,
   MapPin,
+  PackagePlus,
   Pencil,
   Truck,
   X,
@@ -32,6 +33,7 @@ type ReceiptItem = {
 };
 
 type GoodsReceiptDetail = {
+  id?: string;
   receiptNumber: string;
   supplierName: string;
   branch: string;
@@ -41,6 +43,7 @@ type GoodsReceiptDetail = {
   receivedAt?: string | Date | null;
   createdAt?: string | Date | null;
   items?: ReceiptItem[] | null;
+  warehouseImportedAt?: string | Date | null;
 };
 
 type ModelSummary = {
@@ -61,6 +64,7 @@ interface GoodsReceiptDetailModalProps {
   receipt: GoodsReceiptDetail;
   onClose: () => void;
   onEdit?: (receipt: GoodsReceiptDetail) => void;
+  onImportToWarehouse?: (receipt: GoodsReceiptDetail) => void;
 }
 
 function parseImeis(value?: string | null) {
@@ -143,6 +147,7 @@ export function GoodsReceiptDetailModal({
   receipt,
   onClose,
   onEdit,
+  onImportToWarehouse,
 }: GoodsReceiptDetailModalProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -252,6 +257,9 @@ export function GoodsReceiptDetailModal({
                       ? "BORRADOR"
                       : "CANCELADO"}
                 </span>
+                {receipt.warehouseImportedAt && (
+                  <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">ENVIADO A ALMACÉN</span>
+                )}
               </div>
               <p className="truncate text-xs text-slate-500">
                 Registrado el {formattedDate} por {receipt.receivedBy}
@@ -400,6 +408,9 @@ export function GoodsReceiptDetailModal({
           </button>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            {receipt.status === "COMPLETED" && !receipt.warehouseImportedAt && onImportToWarehouse && (
+              <button type="button" onClick={() => { onClose(); onImportToWarehouse(receipt); }} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#5750f1] px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-[#463ec5]"><PackagePlus className="h-4 w-4" /> Importar a almacén</button>
+            )}
             <button
               type="button"
               onClick={onClose}
