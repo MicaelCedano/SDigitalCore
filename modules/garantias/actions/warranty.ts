@@ -374,7 +374,7 @@ const flowRules: Record<FlowOperation, {
   needsReason: boolean;
 }> = {
   assign: { toStatus: "IN_REPAIR", allowed: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], documentType: "TECHNICIAN_ASSIGNMENT", eventType: "ASSIGNED_TO_TECHNICIAN", needsCounterparty: true, needsReason: false },
-  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: true },
+  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: false },
   "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: false },
   "send-supplier": { toStatus: "SENT_TO_SUPPLIER", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"], documentType: "SUPPLIER_SHIPMENT", eventType: "SENT_TO_SUPPLIER", needsCounterparty: true, needsReason: false },
   "receive-supplier": { toStatus: "RECEIVED_FROM_SUPPLIER", allowed: ["SENT_TO_SUPPLIER"], documentType: "SUPPLIER_RECEIPT", eventType: "RECEIVED_FROM_SUPPLIER", needsCounterparty: true, needsReason: true },
