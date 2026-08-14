@@ -46,7 +46,6 @@ export default async function EquiposRevisadosPage({
   const where: Prisma.QcInspectionWhereInput = {
     status: "COMPLETED",
     reviewedAt: { not: null },
-    ...(result ? { result } : {}),
     ...(query
       ? {
           OR: [
@@ -60,50 +59,62 @@ export default async function EquiposRevisadosPage({
       : {}),
   };
 
-  const [total, inspections, resultStats, reviewedToday] = await Promise.all([
-    prisma.qcInspection.count({ where }),
-    prisma.qcInspection.findMany({
-      where,
-      orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        result: true,
-        grade: true,
-        batteryHealth: true,
-        functionalityNotes: true,
-        physicalNotes: true,
-        reviewedAt: true,
-        createdAt: true,
-        reviewerNameSnapshot: true,
-        reviewerId: true,
-        reviewer: { select: { id: true, name: true, username: true } },
-        device: {
-          select: {
-            id: true,
-            imei: true,
-            serialNumber: true,
-            brand: true,
-            model: true,
-            storageGb: true,
-            color: true,
-            status: true,
-            batch: { select: { batchNumber: true, supplierName: true, status: true } },
-          },
+  // Hay varias inspecciones históricas por equipo cuando se corrige o se
+  // reingresa. El listado principal representa equipos, por lo que primero
+  // conservamos solo la inspección más reciente de cada DeviceUnit.
+  const allInspections = await prisma.qcInspection.findMany({
+    where,
+    orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    select: {
+      id: true,
+      deviceId: true,
+      result: true,
+      grade: true,
+      batteryHealth: true,
+      functionalityNotes: true,
+      physicalNotes: true,
+      reviewedAt: true,
+      createdAt: true,
+      reviewerNameSnapshot: true,
+      reviewerId: true,
+      reviewer: { select: { id: true, name: true, username: true } },
+      device: {
+        select: {
+          id: true,
+          imei: true,
+          serialNumber: true,
+          brand: true,
+          model: true,
+          storageGb: true,
+          color: true,
+          status: true,
+          batch: { select: { batchNumber: true, supplierName: true, status: true } },
         },
       },
-    }),
-    // Un solo groupBy para las tres estadísticas de resultado (antes eran 3 counts).
-    prisma.qcInspection.groupBy({
-      by: ["result"],
-      where: { status: "COMPLETED" },
-      _count: { _all: true },
-    }),
-    prisma.qcInspection.count({ where: { status: "COMPLETED", reviewedAt: { gte: today.start, lt: today.end } } }),
-  ]);
+    },
+  });
 
-  const byResult = new Map(resultStats.map((r) => [r.result, r._count._all]));
+  const latestByDevice = new Map<string, (typeof allInspections)[number]>();
+  for (const inspection of allInspections) {
+    if (!latestByDevice.has(inspection.deviceId)) latestByDevice.set(inspection.deviceId, inspection);
+  }
+
+  const latestInspections = Array.from(latestByDevice.values());
+  const filteredInspections = result ? latestInspections.filter((inspection) => inspection.result === result) : latestInspections;
+  const total = filteredInspections.length;
+  const inspections = filteredInspections.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const resultStats = new Map<string | null, number>();
+  for (const inspection of latestInspections) {
+    resultStats.set(inspection.result, (resultStats.get(inspection.result) ?? 0) + 1);
+  }
+  const todayStart = today.start.getTime();
+  const todayEnd = today.end.getTime();
+  const reviewedToday = latestInspections.filter((inspection) => {
+    const reviewedAt = inspection.reviewedAt?.getTime();
+    return reviewedAt !== undefined && reviewedAt >= todayStart && reviewedAt < todayEnd;
+  }).length;
+
+  const byResult = resultStats;
   const functional = byResult.get("FUNCTIONAL") ?? 0;
   const nonFunctional = byResult.get("NON_FUNCTIONAL") ?? 0;
   const unspecified = byResult.get("UNSPECIFIED") ?? 0;
