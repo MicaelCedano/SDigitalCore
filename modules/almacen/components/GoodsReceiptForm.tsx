@@ -41,7 +41,7 @@ const emptyColorVariant = {
   quantity: 1,
   unitPrice: undefined,
   imeis: "",
-  withoutIdentifier: true,
+  withoutIdentifier: false,
 };
 
 const emptyItem = {
