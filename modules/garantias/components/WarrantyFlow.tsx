@@ -116,6 +116,12 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
     setConfirmOpen(true);
   }
 
+  function closeDocument() {
+    setDocument(null);
+    window.dispatchEvent(new Event("warranty-data-changed"));
+    router.refresh();
+  }
+
   async function submit() {
     setConfirmOpen(false); setBusy(true); setMessage("");
     const input = { caseCodes: selected, counterpartyName: counterparty, reason, caseObservations: operation === "receiveTech" && !repaired ? caseObservations : undefined };
@@ -131,15 +137,22 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
       setScanInput("");
       setScanMessage("");
     }
-    window.dispatchEvent(new Event("warranty-data-changed"));
-    router.refresh();
     const documentCode = (result.data as { documentCode?: string }).documentCode;
-    if (!documentCode) return setMessage("Operación completada.");
+    if (!documentCode) {
+      window.dispatchEvent(new Event("warranty-data-changed"));
+      router.refresh();
+      return setMessage("Operación completada.");
+    }
     setLoadingDocument(true);
     const documentResult = await getWarrantyDocument(documentCode);
     setLoadingDocument(false);
-    if (documentResult.success) setDocument(documentResult.data as Document);
-    else setMessage(`Operación completada. Documento ${documentCode}.`);
+    if (documentResult.success) {
+      setDocument(documentResult.data as Document);
+    } else {
+      window.dispatchEvent(new Event("warranty-data-changed"));
+      router.refresh();
+      setMessage(`Operación completada. Documento ${documentCode}.`);
+    }
   }
 
   function toggleAll() { setSelected(allVisibleSelected ? selected.filter((code) => !visibleCases.some((item) => item.caseCode === code)) : [...new Set([...selected, ...visibleCases.map((item) => item.caseCode)])]); }
@@ -210,6 +223,6 @@ export function WarrantyFlow({ operation, cases, embedded = false, defaultCounte
       )}
     </section>
     {confirmOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#5750f1]">Revisión antes de confirmar</p><h2 className="mt-2 text-xl font-black text-slate-800">¿Confirmar {title.toLowerCase()}?</h2></div><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar"><X size={19} /></button></div><div className="mt-5 rounded-xl border border-[#5750f1]/20 bg-[#5750f1]/10 p-4 text-sm text-slate-700"><p><strong>{selected.length}</strong> equipo(s) seleccionado(s)</p>{operation !== "credit" && <p className="mt-1">{label}: <strong>{counterparty}</strong></p>}{needsReason && <p className="mt-1">{reasonLabel}: <strong>{reason}</strong></p>}</div><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Volver</button><button type="button" onClick={submit} disabled={busy} className="rounded-xl bg-[#5750f1] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#463ec5] disabled:opacity-50">Confirmar y generar documento</button></div></div></div>}
-    {document && <WarrantyDocumentPreviewModal document={document} onClose={() => setDocument(null)} />}
+    {document && <WarrantyDocumentPreviewModal document={document} onClose={closeDocument} />}
   </>;
 }
