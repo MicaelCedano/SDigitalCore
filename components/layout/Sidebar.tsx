@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  BriefcaseBusiness,
   FileText,
   LayoutDashboard,
   Settings,
@@ -39,6 +40,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", moduleKey: "dashboard", icon: LayoutDashboard, section: "Inicio" },
+  { label: "Centro de trabajo", href: "/centro-trabajo", moduleKey: "work-center", icon: BriefcaseBusiness, section: "Inicio" },
   { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse, section: "Operaciones", children: [
     { label: "Productos", href: "/almacen" },
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
@@ -110,7 +112,7 @@ export function Sidebar({
 
   const allowedModuleSet = allowedModules ? new Set(allowedModules) : null;
   const visibleItems = navItems.filter((item) =>
-    item.moduleKey === "dashboard" || allowedModuleSet === null || allowedModuleSet.has(item.moduleKey),
+    item.moduleKey === "dashboard" || item.moduleKey === "work-center" || allowedModuleSet === null || allowedModuleSet.has(item.moduleKey),
   );
   const sections = ["Inicio", "Operaciones", "Comercial", "Administración"] as const;
 

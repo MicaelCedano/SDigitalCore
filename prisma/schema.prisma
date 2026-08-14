@@ -60,6 +60,10 @@ model User {
   unlockRecordsCreated UnlockRecord[] @relation("UnlockRecordTechnician")
   unlockRecordsApproved UnlockRecord[] @relation("UnlockRecordAdmin")
 
+  workTasksCreated WorkTask[] @relation("WorkTaskCreator")
+  workTasksAssigned WorkTask[] @relation("WorkTaskAssignee")
+  workTaskEvents WorkTaskEvent[]
+
   @@map("user")
 }
 
@@ -98,6 +102,88 @@ model AccessRequest {
   updatedAt     DateTime            @updatedAt @map("updated_at")
 
   @@map("access_request")
+}
+
+enum WorkTaskKind {
+  MANUAL
+  AUTOMATIC
+}
+
+enum WorkTaskStatus {
+  PENDING
+  IN_PROGRESS
+  IN_REVIEW
+  WAITING
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WorkTaskEventType {
+  CREATED
+  STATUS_CHANGED
+  ASSIGNED
+  PRIORITY_CHANGED
+  DUE_DATE_CHANGED
+  COMMENTED
+  PROGRESS_UPDATED
+  COMPLETED
+}
+
+model WorkTask {
+  id             String          @id @default(cuid())
+  title          String
+  description    String?         @db.Text
+  kind           WorkTaskKind    @default(MANUAL)
+  status         WorkTaskStatus  @default(PENDING)
+  priority       WorkTaskPriority @default(NORMAL)
+  sourceModule   String          @map("source_module")
+  sourceType     String?         @map("source_type")
+  sourceId       String?         @map("source_id")
+  sourceCode     String?         @map("source_code")
+  sourceUrl      String?         @map("source_url")
+  creatorId      String          @map("creator_id")
+  assigneeId     String?         @map("assignee_id")
+  dueAt          DateTime?       @map("due_at")
+  completedAt    DateTime?       @map("completed_at")
+  progressDone   Int             @default(0) @map("progress_done")
+  progressTotal  Int?            @map("progress_total")
+  recurrenceRule String?         @map("recurrence_rule")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  creator  User           @relation("WorkTaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  assignee User?          @relation("WorkTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  events   WorkTaskEvent[]
+
+  @@index([assigneeId, status, dueAt])
+  @@index([sourceModule, status, dueAt])
+  @@index([creatorId, createdAt])
+  @@map("work_task")
+}
+
+model WorkTaskEvent {
+  id        String          @id @default(cuid())
+  taskId    String          @map("task_id")
+  actorId   String?         @map("actor_id")
+  type      WorkTaskEventType
+  note      String?         @db.Text
+  beforeData Json?          @map("before_data")
+  afterData  Json?          @map("after_data")
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  task  WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("work_task_event")
 }
 
 model Account {
