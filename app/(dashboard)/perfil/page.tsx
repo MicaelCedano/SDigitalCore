@@ -78,18 +78,43 @@ export default function PerfilPage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   // Handle Photo Upload
-  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      setAvatarUrl(base64);
-      setNotice("Vista previa lista. Guarda los cambios para actualizar la foto.");
-      setTimeout(() => setNotice(null), 3000);
-    };
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith("image/")) {
+      setNotice("Selecciona un archivo de imagen válido.");
+      return;
+    }
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxDimension = 640;
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("No se pudo preparar la imagen.");
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((result) => result ? resolve(result) : reject(new Error("No se pudo comprimir la imagen.")), "image/jpeg", 0.82);
+      });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setAvatarUrl(base64);
+        setNotice("Foto preparada. Guarda los cambios para actualizarla.");
+        setTimeout(() => setNotice(null), 3000);
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      setNotice("No se pudo procesar esa foto. Prueba con JPG, PNG o WEBP.");
+    } finally {
+      e.target.value = "";
+    }
   }
 
   function handleRemovePhoto() {

@@ -23,6 +23,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 import {
   UserCheck,
   Users,
@@ -364,9 +365,7 @@ export default function ConfiguracionPage() {
                 <Card key={u.id} className="border-slate-200/80 bg-white overflow-hidden shadow-2xs">
                   <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                        {u.name.substring(0, 2).toUpperCase()}
-                      </div>
+                      <UserAvatar name={u.name} email={u.email} src={u.avatarUrl} />
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-bold text-slate-900">{u.name}</h3>

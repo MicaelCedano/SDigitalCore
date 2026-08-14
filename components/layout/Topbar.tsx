@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User, Wallet } from "lucide-react";
 import { GlobalImeiSearch } from "@/components/layout/GlobalImeiSearch";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 export interface TopbarNotification {
   id: string;
@@ -49,10 +49,6 @@ const pageTitles: Record<string, string> = {
 function getPageTitle(pathname: string) {
   const match = Object.entries(pageTitles).find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
   return match?.[1] ?? "Señal Digital";
-}
-
-function getInitials(name?: string | null) {
-  return name?.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
 }
 
 function formatNotificationDate(value: string) {
@@ -211,9 +207,7 @@ export function Topbar({ userName, userEmail, userRole, userAvatarUrl, walletBal
             aria-expanded={dropdownOpen}
             aria-haspopup="menu"
           >
-            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#eef2ff] text-xs font-bold text-[#4338ca]">
-              {userAvatarUrl ? <Image src={userAvatarUrl} alt="" fill className="object-cover" /> : getInitials(userName)}
-            </span>
+            <UserAvatar name={userName} email={userEmail} src={userAvatarUrl} className="h-9 w-9 bg-[#eef2ff] text-[#4338ca]" />
             <span className="hidden min-w-0 sm:block">
               <span className="block max-w-36 truncate text-[13px] font-semibold text-[#101828]">{userName ?? "Usuario"}</span>
               <span className="block text-[11px] capitalize text-[#667085]">{userRole?.toLowerCase() ?? "Administrador"}</span>

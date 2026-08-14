@@ -74,6 +74,7 @@ export async function updateProfileAction(input: ProfileInput) {
     revalidatePath("/precios");
     return { success: true, data: user, requiresRelogin: user.email !== sessionUser.email };
   } catch (error) {
+    if (error instanceof z.ZodError) return { success: false, error: error.issues[0]?.message ?? "Los datos del perfil no son válidos." };
     return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el perfil" };
   }
 }

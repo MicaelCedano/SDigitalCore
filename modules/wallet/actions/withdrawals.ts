@@ -115,6 +115,8 @@ export async function getPendingWithdrawalsAction(): Promise<Result<{
     secureToken: string;
     technicianName: string;
     technicianUsername: string;
+    technicianEmail: string;
+    technicianImage: string | null;
     accountName: string;
     occurredAt: string;
   }>;
@@ -135,7 +137,7 @@ export async function getPendingWithdrawalsAction(): Promise<Result<{
         description: { contains: "Retiro de efectivo" },
       },
       include: {
-        actor: { select: { name: true, username: true } },
+        actor: { select: { name: true, username: true, email: true, image: true } },
         account: { select: { name: true } },
       },
       orderBy: { occurredAt: "desc" },
@@ -150,6 +152,8 @@ export async function getPendingWithdrawalsAction(): Promise<Result<{
         secureToken: entry.secureToken ?? "",
         technicianName: entry.actor?.name ?? "Usuario",
         technicianUsername: entry.actor?.username ?? "",
+        technicianEmail: entry.actor?.email ?? "",
+        technicianImage: entry.actor?.image ?? null,
         accountName: entry.account.name,
         occurredAt: entry.occurredAt.toISOString(),
       })),

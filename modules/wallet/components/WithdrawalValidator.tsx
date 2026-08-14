@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck, CheckCircle2, XCircle, Clock, RefreshCw } from "lucide-react";
 import { getPendingWithdrawalsAction, redeemWithdrawalAction, cancelWithdrawalAction } from "@/modules/wallet/actions/withdrawals";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 interface PendingWithdrawal {
   id: string;
@@ -12,6 +13,8 @@ interface PendingWithdrawal {
   secureToken: string;
   technicianName: string;
   technicianUsername: string;
+  technicianEmail: string;
+  technicianImage: string | null;
   accountName: string;
   occurredAt: string;
 }
@@ -111,9 +114,7 @@ export function WithdrawalValidator() {
               <article key={item.id} className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-black text-white">
-                      {(item.technicianName || item.technicianUsername).substring(0, 2).toUpperCase()}
-                    </span>
+                    <UserAvatar name={item.technicianName} email={item.technicianEmail} src={item.technicianImage} className="h-10 w-10 rounded-xl bg-indigo-600" textClassName="text-sm" />
                     <div>
                       <p className="text-sm font-bold text-slate-900">{item.technicianName} {item.technicianUsername ? `@${item.technicianUsername}` : ""}</p>
                       <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{item.accountName} · {date(item.occurredAt)}</p>
