@@ -50,9 +50,8 @@ export function GoodsReceiptsList() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchReceipts();
-    }, 300);
+    const hasFilter = searchQuery.length > 0 || statusFilter !== "ALL";
+    const timer = setTimeout(() => void fetchReceipts(), hasFilter ? 300 : 0);
     return () => clearTimeout(timer);
   }, [searchQuery, statusFilter]);
 
@@ -413,3 +412,4 @@ export function GoodsReceiptsList() {
     </div>
   );
 }
+

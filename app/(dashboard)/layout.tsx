@@ -8,24 +8,27 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireUser();
-  const persistedUser = await getPersistedCurrentUser();
+  const [user, persistedUser] = await Promise.all([
+    requireUser(),
+    getPersistedCurrentUser(),
+  ]);
   const allowedModules = persistedUser?.roleCode === "ADMIN" ? undefined : persistedUser?.allowedModules ?? [];
-  const notificationCounts = persistedUser?.roleCode === "ADMIN" && persistedUser.status === "ACTIVE"
-    ? await getAdminNotificationCounts()
-    : null;
-
-  // Balance de wallet para mostrarlo en el perfil (solo si el usuario tiene wallet)
-  let walletBalance: string | null = null;
-  try {
-    const wallet = await prisma.wallet.findUnique({
-      where: { userId: user.id },
-      select: { balance: true },
-    });
-    if (wallet) walletBalance = wallet.balance.toFixed(2);
-  } catch {
-    walletBalance = null;
-  }
+  const [notificationCounts, walletBalance] = await Promise.all([
+    persistedUser?.roleCode === "ADMIN" && persistedUser.status === "ACTIVE"
+      ? getAdminNotificationCounts()
+      : Promise.resolve(null),
+    (async () => {
+      try {
+        const wallet = await prisma.wallet.findUnique({
+          where: { userId: user.id },
+          select: { balance: true },
+        });
+        return wallet ? wallet.balance.toFixed(2) : null;
+      } catch {
+        return null;
+      }
+    })(),
+  ]);
 
   return (
     <DashboardLayoutClient
@@ -41,3 +44,4 @@ export default async function DashboardLayout({
     </DashboardLayoutClient>
   );
 }
+
