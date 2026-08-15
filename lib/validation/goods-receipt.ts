@@ -2,9 +2,12 @@ import { z } from "zod";
 
 export const colorVariantSchema = z.object({
   id: z.string().optional(),
+  brand: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
+  capacity: z.string().optional().nullable(),
   color: z.preprocess(
-    (val) => (typeof val === "string" && val.trim() === "" ? "General" : val),
-    z.string().optional().nullable().default("General")
+    (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+    z.string().trim().optional().nullable()
   ),
   quantity: z.number().int().min(1, "La cantidad debe ser al menos 1").default(1),
   unitPrice: z.number().min(0).optional().nullable(),
@@ -13,7 +16,12 @@ export const colorVariantSchema = z.object({
 
 export const goodsReceiptItemSchema = z.object({
   code: z.string().optional().nullable(),
-  description: z.string().min(1, "La descripción del producto es requerida"),
+  // Legacy receipts used this field as the product identity. New receipts keep
+  // it for observations/compatibility and persist identity in colorVariants.
+  description: z.string().optional().nullable().default(""),
+  model: z.string().optional().nullable(),
+  brand: z.string().optional().nullable(),
+  capacity: z.string().optional().nullable(),
   quantity: z.number().int().min(1, "La cantidad debe ser al menos 1"),
   unitPrice: z.number().min(0).optional().nullable(),
   condition: z.string().optional().nullable().default("Nuevo"),
@@ -41,7 +49,7 @@ export const goodsReceiptWarehouseImportLineSchema = z.object({
   name: z.string().trim().min(1, "El modelo es requerido"),
   brand: z.string().trim().optional().default(""),
   capacity: z.string().trim().optional().default(""),
-  color: z.string().trim().min(1).default("General"),
+  color: z.string().trim().optional().nullable(),
   quantity: z.number().int().min(1, "La cantidad debe venir del recibo"),
   unitsPerBox: z.number().int().min(1, "Indica cuántas unidades trae una caja"),
 });
@@ -52,3 +60,4 @@ export const goodsReceiptWarehouseImportSchema = z.object({
 });
 
 export type GoodsReceiptWarehouseImportInput = z.infer<typeof goodsReceiptWarehouseImportSchema>;
+

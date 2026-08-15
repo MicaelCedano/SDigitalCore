@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   saveGoodsReceiptAction,
   getCatalogModelsAction,
+  getGoodsReceiptSuggestionsAction,
 } from "../actions/goods-receipt";
 import { getBranchesAction } from "@/modules/configuracion/actions/branch";
 import { GoodsReceiptInput } from "@/lib/validation/goods-receipt";
@@ -46,6 +47,9 @@ const emptyColorVariant = {
 
 const emptyItem = {
   code: "",
+  brand: "",
+  model: "",
+  capacity: "",
   description: "",
   quantity: 1,
   unitPrice: undefined,
@@ -73,6 +77,12 @@ export function GoodsReceiptForm({
     initialData?.items && initialData.items.length > 0
       ? initialData.items.map((item: any) => ({
           ...item,
+          model: item.model || item.colorVariants?.[0]?.model || item.description || "",
+          brand: item.brand || item.colorVariants?.[0]?.brand || "",
+          capacity: item.capacity || item.colorVariants?.[0]?.capacity || "",
+          // A legacy receipt used description as its identity. Keep it visible
+          // as model while leaving the new observations field separate.
+          description: item.model || item.colorVariants?.[0]?.model ? item.description || "" : "",
           colorVariants:
             item.colorVariants && item.colorVariants.length > 0
               ? item.colorVariants.map((variant: any) => ({
@@ -92,6 +102,8 @@ export function GoodsReceiptForm({
 
   // Sugerencias de autocompletado para modelos
   const [catalogSuggestions, setCatalogSuggestions] = useState<string[]>([]);
+  const [supplierSuggestions, setSupplierSuggestions] = useState<string[]>([]);
+  const [colorSuggestions, setColorSuggestions] = useState<string[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
 
   // Lista de sucursales dinámicas desde BD
@@ -106,6 +118,14 @@ export function GoodsReceiptForm({
       }
     }
     loadBranches();
+  }, []);
+
+  useEffect(() => {
+    void getGoodsReceiptSuggestionsAction().then((res) => {
+      if (!res.success) return;
+      setSupplierSuggestions(res.data.suppliers);
+      setColorSuggestions(res.data.colors);
+    });
   }, []);
 
   // Estado para colapsar / desplegar modelos individualmente
@@ -129,11 +149,11 @@ export function GoodsReceiptForm({
 
   // Cargar catálogo de sugerencias al escribir
   const handleDescriptionChange = async (index: number, val: string) => {
-    handleItemChange(index, "description", val);
+    handleItemChange(index, "model", val);
     setActiveSuggestionIndex(index);
 
     if (val.trim().length >= 1) {
-      const res = await getCatalogModelsAction(val);
+      const res = await getCatalogModelsAction(val, items[index]?.brand);
       if (res.success && res.data) {
         setCatalogSuggestions(res.data);
       }
@@ -181,6 +201,10 @@ export function GoodsReceiptForm({
         setItems(
           savedDraftData.items.map((i: any) => ({
             ...i,
+            model: i.model || i.colorVariants?.[0]?.model || i.description || "",
+            brand: i.brand || i.colorVariants?.[0]?.brand || "",
+            capacity: i.capacity || i.colorVariants?.[0]?.capacity || "",
+            description: i.model || i.colorVariants?.[0]?.model ? i.description || "" : "",
             colorVariants:
               i.colorVariants && i.colorVariants.length > 0
                 ? i.colorVariants.map((variant: any) => ({
@@ -313,9 +337,9 @@ export function GoodsReceiptForm({
       return;
     }
 
-    const invalidItem = items.find((i) => !i.description || !i.description.trim());
+    const invalidItem = items.find((i) => !i.model || !i.model.trim());
     if (invalidItem) {
-      setErrorMessage("Todos los ítems deben tener un Modelo / Descripción");
+      setErrorMessage("Todos los ítems deben tener un Modelo");
       return;
     }
 
@@ -343,7 +367,10 @@ export function GoodsReceiptForm({
 
           return {
             code: i.code ? String(i.code).trim() : null,
-            description: String(i.description).trim(),
+            brand: i.brand ? String(i.brand).trim() : null,
+            model: String(i.model).trim(),
+            capacity: i.capacity ? String(i.capacity).trim() : null,
+            description: i.description ? String(i.description).trim() : null,
             quantity: Math.max(1, totalQty || Number(i.quantity) || 1),
             unitPrice: null,
             condition: i.condition || "Nuevo",
@@ -351,7 +378,10 @@ export function GoodsReceiptForm({
             colorVariants: (i.colorVariants || []).map((v: any) => {
               const vImeiCount = countValidImeis(v.imeis);
               return {
-                color: v.color && v.color.trim() ? v.color.trim() : "General",
+                brand: i.brand ? String(i.brand).trim() : null,
+                model: String(i.model).trim(),
+                capacity: i.capacity ? String(i.capacity).trim() : null,
+                color: v.color && v.color.trim() ? v.color.trim() : null,
                 quantity: vImeiCount > 0 ? vImeiCount : Number(v.quantity) || 1,
                 unitPrice: null,
                 imeis: v.imeis || null,
@@ -495,8 +525,12 @@ export function GoodsReceiptForm({
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
                 placeholder="Ej. Distribuidora Celulares RD"
+                list="receipt-supplier-suggestions"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 transition-colors"
               />
+              <datalist id="receipt-supplier-suggestions">
+                {supplierSuggestions.map((supplier) => <option key={supplier} value={supplier} />)}
+              </datalist>
             </div>
 
             <div>
@@ -612,7 +646,7 @@ export function GoodsReceiptForm({
                         </span>
 
                         <span className="text-xs font-bold text-slate-800">
-                          {item.description ? item.description : <span className="text-slate-400 italic">Escribir nombre del modelo...</span>}
+                          {item.model ? `${item.brand ? `${item.brand} ` : ""}${item.model}${item.capacity ? ` ${item.capacity}` : ""}` : <span className="text-slate-400 italic">Escribir marca y modelo...</span>}
                         </span>
 
                         <div className="flex items-center gap-2 text-[11px] text-slate-500">
@@ -664,20 +698,31 @@ export function GoodsReceiptForm({
                         />
                       </div>
 
-                      {/* Autocomplete Model Description Input */}
-                      <div className="md:col-span-2 relative">
+                      <div className="relative">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Marca <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          value={item.brand || ""}
+                          onChange={(e) => handleItemChange(itemIdx, "brand", e.target.value)}
+                          placeholder="Ej. Samsung"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                        />
+                      </div>
+
+                      {/* Autocomplete Model Input */}
+                      <div className="relative">
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
-                          <span>Modelo / Descripción <span className="text-red-500">*</span></span>
+                          <span>Modelo <span className="text-red-500">*</span></span>
                           <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
                             <Sparkles className="w-3 h-3" /> Auto-guarda en catálogo
                           </span>
                         </label>
                         <input
                           type="text"
-                          value={item.description || ""}
+                          value={item.model || ""}
                           onChange={(e) => handleDescriptionChange(itemIdx, e.target.value)}
                           onFocus={() => setActiveSuggestionIndex(itemIdx)}
-                          placeholder="Ej. iPhone 15 Pro Max 256GB"
+                          placeholder="Ej. iPhone 15 Pro Max"
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
                         />
 
@@ -697,6 +742,28 @@ export function GoodsReceiptForm({
                             ))}
                           </div>
                         )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Capacidad</label>
+                        <input
+                          type="text"
+                          value={item.capacity || ""}
+                          onChange={(e) => handleItemChange(itemIdx, "capacity", e.target.value)}
+                          placeholder="Ej. 8+256GB"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Descripción / compatibilidad</label>
+                        <input
+                          type="text"
+                          value={item.description || ""}
+                          onChange={(e) => handleItemChange(itemIdx, "description", e.target.value)}
+                          placeholder="Observaciones opcionales"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
+                        />
                       </div>
 
                       <div>
@@ -760,12 +827,16 @@ export function GoodsReceiptForm({
                                 <input
                                   type="text"
                                   value={v.color || ""}
+                                  list={`receipt-color-suggestions-${itemIdx}-${vIdx}`}
                                   onChange={(e) =>
                                     handleColorVariantChange(itemIdx, vIdx, "color", e.target.value)
                                   }
                                   placeholder="Ej. Azul Titania (ó General)"
                                   className="w-full bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
                                 />
+                                <datalist id={`receipt-color-suggestions-${itemIdx}-${vIdx}`}>
+                                  {colorSuggestions.map((color) => <option key={color} value={color} />)}
+                                </datalist>
                               </div>
 
                               <label className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] font-semibold text-amber-800 sm:col-span-2">
@@ -898,3 +969,4 @@ export function GoodsReceiptForm({
     </div>
   );
 }
+

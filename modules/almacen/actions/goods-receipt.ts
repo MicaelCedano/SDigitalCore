@@ -18,17 +18,32 @@ import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 /**
  * Auto-guarda nombres de modelos en el catálogo para autocompletado posterior
  */
-async function autoIndexCatalogModels(descriptions: string[]) {
-  try {
-    for (const desc of descriptions) {
-      const cleanName = desc.trim();
-      if (!cleanName) continue;
+function normalizeReceiptText(value: string | null | undefined) {
+  return (value || "").replace(/\s+/g, " ").trim();
+}
 
-      await prisma.catalogModel.upsert({
-        where: { name: cleanName },
-        update: {},
-        create: { name: cleanName },
+function normalizedKey(value: string | null | undefined) {
+  return normalizeReceiptText(value).toLocaleLowerCase("es");
+}
+
+async function autoIndexCatalogModels(models: string[]) {
+  try {
+    const seen = new Set<string>();
+    for (const model of models) {
+      const cleanName = normalizeReceiptText(model);
+      const key = normalizedKey(cleanName);
+      if (!cleanName || seen.has(key)) continue;
+      seen.add(key);
+      const existing = await prisma.catalogModel.findFirst({
+        where: { name: { equals: cleanName, mode: "insensitive" } },
+        select: { id: true },
       });
+      if (existing) continue;
+      try {
+        await prisma.catalogModel.create({ data: { name: cleanName } });
+      } catch (error: any) {
+        if (error?.code !== "P2002") throw error;
+      }
     }
   } catch (err) {
     console.warn("Error al indexar modelos en catálogo:", err);
@@ -38,7 +53,7 @@ async function autoIndexCatalogModels(descriptions: string[]) {
 /**
  * Obtiene sugerencias de modelos guardados para autocompletado
  */
-export async function getCatalogModelsAction(search?: string) {
+export async function getCatalogModelsAction(search?: string, brand?: string) {
   try {
     await requirePermission("warehouse.read");
     const where = search && search.trim() !== ""
@@ -51,7 +66,24 @@ export async function getCatalogModelsAction(search?: string) {
       take: 20,
     });
 
-    return { success: true, data: models.map((m) => m.name) };
+    if (!brand?.trim()) return { success: true, data: models.map((m) => m.name) };
+
+    const receipts = await prisma.goodsReceipt.findMany({
+      select: { items: { select: { description: true, colorVariants: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    });
+    const brandKey = normalizedKey(brand);
+    const brandModels = new Set<string>();
+    for (const receipt of receipts) {
+      for (const item of receipt.items) {
+        const variant = Array.isArray(item.colorVariants) ? item.colorVariants[0] as Record<string, unknown> | undefined : undefined;
+        const itemBrand = typeof variant?.brand === "string" ? variant.brand : "";
+        const itemModel = typeof variant?.model === "string" ? variant.model : item.description;
+        if (normalizedKey(itemBrand) === brandKey && normalizeReceiptText(itemModel)) brandModels.add(normalizeReceiptText(itemModel));
+      }
+    }
+    return { success: true, data: models.map((m) => m.name).filter((name) => brandModels.size === 0 || brandModels.has(normalizeReceiptText(name))) };
   } catch (err) {
     return { success: false, data: [] };
   }
@@ -70,8 +102,33 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
     const receivedBy = user.name || user.email || user.id;
 
     // Auto-indexar los modelos registrados para sugerencias futuras
-    const modelNames = validated.items.map((i) => i.description);
+    const modelNames = validated.items.map((i) => normalizeReceiptText(i.model || i.description));
     await autoIndexCatalogModels(modelNames);
+
+    const persistItem = (item: GoodsReceiptInput["items"][number]) => {
+      const model = normalizeReceiptText(item.model || item.description);
+      const brand = normalizeReceiptText(item.brand);
+      const capacity = normalizeReceiptText(item.capacity);
+      return {
+        code: normalizeReceiptText(item.code) || null,
+        // Keep the legacy column for observations, while older records still
+        // use it as the model and remain importable through the fallback.
+        description: normalizeReceiptText(item.description),
+        quantity: item.quantity,
+        unitPrice: item.unitPrice ?? null,
+        condition: item.condition || "Nuevo",
+        imeiOrSerial: normalizeReceiptText(item.imeiOrSerial) || null,
+        colorVariants: item.colorVariants?.map((variant) => ({
+          ...variant,
+          brand: brand || null,
+          model: model || null,
+          capacity: capacity || null,
+          color: normalizeReceiptText(variant.color) || null,
+          imeis: normalizeReceiptText(variant.imeis) || null,
+        })) as any ?? null,
+        notes: normalizeReceiptText(item.notes) || null,
+      };
+    };
 
     // Si ya tiene ID, actualizamos
     if (validated.id) {
@@ -96,18 +153,7 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
               receivedBy: receivedBy,
               status: validated.status,
               notes: validated.notes,
-              items: {
-                create: validated.items.map((item) => ({
-                  code: item.code || null,
-                  description: item.description,
-                  quantity: item.quantity,
-                  unitPrice: item.unitPrice ?? null,
-                  condition: item.condition || "Nuevo",
-                  imeiOrSerial: item.imeiOrSerial || null,
-                  colorVariants: item.colorVariants ? (item.colorVariants as any) : null,
-                  notes: item.notes || null,
-                })),
-              },
+              items: { create: validated.items.map(persistItem) },
             },
             include: {
               items: true,
@@ -133,18 +179,7 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
         receivedBy: receivedBy,
         status: validated.status,
         notes: validated.notes,
-        items: {
-          create: validated.items.map((item) => ({
-            code: item.code || null,
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice ?? null,
-            condition: item.condition || "Nuevo",
-            imeiOrSerial: item.imeiOrSerial || null,
-            colorVariants: item.colorVariants ? (item.colorVariants as any) : null,
-            notes: item.notes || null,
-          })),
-        },
+        items: { create: validated.items.map(persistItem) },
       },
       include: { items: true },
       });
@@ -237,6 +272,48 @@ export async function getGoodsReceiptByIdAction(id: string) {
   }
 }
 
+export async function getGoodsReceiptSuggestionsAction(brand?: string) {
+  try {
+    await requirePermission("warehouse.read");
+    const receipts = await prisma.goodsReceipt.findMany({
+      select: { supplierName: true, items: { select: { description: true, colorVariants: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    });
+    const suppliers = new Map<string, string>();
+    const colors = new Map<string, string>();
+    const models = new Map<string, { model: string; brand: string; capacity: string }>();
+    const brandKey = normalizedKey(brand);
+    for (const receipt of receipts) {
+      const supplier = normalizeReceiptText(receipt.supplierName);
+      if (supplier) suppliers.set(normalizedKey(supplier), supplier);
+      for (const item of receipt.items) {
+        const variants = Array.isArray(item.colorVariants) ? item.colorVariants : [];
+        for (const rawVariant of variants) {
+          const variant = rawVariant as Record<string, unknown>;
+          const color = normalizeReceiptText(typeof variant.color === "string" ? variant.color : "");
+          if (color && normalizedKey(color) !== "general") colors.set(normalizedKey(color), color);
+          const model = normalizeReceiptText(typeof variant.model === "string" ? variant.model : item.description);
+          const itemBrand = normalizeReceiptText(typeof variant.brand === "string" ? variant.brand : "");
+          const capacity = normalizeReceiptText(typeof variant.capacity === "string" ? variant.capacity : "");
+          if (model && (!brandKey || normalizedKey(itemBrand) === brandKey)) models.set(`${normalizedKey(itemBrand)}|${normalizedKey(model)}|${normalizedKey(capacity)}`, { model, brand: itemBrand, capacity });
+        }
+      }
+    }
+    return {
+      success: true,
+      data: {
+        suppliers: [...suppliers.values()].sort((a, b) => a.localeCompare(b, "es")),
+        colors: [...colors.values()].sort((a, b) => a.localeCompare(b, "es")),
+        models: [...models.values()].sort((a, b) => a.model.localeCompare(b.model, "es")),
+      },
+    };
+  } catch (error) {
+    console.error("Error al obtener sugerencias de recibos:", error);
+    return { success: false, data: { suppliers: [], colors: [], models: [] } };
+  }
+}
+
 export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWarehouseImportInput) {
   try {
     const actor = await requirePermission("warehouse.write");
@@ -269,8 +346,8 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
         const boxes = Math.floor(line.quantity / unitsPerBox);
         const looseUnits = line.quantity % unitsPerBox;
         const product = existing
-          ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color, boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
-          : await tx.warehouseProduct.create({ data: { code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
+          ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
+          : await tx.warehouseProduct.create({ data: { code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
         await tx.warehouseMovement.create({ data: { productId: product.id, type: "ENTRY", boxesCount: boxes, totalUnits: line.quantity, reason: `Importación recibo ${receipt.receiptNumber}`, createdBy: actor.id } });
         await tx.goodsReceiptItem.update({ where: { id: line.itemId }, data: { code } });
         products.push(product);
@@ -310,3 +387,4 @@ export async function deleteGoodsReceiptAction(id: string) {
     return { success: false, error: "Error al anular el recibo" };
   }
 }
+
