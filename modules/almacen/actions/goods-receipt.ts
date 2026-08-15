@@ -11,6 +11,7 @@ import {
   GoodsReceiptWarehouseImportInput,
 } from "@/lib/validation/goods-receipt";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import type { Prisma } from "@prisma/client";
 
 /**
  * Genera un número de folio correlativo único (Ej: REC-20260807-001)
@@ -41,8 +42,8 @@ async function autoIndexCatalogModels(models: string[]) {
       if (existing) continue;
       try {
         await prisma.catalogModel.create({ data: { name: cleanName } });
-      } catch (error: any) {
-        if (error?.code !== "P2002") throw error;
+      } catch (error) {
+        if (!(typeof error === "object" && error !== null && "code" in error && error.code === "P2002")) throw error;
       }
     }
   } catch (err) {
@@ -84,7 +85,7 @@ export async function getCatalogModelsAction(search?: string, brand?: string) {
       }
     }
     return { success: true, data: models.map((m) => m.name).filter((name) => brandModels.size === 0 || brandModels.has(normalizeReceiptText(name))) };
-  } catch (err) {
+  } catch {
     return { success: false, data: [] };
   }
 }
@@ -125,7 +126,7 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
           capacity: capacity || null,
           color: normalizeReceiptText(variant.color) || null,
           imeis: normalizeReceiptText(variant.imeis) || null,
-        })) as any ?? null,
+        })) as Prisma.InputJsonValue ?? null,
         notes: normalizeReceiptText(item.notes) || null,
       };
     };
