@@ -1,8 +1,8 @@
 # Estado actual del proyecto — SDigitalCore
 
-**Fecha de creación:** 2026-08-07  
-**Fase:** 1 — Base del proyecto y configuración  
-**Estado:** En construcción
+**Fecha de actualización:** 2026-08-15
+**Fase:** Endurecimiento, validación y preparación de release
+**Estado:** En construcción operativa; producción requiere reconciliación de migraciones y QA autenticado
 
 ---
 
@@ -10,11 +10,11 @@
 
 | Tecnología | Versión | Uso |
 |---|---|---|
-| Next.js | 15.x | Framework principal — App Router |
+| Next.js | 16.3.0 | Framework principal — App Router y `proxy.ts` |
 | React | 19.x | UI |
 | TypeScript | 5.x (strict) | Tipado |
 | Tailwind CSS | 4.x | Estilos |
-| Prisma | 6.x | ORM |
+| Prisma | 7.9.1 | ORM y PostgreSQL adapter |
 | PostgreSQL | — | Base de datos (Supabase) |
 | NextAuth/Auth.js | v5 beta | Autenticación |
 | Supabase | — | Storage y DB hosting |
@@ -27,72 +27,75 @@
 
 ```
 app/(auth)/            — Login, recuperar contraseña
-app/(dashboard)/       — Módulos protegidos (12 módulos)
+app/(dashboard)/       — Módulos protegidos operativos
 app/api/auth/          — Route handler NextAuth
 app/page.tsx           — Redirige a /dashboard
 
 components/auth/       — LoginForm
 components/layout/     — Sidebar, Topbar
-components/ui/         — Componentes reutilizables (pendiente)
-components/shared/     — SearchInput, ConfirmDialog (pendiente)
+components/ui/         — Componentes reutilizables
+components/shared/     — Componentes compartidos
 
 lib/auth/              — config.ts (NextAuth), helpers.ts, index.ts
 lib/db/                — Prisma singleton
-lib/audit/             — logAudit() placeholder
+lib/audit/             — logAudit() y trazabilidad de operaciones
 lib/storage/           — Supabase Storage helpers
 lib/validation/        — Schemas Zod
 lib/utils/             — format.ts (fechas, moneda)
-lib/pdf/               — Placeholder Fase 13
+lib/pdf/               — Utilidades de documentos
 
-modules/               — Directorios por módulo (pendiente estructura interna)
-prisma/                — schema.prisma (tablas NextAuth mínimas)
+modules/               — Almacén, garantías, QC, reparaciones, desbloqueos, wallet, precios, facturas y centro de trabajo
+prisma/                — schema.prisma, migraciones Prisma y SQL histórico declarado
 docs/                  — Documentación de arquitectura
 ```
 
 ---
 
-## Tablas existentes (Fase 1 — mínimas para NextAuth)
+## Tablas existentes
 
 | Tabla | Descripción |
 |---|---|
-| `user` | Usuarios del sistema |
+| `user` | Usuarios, roles persistidos y módulos autorizados |
 | `account` | Cuentas OAuth vinculadas |
 | `session` | Sesiones activas |
 | `verification_token` | Tokens de verificación |
+| `warranty_case`, `warranty_event`, `warranty_document` | Flujo nativo de garantías |
+| `device_unit`, `qc_inspection`, `qc_revision_batch` | Compras y control de calidad |
+| `repair_job`, `repair_job_item`, `unlock_request`, `unlock_record` | Reparaciones y desbloqueos |
+| `work_task`, `work_task_event`, `work_task_assignee` | Centro de trabajo global |
 
-> **Nota:** Las tablas centrales de negocio se crean en Fase 2.
+> **Nota:** El schema actual contiene módulos operativos. La aplicación de migraciones en producción debe verificarse contra `_prisma_migrations` y el catálogo real.
 
 ---
 
-## Rutas implementadas
+## Rutas activas principales
 
 | Ruta | Protección | Estado |
 |---|---|---|
 | `/` | — | Redirige a `/dashboard` |
 | `/login` | Pública | ✅ Implementada |
 | `/recuperar-password` | Pública | 🔲 Placeholder |
-| `/dashboard` | Auth requerida | ✅ Implementada |
-| `/inventario` | Auth requerida | 🔲 Placeholder Fase 5 |
-| `/almacen` | Auth requerida | 🔲 Placeholder Fase 6 |
-| `/ventas` | Auth requerida | 🔲 Placeholder Fase 9 |
-| `/taller` | Auth requerida | 🔲 Placeholder Fase 10 |
-| `/rma` | Auth requerida | 🔲 Placeholder Fase 11 |
-| `/qc` | Auth requerida | 🔲 Placeholder Fase 12 |
-| `/clientes` | Auth requerida | 🔲 Placeholder Fase 7 |
-| `/proveedores` | Auth requerida | 🔲 Placeholder Fase 7 |
-| `/precios` | Auth requerida | 🔲 Placeholder Fase 8 |
-| `/facturas` | Auth requerida | 🔲 Placeholder Fase 13 |
-| `/reportes` | Auth requerida | 🔲 Placeholder Fase 14 |
-| `/configuracion` | Auth requerida | 🔲 Placeholder Fase 15 |
+| `/dashboard` | Auth requerida | ✅ Resumen operativo |
+| `/almacen` | Auth + permisos | ✅ Recibos, stock y transferencias |
+| `/garantias` | Auth + permisos | ✅ Ingreso, flujos, documentos e historial |
+| `/qc` | Auth + permisos | ✅ Compras, lotes, revisiones, pagos y solicitudes |
+| `/reparaciones` | Auth + permisos | ✅ Cola paginada y reporte de trabajos |
+| `/desbloqueos` | Auth + permisos | ✅ Solicitudes y pagos |
+| `/wallet` | Auth + permisos | ✅ Wallet y retiros |
+| `/precios` | Auth + permisos | ✅ Lista de precios |
+| `/facturas` | Auth + permisos | ✅ Facturas y conduces |
+| `/centro-trabajo` | Auth + permisos | ✅ Bandeja operativa global |
+| `/configuracion` | Auth + permisos | ✅ Usuarios, sucursales y configuración QC |
+| `/api/search/imei` | Sesión + módulos autorizados | ✅ Búsqueda global paginada |
 | `/api/auth/[...nextauth]` | Pública | ✅ Implementada |
 
 ---
 
-## Autenticación — Fase 1
+## Autenticación y permisos
 
-- **Fase 1:** Usuario de prueba hardcodeado (`admin@sdigital.local` / `Admin1234!`) solo en desarrollo.
-- **Fase 3:** Credenciales reales con hash bcrypt, usuarios en PostgreSQL.
-- **Permisos:** Pendiente Fase 3 — `can()` y `requirePermission()` retornan placeholder.
+- Credenciales reales con hash, usuarios y estado en PostgreSQL.
+- NextAuth/Auth.js v5 usa sesión JWT persistente; la autorización se vuelve a comprobar contra el usuario persistido.
+- Las Server Actions usan `requirePermission(...)`, Zod, transacciones cuando corresponde y `audit_log` para mutaciones importantes.
 
 ---
 
@@ -104,41 +107,32 @@ Ver `.env.example` para la lista completa.
 |---|---|
 | `DATABASE_URL` | Placeholder — configurar con Supabase |
 | `DIRECT_URL` | Placeholder — configurar con Supabase |
-| `AUTH_SECRET` | Placeholder — generar secreto real |
+| `AUTH_SECRET` | Configurar un secreto real por ambiente |
 | `NEXT_PUBLIC_SUPABASE_URL` | Placeholder |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Placeholder |
 | `SUPABASE_SERVICE_ROLE_KEY` | Placeholder |
 
 ---
 
-## Módulos planificados
+## Módulos y estado
 
 | Módulo | Fase | Estado |
 |---|---|---|
-| Base del proyecto | 1 | ✅ En curso |
-| Base central DB | 2 | 🔲 Pendiente |
-| Login y permisos | 3 | 🔲 Pendiente |
-| Catálogos | 4 | 🔲 Pendiente |
-| Inventario | 5 | 🔲 Pendiente |
-| Almacén | 6 | 🔲 Pendiente |
-| Clientes y Proveedores | 7 | 🔲 Pendiente |
-| Lista de Precios | 8 | 🔲 Pendiente |
-| Ventas | 9 | 🔲 Pendiente |
-| Taller | 10 | 🔲 Pendiente |
-| RMA y Garantías | 11 | 🔲 Pendiente |
-| QC | 12 | 🔲 Pendiente |
-| Facturas PDF | 13 | 🔲 Pendiente |
-| Reportes | 14 | 🔲 Pendiente |
-| Configuración | 15 | 🔲 Pendiente |
+| Base del proyecto y autenticación | 1–3 | ✅ Operativa |
+| Almacén y catálogo de precios | 4–8 | ✅ Operativo |
+| Garantías, reparaciones y desbloqueos | 10–11 | ✅ Operativos |
+| QC y pagos | 12 | ✅ Operativo |
+| Facturas, dashboard y centro de trabajo | 13–14 | ✅ Operativos |
+| Configuración y endurecimiento | 15+ | 🟡 En curso |
 
 ---
 
 ## Riesgos identificados
 
-- El `.env.local` tiene placeholders — la app no puede conectar a BD hasta configurar Supabase.
+- La aplicación local requiere `.env.local` y dependencias instaladas para ejecutar checks completos.
 - NextAuth v5 (beta) puede tener cambios de API antes de estable.
-- Las migraciones no se aplican hasta que Micael las revise y ejecute manualmente en Supabase.
-- El schema Prisma de Fase 1 es mínimo — no ejecutar `prisma migrate deploy` en producción.
+- Existen 13 SQL históricos declarados en `prisma/manual-migrations.json`; su estado real debe compararse con `_prisma_migrations` antes de reconciliar o aplicar DDL.
+- No ejecutar `prisma migrate deploy`, `db push` ni SQL manual en producción sin esa verificación.
 
 ---
 

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 
 const searchSchema = z.object({
   q: z.string().trim().regex(/^\d{4,15}$/, "Escribe entre 4 y 15 dígitos."),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  pageSize: z.coerce.number().int().min(5).max(20).default(8),
 });
 
 type GlobalImeiResult = {
@@ -18,6 +20,7 @@ type GlobalImeiResult = {
   status: string;
   date: string;
   href: string;
+  dedupeKey?: string;
 };
 
 function findMatchingImei(value: string | null, query: string) {
@@ -32,12 +35,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Sesión no autorizada." }, { status: 401 });
   }
 
-  const parsed = searchSchema.safeParse({ q: new URL(request.url).searchParams.get("q") ?? "" });
+  const params = new URL(request.url).searchParams;
+  const parsed = searchSchema.safeParse({
+    q: params.get("q") ?? "",
+    page: params.get("page") ?? undefined,
+    pageSize: params.get("pageSize") ?? undefined,
+  });
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Búsqueda inválida." }, { status: 400 });
   }
 
-  const query = parsed.data.q;
+  const { q: query, page, pageSize } = parsed.data;
+  const skip = (page - 1) * pageSize;
+  const take = pageSize + 1;
   const isAdmin = user.roleCode === "ADMIN";
   const modules = new Set(user.allowedModules);
   const canSearchWarranties = isAdmin || modules.has("garantias");
@@ -53,7 +63,8 @@ export async function GET(request: Request) {
           where: { imei: { contains: query } },
           select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true, entryDate: true, archivedAt: true },
           orderBy: { createdAt: "desc" },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
     canSearchWarehouse
@@ -66,7 +77,8 @@ export async function GET(request: Request) {
             receipt: { select: { receiptNumber: true, supplierName: true, branch: true, status: true, receivedAt: true } },
           },
           orderBy: { createdAt: "desc" },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
     canSearchWarehouse
@@ -79,7 +91,8 @@ export async function GET(request: Request) {
             count: { select: { countNumber: true, title: true, branch: true, status: true, startedAt: true } },
           },
           orderBy: { createdAt: "desc" },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
     canSearchInvoices
@@ -92,13 +105,15 @@ export async function GET(request: Request) {
             invoice: { select: { invoiceNumber: true, type: true, clientName: true, branch: true, status: true, createdAt: true } },
           },
           orderBy: { invoice: { createdAt: "desc" } },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
     canSearchQc
       ? prisma.qcInspection.findMany({
           where: {
             status: "COMPLETED",
+            corrections: { none: {} },
             device: { imei: { contains: query, mode: "insensitive" } },
           },
           select: {
@@ -118,7 +133,8 @@ export async function GET(request: Request) {
             },
           },
           orderBy: { reviewedAt: "desc" },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
     canSearchRepairs
@@ -135,7 +151,8 @@ export async function GET(request: Request) {
             job: { select: { jobCode: true, status: true, createdAt: true } },
           },
           orderBy: { createdAt: "desc" },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
     canSearchUnlocks
@@ -149,7 +166,8 @@ export async function GET(request: Request) {
             request: { select: { requestCode: true, status: true } },
           },
           orderBy: { paidAt: "desc" },
-          take: 6,
+          skip,
+          take,
         })
       : Promise.resolve([]),
   ]);
@@ -162,8 +180,12 @@ export async function GET(request: Request) {
   }
   const latestQcInspections = Array.from(latestQcByDevice.values());
 
+  const hasMore = [warranties, receiptItems, countItems, invoiceItems, qcInspections, repairItems, unlockRecords]
+    .some((items) => items.length > pageSize);
+  const pageItems = <T,>(items: T[]) => items.slice(0, pageSize);
+
   const results: GlobalImeiResult[] = [
-    ...warranties.map((item) => ({
+    ...pageItems(warranties).map((item) => ({
       id: `warranty-${item.id}`,
       source: "warranty" as const,
       sourceLabel: "Garantía",
@@ -175,7 +197,7 @@ export async function GET(request: Request) {
       date: item.entryDate.toISOString(),
       href: `/garantias/${encodeURIComponent(item.caseCode)}`,
     })),
-    ...receiptItems.map((item) => ({
+    ...pageItems(receiptItems).map((item) => ({
       id: `receipt-${item.id}`,
       source: "receipt" as const,
       sourceLabel: "Recibo de mercancía",
@@ -187,7 +209,7 @@ export async function GET(request: Request) {
       date: item.receipt.receivedAt.toISOString(),
       href: "/almacen/recibos",
     })),
-    ...countItems.map((item) => ({
+    ...pageItems(countItems).map((item) => ({
       id: `stock-count-${item.id}`,
       source: "stock-count" as const,
       sourceLabel: "Conteo de stock",
@@ -199,7 +221,7 @@ export async function GET(request: Request) {
       date: item.count.startedAt.toISOString(),
       href: "/almacen",
     })),
-    ...invoiceItems.map((item) => ({
+    ...pageItems(invoiceItems).map((item) => ({
       id: `invoice-${item.id}`,
       source: "invoice" as const,
       sourceLabel: item.invoice.type === "CONDUCE" ? "Conduce" : "Factura",
@@ -211,8 +233,9 @@ export async function GET(request: Request) {
       date: item.invoice.createdAt.toISOString(),
       href: "/facturas",
     })),
-    ...latestQcInspections.map((item) => ({
+    ...pageItems(latestQcInspections).map((item) => ({
       id: `qc-${item.id}`,
+      dedupeKey: `device-${item.device.id}`,
       source: "qc" as const,
       sourceLabel: "Control de calidad",
       documentNumber: item.device.batch?.batchNumber ?? "Equipo revisado",
@@ -223,7 +246,7 @@ export async function GET(request: Request) {
       date: (item.reviewedAt ?? item.createdAt).toISOString(),
       href: `/qc/equipos-revisados?q=${encodeURIComponent(item.device.imei ?? query)}`,
     })),
-    ...repairItems.map((item) => ({
+    ...pageItems(repairItems).map((item) => ({
       id: `repair-${item.id}`,
       source: "repair" as const,
       sourceLabel: "Reparaciones",
@@ -235,7 +258,7 @@ export async function GET(request: Request) {
       date: item.createdAt.toISOString(),
       href: "/reparaciones/pagos",
     })),
-    ...unlockRecords.map((item) => ({
+    ...pageItems(unlockRecords).map((item) => ({
       id: `unlock-${item.id}`,
       source: "unlock" as const,
       sourceLabel: "Desbloqueos",
@@ -249,9 +272,8 @@ export async function GET(request: Request) {
     })),
   ]
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-    // Cada módulo aporta hasta seis coincidencias; no recortar a 18 ocultando
-    // módulos completos cuando el mismo IMEI aparece en varios flujos.
-    .slice(0, 50);
+    // Cada página trae una ventana por módulo. El cliente puede cargar la siguiente
+    // ventana sin ocultar coincidencias detrás de un límite global fijo.
 
-  return NextResponse.json({ query, results }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ query, page, pageSize, hasMore, results }, { headers: { "Cache-Control": "no-store" } });
 }

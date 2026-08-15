@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "status": "requires-production-reconciliation",
+  "description": "SQL históricos que se conservaron fuera del flujo ejecutable de Prisma hasta verificar su aplicación real y su registro en _prisma_migrations.",
+  "files": [
+    "20260812_add_device_photos.sql",
+    "20260812_add_penalties.sql",
+    "20260812_add_penalty_source_system.sql",
+    "20260812_add_qc_batch_assignment.sql",
+    "20260812_add_qc_batch_submitted.sql",
+    "20260812_add_qc_imei_requests.sql",
+    "20260812_add_qc_model_image.sql",
+    "20260812_add_qc_revision_batch.sql",
+    "20260812_add_repair_traceability.sql",
+    "20260812_add_repairs.sql",
+    "20260812_add_unlock_traceability.sql",
+    "20260812_add_unlocks.sql",
+    "20260812_add_withdrawal_redeem.sql"
+  ]
+}

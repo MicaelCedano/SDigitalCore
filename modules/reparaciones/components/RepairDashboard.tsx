@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  Loader2,
   Wrench,
   Inbox,
   Clock,
@@ -25,6 +24,7 @@ interface RepairDashboardProps {
 export function RepairDashboard({ initialData }: RepairDashboardProps) {
   const [data, setData] = useState(initialData);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [prefilled, setPrefilled] = useState<any | null>(null);
   const [message, setMessage] = useState("");
@@ -49,6 +49,26 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
   };
 
   const { queue, myJobs, stats } = data;
+
+  const loadMoreQueue = async () => {
+    if (loadingMore || !data.queueHasMore) return;
+    setLoadingMore(true);
+    setMessage("");
+    const res = await getRepairDashboardAction({
+      queuePage: data.queuePage + 1,
+      queuePageSize: data.queuePageSize,
+    });
+    if (res.success && res.data.data) {
+      setData({
+        ...res.data.data,
+        queue: [...data.queue, ...res.data.data.queue],
+      });
+    } else {
+      setMessageTone("error");
+      setMessage("No se pudo cargar el resto de la cola.");
+    }
+    setLoadingMore(false);
+  };
 
   async function handleReport(values: { observaciones?: string; items: any[] }) {
     setMessage("");
@@ -187,7 +207,7 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
             <UserCheck className="w-4 h-4 text-[#5750f1]" /> Cola de Reparaciones
           </h2>
           <span className="text-[11px] font-bold text-slate-400">
-            {queue.length} caso(s) asignado(s) desde garantías
+            {data.queueTotal ?? queue.length} caso(s) asignado(s) desde garantías
           </span>
         </div>
 
@@ -201,7 +221,8 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
             </p>
           </div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+          <>
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
@@ -249,7 +270,20 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
                 </tbody>
               </table>
             </div>
-          </div>
+            </div>
+            {data.queueHasMore ? (
+              <div className="border-t border-slate-100 bg-slate-50 p-3 text-center">
+                <button
+                  type="button"
+                  onClick={loadMoreQueue}
+                  disabled={loadingMore}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {loadingMore ? "Cargando más casos..." : "Cargar más casos"}
+                </button>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 

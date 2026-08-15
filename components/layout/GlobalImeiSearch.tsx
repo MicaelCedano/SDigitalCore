@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Barcode, FileText, LoaderCircle, PackageCheck, Search, ShieldCheck, X } from "lucide-react";
 
 type GlobalImeiResult = {
@@ -15,6 +15,14 @@ type GlobalImeiResult = {
   status: string;
   date: string;
   href: string;
+  dedupeKey?: string;
+};
+
+type GlobalImeiSearchResponse = {
+  results?: GlobalImeiResult[];
+  page?: number;
+  hasMore?: boolean;
+  error?: string;
 };
 
 const sourceIcons = {
@@ -36,16 +44,44 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function mergeResults(current: GlobalImeiResult[], incoming: GlobalImeiResult[]) {
+  const resultKey = (result: GlobalImeiResult) => result.dedupeKey ?? result.id;
+  const byKey = new Map(current.map((result) => [resultKey(result), result]));
+  for (const result of incoming) {
+    if (!byKey.has(resultKey(result))) byKey.set(resultKey(result), result);
+  }
+  return Array.from(byKey.values());
+}
+
 export function GlobalImeiSearch() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<GlobalImeiResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const requestVersionRef = useRef(0);
 
   const digits = query.replace(/\D/g, "").slice(0, 15);
+
+  function handleQueryChange(value: string) {
+    const nextQuery = value.replace(/\D/g, "").slice(0, 15);
+    const nextDigits = nextQuery.replace(/\D/g, "");
+    setQuery(nextQuery);
+    if (nextDigits.length < 4) {
+      setResults([]);
+      setPage(1);
+      setHasMore(false);
+      setError(null);
+      setLoadMoreError(null);
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -67,45 +103,68 @@ export function GlobalImeiSearch() {
     };
   }, []);
 
+  const loadPage = useCallback(async (searchDigits: string, nextPage: number, append: boolean, signal: AbortSignal) => {
+    const requestVersion = ++requestVersionRef.current;
+    if (append) {
+      setLoadingMore(true);
+      setLoadMoreError(null);
+    } else {
+      setLoading(true);
+      setError(null);
+      setLoadMoreError(null);
+    }
+    try {
+      const response = await fetch(`/api/search/imei?q=${encodeURIComponent(searchDigits)}&page=${nextPage}`, {
+        cache: "no-store",
+        signal,
+      });
+      const payload = (await response.json()) as GlobalImeiSearchResponse;
+      if (!response.ok) throw new Error(payload.error || "No se pudo completar la búsqueda.");
+      if (requestVersion !== requestVersionRef.current) return;
+      const incoming = payload.results ?? [];
+      setResults((current) => (append ? mergeResults(current, incoming) : incoming));
+      setPage(payload.page ?? nextPage);
+      setHasMore(Boolean(payload.hasMore));
+    } catch (requestError) {
+      if (requestVersion !== requestVersionRef.current) return;
+      if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+      const message = requestError instanceof Error ? requestError.message : "No se pudo completar la búsqueda.";
+      if (append) setLoadMoreError(message);
+      else {
+        setResults([]);
+        setError(message);
+      }
+    } finally {
+      if (!signal.aborted && requestVersion === requestVersionRef.current) {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (digits.length < 4) {
-      setResults([]);
-      setError(null);
-      setLoading(false);
       return;
     }
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/search/imei?q=${encodeURIComponent(digits)}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = (await response.json()) as { results?: GlobalImeiResult[]; error?: string };
-        if (!response.ok) throw new Error(payload.error || "No se pudo completar la búsqueda.");
-        setResults(payload.results ?? []);
-      } catch (requestError) {
-        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
-        setResults([]);
-        setError(requestError instanceof Error ? requestError.message : "No se pudo completar la búsqueda.");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
+      void loadPage(digits, 1, false, controller.signal);
     }, 250);
 
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [digits]);
+  }, [digits, loadPage]);
 
   function clearSearch() {
     setQuery("");
     setResults([]);
+    setPage(1);
+    setHasMore(false);
     setError(null);
+    setLoadMoreError(null);
     inputRef.current?.focus();
   }
 
@@ -116,12 +175,11 @@ export function GlobalImeiSearch() {
         <input
           ref={inputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value.replace(/\D/g, "").slice(0, 15))}
+          onChange={(event) => handleQueryChange(event.target.value)}
           onFocus={() => setOpen(true)}
           inputMode="numeric"
           autoComplete="off"
           aria-label="Buscar IMEI en todos los módulos"
-          aria-expanded={open}
           placeholder="Buscar IMEI global..."
           className="focus-ring h-10 w-56 rounded-[10px] border border-[#d0d5dd] bg-[#f8fafc] pl-9 pr-9 text-sm text-[#101828] outline-none transition focus:w-72 focus:border-[#818cf8] focus:bg-white lg:w-64"
         />
@@ -155,7 +213,7 @@ export function GlobalImeiSearch() {
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(event) => setQuery(event.target.value.replace(/\D/g, "").slice(0, 15))}
+                onChange={(event) => handleQueryChange(event.target.value)}
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder="Escribe al menos 4 dígitos"
@@ -210,6 +268,19 @@ export function GlobalImeiSearch() {
                 </Link>
               );
             })}
+            {hasMore ? (
+              <div className="border-t border-[#f0f1f3] px-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => void loadPage(digits, page + 1, true, new AbortController().signal)}
+                  disabled={loadingMore}
+                  className="focus-ring w-full rounded-xl border border-[#d0d5dd] px-3 py-2 text-xs font-semibold text-[#475467] transition hover:bg-[#f8fafc] disabled:cursor-wait disabled:opacity-60"
+                >
+                  {loadingMore ? "Cargando más resultados..." : "Cargar más resultados"}
+                </button>
+                {loadMoreError ? <p role="alert" className="px-2 py-2 text-center text-xs text-[#b42318]">{loadMoreError}</p> : null}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

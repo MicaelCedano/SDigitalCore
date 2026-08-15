@@ -25,6 +25,10 @@ type RepairDashboardPayload = {
   isAdmin: boolean;
   data: {
     queue: Array<{ id: string; caseCode: string; imei: string; model: string; clientName: string; problem: string; entryDate: Date }>;
+    queuePage: number;
+    queuePageSize: number;
+    queueTotal: number;
+    queueHasMore: boolean;
     myJobs: Array<{
       id: string;
       jobCode: string;
@@ -40,6 +44,11 @@ type RepairDashboardPayload = {
 };
 
 type ApproveRepairJobResult = { jobCode: string; equipos: number; montoPorEquipo: number; montoTotal: number };
+
+const repairDashboardInputSchema = z.object({
+  queuePage: z.coerce.number().int().min(1).max(1000).default(1),
+  queuePageSize: z.coerce.number().int().min(10).max(50).default(50),
+});
 
 // ============================================================
 // Listado y envío desde garantías
@@ -131,21 +140,27 @@ export async function saveTechnicianRepairRateAction(input: { technicianId: stri
 // Dashboard del técnico (cola + mis trabajos + wallet)
 // ============================================================
 
-export async function getRepairDashboardAction(): Promise<Result<RepairDashboardPayload>> {
+export async function getRepairDashboardAction(input?: unknown): Promise<Result<RepairDashboardPayload>> {
   try {
     await requirePermission("reparaciones.read");
+    const parsedInput = repairDashboardInputSchema.safeParse(input ?? {});
+    if (!parsedInput.success) return { success: false, error: "Parámetros de paginación inválidos." };
+    const { queuePage, queuePageSize } = parsedInput.data;
     const persisted = await getPersistedCurrentUser();
     if (!persisted) return { success: false, error: "Sesión no persistida." };
     if (persisted.roleCode === "ADMIN") return ok({ isAdmin: true, data: null });
 
-    const [queue, myJobs, wallet] = await Promise.all([
+    const queueWhere = { assignedTechnicianId: persisted.id, status: "IN_REPAIR" as const, archivedAt: null };
+    const [queue, queueTotal, myJobs, wallet] = await Promise.all([
       // Cola: casos de garantía enviados a este técnico (IN_REPAIR + assignedTechnicianId)
       prisma.warrantyCase.findMany({
-        where: { assignedTechnicianId: persisted.id, status: "IN_REPAIR", archivedAt: null },
+        where: queueWhere,
         orderBy: { entryDate: "asc" },
-        take: 200,
+        skip: (queuePage - 1) * queuePageSize,
+        take: queuePageSize + 1,
         select: { id: true, caseCode: true, imei: true, model: true, clientName: true, problem: true, entryDate: true },
       }),
+      prisma.warrantyCase.count({ where: queueWhere }),
       // Trabajos reportados por mí (pendientes y pagados)
       prisma.repairJob.findMany({
         where: { technicianId: persisted.id },
@@ -164,10 +179,14 @@ export async function getRepairDashboardAction(): Promise<Result<RepairDashboard
     return ok({
       isAdmin: false,
       data: {
-        queue,
+        queue: queue.slice(0, queuePageSize),
+        queuePage,
+        queuePageSize,
+        queueTotal,
+        queueHasMore: queue.length > queuePageSize,
         myJobs,
         stats: {
-          enCola: queue.length,
+          enCola: queueTotal,
           trabajosPendientes: pendingJobs.length,
           pendienteEquipos,
           totalPagado,
