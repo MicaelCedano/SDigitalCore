@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { createWarrantyCases, getWarrantyDocument, lookupImeiContext } from "@/modules/garantias/actions/warranty";
 import { WarrantyDocumentPreviewModal, type WarrantyDocument } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
+import { listBusinessPartnersAction } from "@/modules/configuracion/actions/business-partner";
 
 type Device = {
   imei: string;
@@ -29,6 +30,13 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
   const [busy, setBusy] = useState(false);
   const [document, setDocument] = useState<WarrantyDocument | null>(null);
   const [lookupLoading, setLookupLoading] = useState<Record<number, boolean>>({});
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    void listBusinessPartnersAction("CUSTOMER").then((result) => {
+      if (result.success) setCustomers(result.data.map((customer) => ({ id: customer.id, name: customer.name })));
+    });
+  }, []);
 
   async function handleImeiChange(index: number, val: string) {
     const cleanImei = val.replace(/\D/g, "");
@@ -139,8 +147,10 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
                   value={clientName}
                   onChange={(event) => setClientName(event.target.value)}
                   placeholder="Nombre del cliente"
+                  list="warranty-customers"
                   className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
                 />
+                <datalist id="warranty-customers">{customers.map((customer) => <option key={customer.id} value={customer.name} />)}</datalist>
               </label>
               <label className="text-sm font-medium text-slate-700">
                 Fecha de ingreso
@@ -165,8 +175,10 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
                 value={clientName}
                 onChange={(event) => setClientName(event.target.value)}
                 placeholder="Nombre del cliente"
+                list="warranty-customers"
                 className="mt-1 h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
               />
+              <datalist id="warranty-customers">{customers.map((customer) => <option key={customer.id} value={customer.name} />)}</datalist>
             </label>
             <label className="text-sm font-medium text-slate-700">
               Fecha de ingreso

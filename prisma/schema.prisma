@@ -29,41 +29,42 @@ model User {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  accounts Account[]
-  sessions Session[]
-  auditLogs AuditLog[]
-  wallet Wallet?
-  legacyIdentities LegacyUserIdentity[] @relation("LegacyIdentityCoreUser")
+  accounts               Account[]
+  sessions               Session[]
+  auditLogs              AuditLog[]
+  wallet                 Wallet?
+  legacyIdentities       LegacyUserIdentity[] @relation("LegacyIdentityCoreUser")
   legacyIdentitiesLinked LegacyUserIdentity[] @relation("LegacyIdentityLinkedBy")
-  walletLedgerEntries WalletLedgerEntry[] @relation("WalletLedgerActor")
-  redeemedWithdrawals WalletLedgerEntry[] @relation("WalletLedgerRedeemer")
-  penaltiesReceived Penalty[] @relation("PenaltyTechnician")
-  penaltiesApplied Penalty[] @relation("PenaltyAdmin")
+  walletLedgerEntries    WalletLedgerEntry[]  @relation("WalletLedgerActor")
+  redeemedWithdrawals    WalletLedgerEntry[]  @relation("WalletLedgerRedeemer")
+  penaltiesReceived      Penalty[]            @relation("PenaltyTechnician")
+  penaltiesApplied       Penalty[]            @relation("PenaltyAdmin")
 
-  warrantiesCreated WarrantyCase[] @relation("WarrantyCreatedBy")
-  warrantiesUpdated WarrantyCase[] @relation("WarrantyUpdatedBy")
-  warrantiesAssigned WarrantyCase[]     @relation("WarrantyAssignedTechnician")
-  warrantiesArchived WarrantyCase[]     @relation("WarrantyArchivedBy")
-  warrantyEvents WarrantyEvent[]
-  warrantyDocuments WarrantyDocument[]
-  qcInspections QcInspection[] @relation("QcInspectionReviewer")
-  assignedBatches QcRevisionBatch[] @relation("QcBatchAssignee")
-  qcAssignedDevices DeviceUnit[] @relation("QcDeviceAssignee")
-  qcImeiRequests QcImeiRequest[] @relation("QcImeiRequestRequester")
-  qcImeiRequestsAccepted QcImeiRequest[] @relation("QcImeiRequestAcceptor")
-  repairJobsCreated RepairJob[] @relation("RepairJobTechnician")
-  repairJobsApproved RepairJob[] @relation("RepairJobApprovedBy")
-  repairRates TechnicianRepairRate[] @relation("TechnicianRepairRateTechnician")
-  repairRatesManaged TechnicianRepairRate[] @relation("TechnicianRepairRateAdmin")
-  unlockRequestsCreated UnlockRequest[] @relation("UnlockRequestTechnician")
-  unlockRequestsApproved UnlockRequest[] @relation("UnlockRequestAdmin")
-  unlockRecordsCreated UnlockRecord[] @relation("UnlockRecordTechnician")
-  unlockRecordsApproved UnlockRecord[] @relation("UnlockRecordAdmin")
+  warrantiesCreated       WarrantyCase[]         @relation("WarrantyCreatedBy")
+  warrantiesUpdated       WarrantyCase[]         @relation("WarrantyUpdatedBy")
+  warrantiesAssigned      WarrantyCase[]         @relation("WarrantyAssignedTechnician")
+  warrantiesArchived      WarrantyCase[]         @relation("WarrantyArchivedBy")
+  businessPartnersCreated BusinessPartner[]      @relation("BusinessPartnerCreatedBy")
+  warrantyEvents          WarrantyEvent[]
+  warrantyDocuments       WarrantyDocument[]
+  qcInspections           QcInspection[]         @relation("QcInspectionReviewer")
+  assignedBatches         QcRevisionBatch[]      @relation("QcBatchAssignee")
+  qcAssignedDevices       DeviceUnit[]           @relation("QcDeviceAssignee")
+  qcImeiRequests          QcImeiRequest[]        @relation("QcImeiRequestRequester")
+  qcImeiRequestsAccepted  QcImeiRequest[]        @relation("QcImeiRequestAcceptor")
+  repairJobsCreated       RepairJob[]            @relation("RepairJobTechnician")
+  repairJobsApproved      RepairJob[]            @relation("RepairJobApprovedBy")
+  repairRates             TechnicianRepairRate[] @relation("TechnicianRepairRateTechnician")
+  repairRatesManaged      TechnicianRepairRate[] @relation("TechnicianRepairRateAdmin")
+  unlockRequestsCreated   UnlockRequest[]        @relation("UnlockRequestTechnician")
+  unlockRequestsApproved  UnlockRequest[]        @relation("UnlockRequestAdmin")
+  unlockRecordsCreated    UnlockRecord[]         @relation("UnlockRecordTechnician")
+  unlockRecordsApproved   UnlockRecord[]         @relation("UnlockRecordAdmin")
 
-  workTasksCreated WorkTask[] @relation("WorkTaskCreator")
-  workTasksAssigned WorkTask[] @relation("WorkTaskAssignee")
-  workTaskEvents WorkTaskEvent[]
-  workTaskAssignments WorkTaskAssignee[] @relation("WorkTaskAssignmentUser")
+  workTasksCreated           WorkTask[]         @relation("WorkTaskCreator")
+  workTasksAssigned          WorkTask[]         @relation("WorkTaskAssignee")
+  workTaskEvents             WorkTaskEvent[]
+  workTaskAssignments        WorkTaskAssignee[] @relation("WorkTaskAssignmentUser")
   workTaskAssignmentsCreated WorkTaskAssignee[] @relation("WorkTaskAssignmentCreator")
 
   @@map("user")
@@ -88,6 +89,46 @@ model AuditLog {
   @@index([module, createdAt])
   @@index([entityType, entityId])
   @@map("audit_log")
+}
+
+enum BusinessPartnerKind {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+
+  @@map("business_partner_kind")
+}
+
+enum BusinessPartnerStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("business_partner_status")
+}
+
+model BusinessPartner {
+  id          String                @id @default(cuid())
+  name        String                @db.VarChar(160)
+  kind        BusinessPartnerKind
+  taxId       String?               @map("tax_id") @db.VarChar(40)
+  contactName String?               @map("contact_name") @db.VarChar(160)
+  phone       String?               @db.VarChar(40)
+  email       String?               @db.VarChar(200)
+  address     String?               @db.VarChar(300)
+  notes       String?               @db.Text
+  status      BusinessPartnerStatus @default(ACTIVE)
+  createdById String?               @map("created_by_id")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  createdBy     User?          @relation("BusinessPartnerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  warrantyCases WarrantyCase[]
+
+  @@unique([name, kind])
+  @@index([kind, status, name])
+  @@index([phone])
+  @@index([taxId])
+  @@map("business_partner")
 }
 
 model AccessRequest {
@@ -143,31 +184,31 @@ enum WorkTaskEventType {
 }
 
 model WorkTask {
-  id             String          @id @default(cuid())
+  id             String                 @id @default(cuid())
   title          String
-  description    String?         @db.Text
-  kind           WorkTaskKind    @default(MANUAL)
+  description    String?                @db.Text
+  kind           WorkTaskKind           @default(MANUAL)
   assignmentMode WorkTaskAssignmentMode @default(SINGLE) @map("assignment_mode")
-  status         WorkTaskStatus  @default(PENDING)
-  priority       WorkTaskPriority @default(NORMAL)
-  sourceModule   String          @map("source_module")
-  sourceType     String?         @map("source_type")
-  sourceId       String?         @map("source_id")
-  sourceCode     String?         @map("source_code")
-  sourceUrl      String?         @map("source_url")
-  creatorId      String          @map("creator_id")
-  assigneeId     String?         @map("assignee_id")
-  dueAt          DateTime?       @map("due_at")
-  completedAt    DateTime?       @map("completed_at")
-  progressDone   Int             @default(0) @map("progress_done")
-  progressTotal  Int?            @map("progress_total")
-  recurrenceRule String?         @map("recurrence_rule")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  status         WorkTaskStatus         @default(PENDING)
+  priority       WorkTaskPriority       @default(NORMAL)
+  sourceModule   String                 @map("source_module")
+  sourceType     String?                @map("source_type")
+  sourceId       String?                @map("source_id")
+  sourceCode     String?                @map("source_code")
+  sourceUrl      String?                @map("source_url")
+  creatorId      String                 @map("creator_id")
+  assigneeId     String?                @map("assignee_id")
+  dueAt          DateTime?              @map("due_at")
+  completedAt    DateTime?              @map("completed_at")
+  progressDone   Int                    @default(0) @map("progress_done")
+  progressTotal  Int?                   @map("progress_total")
+  recurrenceRule String?                @map("recurrence_rule")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
 
-  creator  User           @relation("WorkTaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
-  assignee User?          @relation("WorkTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  events   WorkTaskEvent[]
+  creator   User               @relation("WorkTaskCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  assignee  User?              @relation("WorkTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  events    WorkTaskEvent[]
   assignees WorkTaskAssignee[]
 
   @@index([assigneeId, status, dueAt])
@@ -177,11 +218,11 @@ model WorkTask {
 }
 
 model WorkTaskAssignee {
-  id         String   @id @default(cuid())
-  taskId     String   @map("task_id")
-  userId     String   @map("user_id")
-  assignedById String? @map("assigned_by_id")
-  assignedAt DateTime @default(now()) @map("assigned_at")
+  id           String   @id @default(cuid())
+  taskId       String   @map("task_id")
+  userId       String   @map("user_id")
+  assignedById String?  @map("assigned_by_id")
+  assignedAt   DateTime @default(now()) @map("assigned_at")
 
   task       WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user       User     @relation("WorkTaskAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -193,14 +234,14 @@ model WorkTaskAssignee {
 }
 
 model WorkTaskEvent {
-  id        String          @id @default(cuid())
-  taskId    String          @map("task_id")
-  actorId   String?         @map("actor_id")
-  type      WorkTaskEventType
-  note      String?         @db.Text
-  beforeData Json?          @map("before_data")
-  afterData  Json?          @map("after_data")
-  createdAt DateTime        @default(now()) @map("created_at")
+  id         String            @id @default(cuid())
+  taskId     String            @map("task_id")
+  actorId    String?           @map("actor_id")
+  type       WorkTaskEventType
+  note       String?           @db.Text
+  beforeData Json?             @map("before_data")
+  afterData  Json?             @map("after_data")
+  createdAt  DateTime          @default(now()) @map("created_at")
 
   task  WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   actor User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
@@ -348,28 +389,28 @@ enum PenaltyStatus {
 // ============================================================
 
 model LegacyMigrationBatch {
-  id                    String                @id @default(cuid())
-  sourceSystem          String                @map("source_system") @db.VarChar(80)
-  mode                  LegacyMigrationMode
-  status                LegacyMigrationStatus @default(RUNNING)
-  cutoffAt              DateTime?             @map("cutoff_at")
-  sourceUserCount       Int                   @default(0) @map("source_user_count")
-  sourceWalletCount     Int                   @default(0) @map("source_wallet_count")
-  sourceAccountCount    Int                   @default(0) @map("source_account_count")
-  sourceTransactionCount Int                  @default(0) @map("source_transaction_count")
-  sourceBalanceTotal    Decimal               @default(0) @map("source_balance_total") @db.Decimal(14, 2)
-  transferredUserCount  Int                   @default(0) @map("transferred_user_count")
-  transferredBalanceTotal Decimal             @default(0) @map("transferred_balance_total") @db.Decimal(14, 2)
-  checksum              String?               @db.VarChar(128)
-  reconciliation        Json?
-  errorMessage          String?               @map("error_message") @db.Text
-  createdAt             DateTime              @default(now()) @map("created_at")
-  completedAt           DateTime?             @map("completed_at")
+  id                      String                @id @default(cuid())
+  sourceSystem            String                @map("source_system") @db.VarChar(80)
+  mode                    LegacyMigrationMode
+  status                  LegacyMigrationStatus @default(RUNNING)
+  cutoffAt                DateTime?             @map("cutoff_at")
+  sourceUserCount         Int                   @default(0) @map("source_user_count")
+  sourceWalletCount       Int                   @default(0) @map("source_wallet_count")
+  sourceAccountCount      Int                   @default(0) @map("source_account_count")
+  sourceTransactionCount  Int                   @default(0) @map("source_transaction_count")
+  sourceBalanceTotal      Decimal               @default(0) @map("source_balance_total") @db.Decimal(14, 2)
+  transferredUserCount    Int                   @default(0) @map("transferred_user_count")
+  transferredBalanceTotal Decimal               @default(0) @map("transferred_balance_total") @db.Decimal(14, 2)
+  checksum                String?               @db.VarChar(128)
+  reconciliation          Json?
+  errorMessage            String?               @map("error_message") @db.Text
+  createdAt               DateTime              @default(now()) @map("created_at")
+  completedAt             DateTime?             @map("completed_at")
 
-  identities LegacyUserIdentity[]
+  identities           LegacyUserIdentity[]
   archivedTransactions LegacyWalletTransaction[]
-  archivedAccounts LegacyWalletAccount[]
-  ledgerEntries WalletLedgerEntry[]
+  archivedAccounts     LegacyWalletAccount[]
+  ledgerEntries        WalletLedgerEntry[]
 
   @@index([sourceSystem, createdAt])
   @@index([status, createdAt])
@@ -377,21 +418,21 @@ model LegacyMigrationBatch {
 }
 
 model LegacyWalletAccount {
-  id                String   @id @default(cuid())
-  sourceSystem      String   @map("source_system") @db.VarChar(80)
-  sourceAccountId   String   @map("source_account_id") @db.VarChar(80)
-  legacyIdentityId  String   @map("legacy_identity_id")
-  nameSnapshot      String   @map("name_snapshot") @db.VarChar(160)
-  typeSnapshot      String?  @map("type_snapshot") @db.VarChar(80)
-  balanceSnapshot   Decimal  @default(0) @map("balance_snapshot") @db.Decimal(14, 2)
-  savingsGoalSnapshot Decimal? @map("savings_goal_snapshot") @db.Decimal(14, 2)
-  colorSnapshot     String?  @map("color_snapshot") @db.VarChar(40)
-  createdAtSnapshot DateTime? @map("created_at_snapshot")
-  batchId           String?  @map("batch_id")
-  importedAt        DateTime @default(now()) @map("imported_at")
+  id                  String    @id @default(cuid())
+  sourceSystem        String    @map("source_system") @db.VarChar(80)
+  sourceAccountId     String    @map("source_account_id") @db.VarChar(80)
+  legacyIdentityId    String    @map("legacy_identity_id")
+  nameSnapshot        String    @map("name_snapshot") @db.VarChar(160)
+  typeSnapshot        String?   @map("type_snapshot") @db.VarChar(80)
+  balanceSnapshot     Decimal   @default(0) @map("balance_snapshot") @db.Decimal(14, 2)
+  savingsGoalSnapshot Decimal?  @map("savings_goal_snapshot") @db.Decimal(14, 2)
+  colorSnapshot       String?   @map("color_snapshot") @db.VarChar(40)
+  createdAtSnapshot   DateTime? @map("created_at_snapshot")
+  batchId             String?   @map("batch_id")
+  importedAt          DateTime  @default(now()) @map("imported_at")
 
-  legacyIdentity LegacyUserIdentity @relation(fields: [legacyIdentityId], references: [id], onDelete: Restrict)
-  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  legacyIdentity LegacyUserIdentity    @relation(fields: [legacyIdentityId], references: [id], onDelete: Restrict)
+  batch          LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   @@unique([sourceSystem, sourceAccountId])
   @@index([legacyIdentityId])
@@ -419,11 +460,11 @@ model LegacyUserIdentity {
   lastSyncedAt           DateTime                  @default(now()) @map("last_synced_at")
   batchId                String?                   @map("batch_id")
 
-  coreUser User? @relation("LegacyIdentityCoreUser", fields: [coreUserId], references: [id], onDelete: Restrict)
-  linkedBy User? @relation("LegacyIdentityLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
-  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  coreUser             User?                     @relation("LegacyIdentityCoreUser", fields: [coreUserId], references: [id], onDelete: Restrict)
+  linkedBy             User?                     @relation("LegacyIdentityLinkedBy", fields: [linkedById], references: [id], onDelete: SetNull)
+  batch                LegacyMigrationBatch?     @relation(fields: [batchId], references: [id], onDelete: SetNull)
   archivedTransactions LegacyWalletTransaction[]
-  archivedAccounts LegacyWalletAccount[]
+  archivedAccounts     LegacyWalletAccount[]
 
   @@unique([sourceSystem, sourceUserId])
   @@unique([sourceSystem, coreUserId])
@@ -434,21 +475,21 @@ model LegacyUserIdentity {
 }
 
 model LegacyWalletTransaction {
-  id                  String   @id @default(cuid())
-  sourceSystem        String   @map("source_system") @db.VarChar(80)
-  sourceTransactionId String   @map("source_transaction_id") @db.VarChar(80)
-  legacyIdentityId    String   @map("legacy_identity_id")
-  amount              Decimal  @db.Decimal(14, 2)
-  typeSnapshot        String   @map("type_snapshot") @db.VarChar(80)
-  statusSnapshot      String?  @map("status_snapshot") @db.VarChar(80)
-  descriptionSnapshot String?  @map("description_snapshot") @db.Text
+  id                  String    @id @default(cuid())
+  sourceSystem        String    @map("source_system") @db.VarChar(80)
+  sourceTransactionId String    @map("source_transaction_id") @db.VarChar(80)
+  legacyIdentityId    String    @map("legacy_identity_id")
+  amount              Decimal   @db.Decimal(14, 2)
+  typeSnapshot        String    @map("type_snapshot") @db.VarChar(80)
+  statusSnapshot      String?   @map("status_snapshot") @db.VarChar(80)
+  descriptionSnapshot String?   @map("description_snapshot") @db.Text
   occurredAt          DateTime? @map("occurred_at")
-  redeemedSnapshot    Boolean? @map("redeemed_snapshot")
-  batchId             String?  @map("batch_id")
-  importedAt          DateTime @default(now()) @map("imported_at")
+  redeemedSnapshot    Boolean?  @map("redeemed_snapshot")
+  batchId             String?   @map("batch_id")
+  importedAt          DateTime  @default(now()) @map("imported_at")
 
-  legacyIdentity LegacyUserIdentity @relation(fields: [legacyIdentityId], references: [id], onDelete: Restrict)
-  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  legacyIdentity LegacyUserIdentity    @relation(fields: [legacyIdentityId], references: [id], onDelete: Restrict)
+  batch          LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   @@unique([sourceSystem, sourceTransactionId])
   @@index([legacyIdentityId, occurredAt])
@@ -464,9 +505,9 @@ model Wallet {
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   accounts WalletAccount[]
-  entries WalletLedgerEntry[]
+  entries  WalletLedgerEntry[]
 
   @@index([status, updatedAt])
   @@map("wallet")
@@ -485,7 +526,7 @@ model WalletAccount {
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  wallet  Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
   entries WalletLedgerEntry[]
 
   @@unique([sourceSystem, sourceAccountId])
@@ -494,30 +535,30 @@ model WalletAccount {
 }
 
 model WalletLedgerEntry {
-  id          String                  @id @default(cuid())
-  walletId    String                  @map("wallet_id")
-  accountId   String                  @map("account_id")
-  type        WalletLedgerEntryType
-  status      WalletLedgerEntryStatus @default(POSTED)
-  amount      Decimal                 @db.Decimal(14, 2)
-  description String?                 @db.Text
-  externalKey String                  @unique @map("external_key") @db.VarChar(255)
-  secureToken String?                 @unique @map("secure_token") @db.VarChar(64)
-  actorId     String?                 @map("actor_id")
-  batchId     String?                 @map("batch_id")
-  reversalOfId String?                @unique @map("reversal_of_id")
-  redeemedAt  DateTime?               @map("redeemed_at")
-  redeemedById String?                @map("redeemed_by_id")
-  occurredAt  DateTime                @default(now()) @map("occurred_at")
-  createdAt   DateTime                @default(now()) @map("created_at")
+  id           String                  @id @default(cuid())
+  walletId     String                  @map("wallet_id")
+  accountId    String                  @map("account_id")
+  type         WalletLedgerEntryType
+  status       WalletLedgerEntryStatus @default(POSTED)
+  amount       Decimal                 @db.Decimal(14, 2)
+  description  String?                 @db.Text
+  externalKey  String                  @unique @map("external_key") @db.VarChar(255)
+  secureToken  String?                 @unique @map("secure_token") @db.VarChar(64)
+  actorId      String?                 @map("actor_id")
+  batchId      String?                 @map("batch_id")
+  reversalOfId String?                 @unique @map("reversal_of_id")
+  redeemedAt   DateTime?               @map("redeemed_at")
+  redeemedById String?                 @map("redeemed_by_id")
+  occurredAt   DateTime                @default(now()) @map("occurred_at")
+  createdAt    DateTime                @default(now()) @map("created_at")
 
-  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
-  account WalletAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  actor User? @relation("WalletLedgerActor", fields: [actorId], references: [id], onDelete: SetNull)
-  redeemedBy User? @relation("WalletLedgerRedeemer", fields: [redeemedById], references: [id], onDelete: SetNull)
-  batch LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  reversalOf WalletLedgerEntry? @relation("WalletLedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversedBy WalletLedgerEntry? @relation("WalletLedgerReversal")
+  wallet     Wallet                @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  account    WalletAccount         @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  actor      User?                 @relation("WalletLedgerActor", fields: [actorId], references: [id], onDelete: SetNull)
+  redeemedBy User?                 @relation("WalletLedgerRedeemer", fields: [redeemedById], references: [id], onDelete: SetNull)
+  batch      LegacyMigrationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  reversalOf WalletLedgerEntry?    @relation("WalletLedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy WalletLedgerEntry?    @relation("WalletLedgerReversal")
   penalty    Penalty?
 
   @@index([walletId, occurredAt])
@@ -614,8 +655,8 @@ model QcRevisionBatch {
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
 
-  assignedTo User? @relation("QcBatchAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  devices DeviceUnit[]
+  assignedTo User?        @relation("QcBatchAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  devices    DeviceUnit[]
 
   @@index([status, receivedAt])
   @@index([assignedToId])
@@ -645,11 +686,11 @@ model DeviceUnit {
   photos      DevicePhoto[]    @relation("DevicePhotos")
   penalties   Penalty[]
 
+  @@unique([sourceSystem, sourceRecordId])
   @@index([status, updatedAt])
   @@index([brand, model])
   @@index([batchId])
   @@index([assignedToId])
-  @@unique([sourceSystem, sourceRecordId])
   @@map("device_unit")
 }
 
@@ -676,11 +717,11 @@ model QcInspection {
   supersedes  QcInspection?  @relation("QcInspectionCorrections", fields: [supersedesId], references: [id], onDelete: Restrict)
   corrections QcInspection[] @relation("QcInspectionCorrections")
 
+  @@unique([sourceSystem, sourceRecordId])
   @@index([deviceId, reviewedAt])
   @@index([reviewerId, reviewedAt])
   @@index([status, reviewedAt])
   @@index([result, reviewedAt])
-  @@unique([sourceSystem, sourceRecordId])
   @@map("qc_inspection")
 }
 
@@ -695,7 +736,7 @@ model QcImeiRequest {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  requester User @relation("QcImeiRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  requester User  @relation("QcImeiRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   acceptor  User? @relation("QcImeiRequestAcceptor", fields: [acceptedBy], references: [id], onDelete: SetNull)
 
   @@index([requesterId, createdAt])
@@ -773,86 +814,89 @@ enum WarrantyDocumentType {
 }
 
 model WarrantyCase {
-  id                    String   @id @default(cuid())
-  caseCode              String   @unique @map("case_code")
-  imei                  String
-  model                 String
-  color                 String?
-  clientName            String   @map("client_name")
-  problem               String   @db.Text
-  status                WarrantyStatus @default(RECEIVED)
-  entryDate             DateTime @db.Date @map("entry_date")
-  createdById           String?  @map("created_by_id")
-  updatedById           String?  @map("updated_by_id")
-  assignedTechnicianId  String?  @map("assigned_technician_id")
+  id                     String         @id @default(cuid())
+  caseCode               String         @unique @map("case_code")
+  imei                   String
+  model                  String
+  color                  String?
+  clientName             String         @map("client_name")
+  customerId             String?        @map("customer_id")
+  problem                String         @db.Text
+  status                 WarrantyStatus @default(RECEIVED)
+  entryDate              DateTime       @map("entry_date") @db.Date
+  createdById            String?        @map("created_by_id")
+  updatedById            String?        @map("updated_by_id")
+  assignedTechnicianId   String?        @map("assigned_technician_id")
   assignedTechnicianName String?        @map("assigned_technician_name")
-  currentSupplierName   String?  @map("current_supplier_name")
-  archivedAt            DateTime? @map("archived_at")
-  archivedById          String?  @map("archived_by_id")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  currentSupplierName    String?        @map("current_supplier_name")
+  archivedAt             DateTime?      @map("archived_at")
+  archivedById           String?        @map("archived_by_id")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
 
-  createdBy User? @relation("WarrantyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy User? @relation("WarrantyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  assignedTechnician User? @relation("WarrantyAssignedTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
-  archivedBy User? @relation("WarrantyArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
-  events WarrantyEvent[]
-  documentItems WarrantyDocumentItem[]
-  repairItems RepairJobItem[]
+  createdBy          User?                  @relation("WarrantyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy          User?                  @relation("WarrantyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  assignedTechnician User?                  @relation("WarrantyAssignedTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  archivedBy         User?                  @relation("WarrantyArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+  customer           BusinessPartner?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  events             WarrantyEvent[]
+  documentItems      WarrantyDocumentItem[]
+  repairItems        RepairJobItem[]
 
   @@index([imei, createdAt])
   @@index([status, entryDate])
   @@index([clientName])
+  @@index([customerId])
   @@index([archivedAt])
   @@map("warranty_case")
 }
 
 model WarrantyEvent {
-  id String @id @default(cuid())
-  caseId String @map("case_id")
-  type WarrantyEventType
-  fromStatus WarrantyStatus? @map("from_status")
-  toStatus WarrantyStatus? @map("to_status")
-  actorId String? @map("actor_id")
-  actorNameSnapshot String? @map("actor_name_snapshot")
-  counterpartyName String? @map("counterparty_name")
-  reason String? @db.Text
-  beforeData Json? @map("before_data")
-  afterData Json? @map("after_data")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                String            @id @default(cuid())
+  caseId            String            @map("case_id")
+  type              WarrantyEventType
+  fromStatus        WarrantyStatus?   @map("from_status")
+  toStatus          WarrantyStatus?   @map("to_status")
+  actorId           String?           @map("actor_id")
+  actorNameSnapshot String?           @map("actor_name_snapshot")
+  counterpartyName  String?           @map("counterparty_name")
+  reason            String?           @db.Text
+  beforeData        Json?             @map("before_data")
+  afterData         Json?             @map("after_data")
+  createdAt         DateTime          @default(now()) @map("created_at")
 
-  case WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  case  WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([caseId, createdAt])
   @@map("warranty_event")
 }
 
 model WarrantyDocument {
-  id String @id @default(cuid())
-  documentCode String @unique @map("document_code")
-  type WarrantyDocumentType
-  counterpartyName String @map("counterparty_name")
-  documentDate DateTime @db.Date @map("document_date")
-  createdById String? @map("created_by_id")
-  notes String? @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
+  id               String               @id @default(cuid())
+  documentCode     String               @unique @map("document_code")
+  type             WarrantyDocumentType
+  counterpartyName String               @map("counterparty_name")
+  documentDate     DateTime             @map("document_date") @db.Date
+  createdById      String?              @map("created_by_id")
+  notes            String?              @db.Text
+  createdAt        DateTime             @default(now()) @map("created_at")
 
-  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  items WarrantyDocumentItem[]
+  createdBy User?                  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items     WarrantyDocumentItem[]
 
   @@index([type, documentDate])
   @@map("warranty_document")
 }
 
 model WarrantyDocumentItem {
-  id String @id @default(cuid())
+  id         String @id @default(cuid())
   documentId String @map("document_id")
-  caseId String @map("case_id")
-  sortOrder Int @default(0) @map("sort_order")
+  caseId     String @map("case_id")
+  sortOrder  Int    @default(0) @map("sort_order")
 
   document WarrantyDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  case WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  case     WarrantyCase     @relation(fields: [caseId], references: [id], onDelete: Restrict)
 
   @@unique([documentId, caseId])
   @@index([caseId])
@@ -860,10 +904,10 @@ model WarrantyDocumentItem {
 }
 
 model WarrantyDailySequence {
-  id String @id @default(cuid())
-  sequenceDate DateTime @db.Date @map("sequence_date")
-  sequenceType String @map("sequence_type")
-  lastValue Int @default(0) @map("last_value")
+  id           String   @id @default(cuid())
+  sequenceDate DateTime @map("sequence_date") @db.Date
+  sequenceType String   @map("sequence_type")
+  lastValue    Int      @default(0) @map("last_value")
 
   @@unique([sequenceDate, sequenceType])
   @@map("warranty_daily_sequence")
@@ -871,7 +915,7 @@ model WarrantyDailySequence {
 
 model OperationalDailySequence {
   id           String   @id @default(cuid())
-  sequenceDate DateTime @db.Date @map("sequence_date")
+  sequenceDate DateTime @map("sequence_date") @db.Date
   sequenceType String   @map("sequence_type")
   lastValue    Int      @default(0) @map("last_value")
 
@@ -898,8 +942,8 @@ model RepairJob {
   status         RepairJobStatus @default(PENDING_PAYMENT)
   observaciones  String?         @db.Text
   totalEquipos   Int             @default(0) @map("total_equipos")
-  montoPorEquipo Decimal         @default(50) @db.Decimal(10, 2) @map("monto_por_equipo")
-  montoTotal     Decimal         @default(0) @db.Decimal(10, 2) @map("monto_total")
+  montoPorEquipo Decimal         @default(50) @map("monto_por_equipo") @db.Decimal(10, 2)
+  montoTotal     Decimal         @default(0) @map("monto_total") @db.Decimal(10, 2)
   approvedById   String?         @map("approved_by_id")
   approvedAt     DateTime?       @map("approved_at")
   createdAt      DateTime        @default(now()) @map("created_at")
@@ -907,8 +951,8 @@ model RepairJob {
   sourceSystem   String?         @map("source_system")
   sourceRecordId String?         @map("source_record_id")
 
-  technician User  @relation("RepairJobTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
-  approvedBy User? @relation("RepairJobApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  technician User            @relation("RepairJobTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
+  approvedBy User?           @relation("RepairJobApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   items      RepairJobItem[]
 
   @@unique([sourceSystem, sourceRecordId])
@@ -930,7 +974,7 @@ model RepairJobItem {
   sourceSystem   String?  @map("source_system")
   sourceRecordId String?  @map("source_record_id")
 
-  job          RepairJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job          RepairJob     @relation(fields: [jobId], references: [id], onDelete: Cascade)
   warrantyCase WarrantyCase? @relation(fields: [warrantyCaseId], references: [id], onDelete: SetNull)
 
   @@unique([sourceSystem, sourceRecordId])
@@ -942,12 +986,12 @@ model RepairJobItem {
 model TechnicianRepairRate {
   id                 String   @id @default(cuid())
   technicianId       String   @unique @map("technician_id")
-  montoPorReparacion Decimal  @default(50) @db.Decimal(10, 2) @map("monto_por_reparacion")
+  montoPorReparacion Decimal  @default(50) @map("monto_por_reparacion") @db.Decimal(10, 2)
   activo             Boolean  @default(true)
   adminId            String?  @map("admin_id")
   fechaConfiguracion DateTime @default(now()) @map("fecha_configuracion")
 
-  technician User @relation("TechnicianRepairRateTechnician", fields: [technicianId], references: [id], onDelete: Cascade)
+  technician User  @relation("TechnicianRepairRateTechnician", fields: [technicianId], references: [id], onDelete: Cascade)
   admin      User? @relation("TechnicianRepairRateAdmin", fields: [adminId], references: [id], onDelete: SetNull)
 
   @@map("technician_repair_rate")
@@ -975,8 +1019,8 @@ model UnlockRequest {
   status           UnlockRequestStatus @default(PENDING_ADMIN)
   observacion      String?             @db.Text
   totalEquipos     Int                 @default(0) @map("total_equipos")
-  montoPorEquipo   Decimal             @default(25) @db.Decimal(10, 2) @map("monto_por_equipo")
-  montoTotalPagado Decimal             @default(0) @db.Decimal(10, 2) @map("monto_total_pagado")
+  montoPorEquipo   Decimal             @default(25) @map("monto_por_equipo") @db.Decimal(10, 2)
+  montoTotalPagado Decimal             @default(0) @map("monto_total_pagado") @db.Decimal(10, 2)
   adminId          String?             @map("admin_id")
   adminObservation String?             @map("admin_observation") @db.Text
   approvedAt       DateTime?           @map("approved_at")
@@ -985,8 +1029,8 @@ model UnlockRequest {
   sourceSystem     String?             @map("source_system") @db.VarChar(80)
   sourceRecordId   String?             @map("source_record_id") @db.VarChar(80)
 
-  technician   User          @relation("UnlockRequestTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
-  admin        User?         @relation("UnlockRequestAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  technician    User           @relation("UnlockRequestTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
+  admin         User?          @relation("UnlockRequestAdmin", fields: [adminId], references: [id], onDelete: SetNull)
   unlockRecords UnlockRecord[]
 
   @@unique([sourceSystem, sourceRecordId])
@@ -996,16 +1040,16 @@ model UnlockRequest {
 }
 
 model UnlockRecord {
-  id          String   @id @default(cuid())
-  imei        String   @unique
-  model       String   @map("model")
-  requestId   String   @map("request_id")
-  technicianId String  @map("technician_id")
-  adminId     String   @map("admin_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  paidAt      DateTime @default(now()) @map("paid_at")
-  sourceSystem     String? @map("source_system") @db.VarChar(80)
-  sourceRecordId   String? @map("source_record_id") @db.VarChar(80)
+  id             String   @id @default(cuid())
+  imei           String   @unique
+  model          String   @map("model")
+  requestId      String   @map("request_id")
+  technicianId   String   @map("technician_id")
+  adminId        String   @map("admin_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  paidAt         DateTime @default(now()) @map("paid_at")
+  sourceSystem   String?  @map("source_system") @db.VarChar(80)
+  sourceRecordId String?  @map("source_record_id") @db.VarChar(80)
 
   request    UnlockRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
   technician User          @relation("UnlockRecordTechnician", fields: [technicianId], references: [id], onDelete: Restrict)
@@ -1022,18 +1066,18 @@ model UnlockRecord {
 // ============================================================
 
 model GoodsReceipt {
-  id            String             @id @default(cuid())
-  receiptNumber String             @unique @map("receipt_number")
-  supplierName  String             @map("supplier_name")
-  branch        String
-  receivedBy    String             @map("received_by")
-  status        GoodsReceiptStatus @default(COMPLETED)
-  notes         String?            @db.Text
-  receivedAt    DateTime           @default(now()) @map("received_at")
-  warehouseImportedAt DateTime?    @map("warehouse_imported_at")
-  warehouseImportedBy String?      @map("warehouse_imported_by")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
+  id                  String             @id @default(cuid())
+  receiptNumber       String             @unique @map("receipt_number")
+  supplierName        String             @map("supplier_name")
+  branch              String
+  receivedBy          String             @map("received_by")
+  status              GoodsReceiptStatus @default(COMPLETED)
+  notes               String?            @db.Text
+  receivedAt          DateTime           @default(now()) @map("received_at")
+  warehouseImportedAt DateTime?          @map("warehouse_imported_at")
+  warehouseImportedBy String?            @map("warehouse_imported_by")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
 
   items GoodsReceiptItem[]
 
@@ -1099,8 +1143,8 @@ model QcSupplier {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  @@index([status, name])
   @@unique([sourceSystem, sourceRecordId])
+  @@index([status, name])
   @@map("qc_supplier")
 }
 
@@ -1170,7 +1214,7 @@ model WarehouseProduct {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  movements WarehouseMovement[]
+  movements    WarehouseMovement[]
   requestItems WarehouseRequestItem[]
 
   @@map("warehouse_product")
@@ -1218,24 +1262,24 @@ model WarehouseRequest {
   title       String                 @map("titulo")
   branch      String                 @map("sucursal")
   requestedBy String                 @map("requested_by")
-  type        WarehouseRequestType    @default(EXIT) @map("tipo")
+  type        WarehouseRequestType   @default(EXIT) @map("tipo")
   status      WarehouseRequestStatus @default(PENDING) @map("status")
   details     String?                @map("detalles") @db.Text
   createdAt   DateTime               @default(now()) @map("created_at")
   updatedAt   DateTime               @updatedAt @map("updated_at")
 
-  items       WarehouseRequestItem[]
+  items WarehouseRequestItem[]
 
   @@map("warehouse_request")
 }
 
 model WarehouseRequestItem {
-  id        String          @id @default(cuid())
-  requestId String          @map("request_id")
-  request   WarehouseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  productId String          @map("product_id")
-  product   WarehouseProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
-  unitsCount Int            @map("unidades")
+  id         String           @id @default(cuid())
+  requestId  String           @map("request_id")
+  request    WarehouseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  productId  String           @map("product_id")
+  product    WarehouseProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitsCount Int              @map("unidades")
 
   @@unique([requestId, productId])
   @@map("warehouse_request_item")

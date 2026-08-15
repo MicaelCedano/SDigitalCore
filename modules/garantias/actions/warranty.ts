@@ -12,6 +12,7 @@ import {
 import { civilDate, nextWarrantyNumber, santoDomingoDateString } from "@/modules/garantias/lib/document-number";
 import { Prisma, WarrantyDocumentType, WarrantyEventType, WarrantyStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { ensureCustomerForWarranty } from "@/modules/configuracion/actions/business-partner";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 type ArchiveFilter = "active" | "archived" | "all";
@@ -281,6 +282,7 @@ export async function createWarrantyCases(input: unknown): Promise<Result<{ case
       return { success: false, error: "Revisa los datos del ingreso.", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
     }
     const result = await prisma.$transaction(async (tx) => {
+      const customerId = await ensureCustomerForWarranty(parsed.data.clientName, actor.id, tx);
       const incomingImeis = parsed.data.devices.map((device) => device.imei);
       const existing = await tx.warrantyCase.findMany({
         where: { imei: { in: incomingImeis }, archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } },
@@ -300,6 +302,7 @@ export async function createWarrantyCases(input: unknown): Promise<Result<{ case
             model: normalizeName(device.model),
             color: device.color ? normalizeName(device.color) : null,
             clientName: normalizeName(parsed.data.clientName),
+            customerId,
             problem: device.problem.trim(),
             entryDate: civilDate(parsed.data.entryDate),
             createdById: actor.id,
