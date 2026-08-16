@@ -5,6 +5,22 @@ import { usePathname } from "next/navigation";
 
 type FcmModule = typeof import("tauri-plugin-fcm");
 
+function describeError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const value = error as Record<string, unknown>;
+    if (typeof value.message === "string") return value.message;
+    if (typeof value.error === "string") return value.error;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "Error nativo no serializable";
+    }
+  }
+  return String(error);
+}
+
 export function FcmRegistration() {
   const started = useRef(false);
   const [status, setStatus] = useState<"idle" | "registering" | "denied" | "error" | "success">("idle");
@@ -60,7 +76,7 @@ export function FcmRegistration() {
         });
         setStatus("success");
       } catch (error) {
-        const detail = error instanceof Error ? error.message : "Error desconocido";
+        const detail = describeError(error);
         throw new Error(`${stage}: ${detail}`);
       }
     };
@@ -68,7 +84,7 @@ export function FcmRegistration() {
     await register().catch((error) => {
       started.current = false;
       setStatus("error");
-      setErrorMessage(error instanceof Error ? error.message : "Error desconocido de FCM");
+      setErrorMessage(describeError(error));
       console.error("[FCM] No se pudo registrar el dispositivo", error);
     });
   }, []);
