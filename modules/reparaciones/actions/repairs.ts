@@ -478,5 +478,6 @@ export async function approveRepairJobAction(input: { jobId: string; customMonto
     revalidatePath("/reparaciones/pagos");
     revalidatePath("/wallet");
     revalidatePath("/garantias");
+    revalidatePath("/dashboard");
   }
 }

@@ -207,16 +207,26 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     recentWarrantyEvents,
     warrantyCounts,
     // Módulos activos: reparaciones, desbloqueos, QC, wallet
-    repairJobsPending,
+    repairJobsPending: repairJobsPending.map((job) => ({
+      ...job,
+      montoTotal: Number(job.montoTotal),
+      montoPorEquipo: Number(job.montoPorEquipo),
+    })),
     repairPendingCount: repairJobsPending.length,
     repairPendingTotal,
-    unlockRequestsPending,
+    unlockRequestsPending: unlockRequestsPending.map((req) => ({
+      ...req,
+      montoTotalPagado: Number(req.montoTotalPagado),
+    })),
     unlockPendingCount: unlockRequestsPending.length,
     unlockPendingTotal,
     qcBatchesPending,
     qcPendingCount: qcBatchesPending.length,
     qcPendingTotalDevices,
-    walletRedemptionsPending,
+    walletRedemptionsPending: walletRedemptionsPending.map((entry) => ({
+      ...entry,
+      amount: Number(entry.amount),
+    })),
     redemptionsPendingCount: walletRedemptionsPending.length,
     redemptionsPendingTotal,
   };
