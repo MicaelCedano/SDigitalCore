@@ -1,16 +1,54 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
+import { Prisma, WorkTaskStatus } from "@prisma/client";
 
-function emptyWorkCenterData(userId: string, roleCode: string) {
+const taskInclude = {
+  creator: { select: { name: true, email: true } },
+  assignee: { select: { id: true, name: true, email: true, image: true } },
+  assignees: {
+    include: { user: { select: { id: true, name: true, email: true, image: true } } },
+    orderBy: { assignedAt: "asc" },
+  },
+  events: {
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    include: { actor: { select: { name: true } } },
+  },
+} satisfies Prisma.WorkTaskInclude;
+
+type WorkTaskWithRelations = Prisma.WorkTaskGetPayload<{ include: typeof taskInclude }>;
+type WorkCenterData = {
+  tasks: WorkTaskWithRelations[];
+  historyTasks: WorkTaskWithRelations[];
+  activeUsers: { id: string; name: string | null; email: string; image: string | null }[];
+  metrics: { action: number; completedToday: number; overdue: number };
+  currentUserId: string;
+  roleCode: string;
+  schemaReady: boolean;
+};
+
+function emptyWorkCenterData(userId: string, roleCode: string): WorkCenterData {
   return {
     tasks: [],
+    historyTasks: [],
     activeUsers: [],
     metrics: { action: 0, completedToday: 0, overdue: 0 },
     currentUserId: userId,
     roleCode,
     schemaReady: false,
   };
+}
+
+function startOfCurrentWeekInSantoDomingo() {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Santo_Domingo", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(new Date());
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  const localDateAsUtc = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = localDateAsUtc.getUTCDay();
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  return new Date(Date.UTC(year, month - 1, day - daysSinceMonday, 4));
 }
 
 export async function getWorkCenterData() {
@@ -37,23 +75,32 @@ export async function getWorkCenterData() {
           ],
         };
 
+    const weekStart = startOfCurrentWeekInSantoDomingo();
+    const terminalStatuses: WorkTaskStatus[] = ["COMPLETED", "CANCELLED"];
+    const currentTasksWhere: Prisma.WorkTaskWhereInput = {
+      ...scope,
+      OR: [
+        { status: { notIn: terminalStatuses } },
+        { status: { in: terminalStatuses }, completedAt: { gte: weekStart } },
+        { status: { in: terminalStatuses }, completedAt: null },
+      ],
+    };
+    const historyTasksWhere: Prisma.WorkTaskWhereInput = {
+      ...scope,
+      status: { in: terminalStatuses },
+      completedAt: { lt: weekStart },
+    };
+
     const tasks = await prisma.workTask.findMany({
-      where: scope,
-      include: {
-        creator: { select: { name: true, email: true } },
-        assignee: { select: { id: true, name: true, email: true, image: true } },
-        assignees: {
-          include: { user: { select: { id: true, name: true, email: true, image: true } } },
-          orderBy: { assignedAt: "asc" },
-        },
-        events: {
-          orderBy: { createdAt: "desc" },
-          take: 8,
-          include: { actor: { select: { name: true } } },
-        },
-      },
+      where: currentTasksWhere,
+      include: taskInclude,
       orderBy: [{ status: "asc" }, { dueAt: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
       take: 100,
+    });
+    const historyTasks = await prisma.workTask.findMany({
+      where: historyTasksWhere,
+      include: taskInclude,
+      orderBy: { completedAt: "desc" },
     });
 
     const [activeUsers, completedToday] = await Promise.all([
@@ -67,7 +114,7 @@ export async function getWorkCenterData() {
         where: {
           ...scope,
           status: "COMPLETED",
-          completedAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+          completedAt: { gte: weekStart },
         },
       }),
     ]);
@@ -79,6 +126,7 @@ export async function getWorkCenterData() {
 
     return {
       tasks,
+      historyTasks,
       activeUsers,
       metrics: {
         action: tasks.filter((task) => ["PENDING", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)).length,
