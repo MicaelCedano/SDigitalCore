@@ -15,7 +15,7 @@ import {
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
-import { sendPushToRole } from "@/lib/mobile/push";
+import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import type { Prisma } from "@prisma/client";
 
 const legacyWarehouseProductSelect = {
@@ -492,6 +492,31 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
       return tx.warehouseRequest.update({ where: { id }, data: { status } });
     });
     await logAudit({ userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: updated.id, afterData: { status: updated.status } });
+    const requesterIdentity = await prisma.warehouseRequest.findUnique({ where: { id }, select: { requestedBy: true } });
+    const requesterMatches = requesterIdentity?.requestedBy
+      ? await prisma.user.findMany({
+          where: {
+            status: "ACTIVE",
+            OR: [
+              { id: requesterIdentity.requestedBy },
+              { email: requesterIdentity.requestedBy },
+              { username: requesterIdentity.requestedBy },
+              { name: requesterIdentity.requestedBy },
+            ],
+          },
+          select: { id: true },
+          take: 2,
+        })
+      : [];
+    const requester = requesterMatches.length === 1 ? requesterMatches[0] : null;
+    if (requester) {
+      await sendPushToUsers([requester.id], {
+        title: updated.status === "APPROVED" ? "Solicitud de almacén aprobada" : "Solicitud de almacén rechazada",
+        body: `La solicitud ${updated.requestCode} fue ${updated.status === "APPROVED" ? "aprobada" : "rechazada"}.`,
+        route: "/almacen/transferencias",
+        type: updated.status === "APPROVED" ? "warehouse_request.approved" : "warehouse_request.rejected",
+      });
+    }
 
     revalidatePath("/almacen/transferencias");
     revalidatePath("/dashboard");
