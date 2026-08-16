@@ -38,7 +38,11 @@ export async function POST(request: Request) {
       tokens: target.pushDevices.map((device) => device.token),
       notification: { title: parsed.data.title, body: parsed.data.body },
       data: { type: "admin_test", route: "/dashboard" },
-      android: { notification: { channelId: "sdigitalcore", clickAction: "FLUTTER_NOTIFICATION_CLICK" } },
+      // No usamos `clickAction` de Flutter: la APK es Tauri y esa acción no
+      // existe en su manifest de Android; al tocarla Android no tenía una
+      // Activity válida que abrir. Sin una acción explícita, FCM usa la
+      // Activity principal de la aplicación.
+      android: { notification: { channelId: "sdigitalcore" } },
     });
 
     const invalidDeviceIds = response.responses.flatMap((result, index) => {
