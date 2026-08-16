@@ -331,18 +331,32 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          {/* Widgets Principales Admin */}
-          <section className="space-y-6">
-            <AdminWarrantyWidget
-              cases={overview.recentWarrantyCases}
-              events={overview.recentWarrantyEvents}
-              counts={overview.warrantyCounts}
-            />
+          {/* Alerta inteligente con gradiente */}
+          {totalPendingCount > 0 ? (
+            <div className="flex flex-col gap-3.5 rounded-2xl border border-amber-200/70 bg-gradient-to-r from-amber-50/70 via-orange-50/30 to-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-4.5">
+              <div className="flex items-start gap-3 sm:items-center">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-amber-700">
+                  <AlertCircle size={20} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-amber-900">
+                    Atención: Tienes {totalPendingCount} pago{totalPendingCount === 1 ? "" : "s"} y lote{totalPendingCount === 1 ? "" : "s"} listos para autorización
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-800/80">
+                    Monto total acumulado: <strong>RD$ {totalPendingPayouts.toLocaleString("es-DO")}</strong>. Puedes aprobarlos directamente abajo en 1 clic.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
+          {/* Grilla principal 1: Estaciones de Trabajo (2 columnas en xl) */}
+          <section className="grid gap-6 xl:grid-cols-2" aria-label="Estaciones de trabajo operativas">
+            {/* Widget 1: Centro de Aprobaciones y Pagos Inmediatos */}
             <AdminTechnicianPaymentsWidget
-              qcBatches={overview.qcBatchesPending}
               repairJobs={overview.repairJobsPending}
               unlockRequests={overview.unlockRequestsPending}
+              qcBatches={overview.qcBatchesPending}
               walletRedemptions={overview.walletRedemptionsPending}
               repairPendingTotal={overview.repairPendingTotal}
               unlockPendingTotal={overview.unlockPendingTotal}
@@ -350,11 +364,97 @@ export default async function DashboardPage() {
               redemptionsPendingTotal={overview.redemptionsPendingTotal}
             />
 
+            {/* Widget 2: Centro de Trabajo Operativo en Vivo */}
             <AdminWorkCenterWidget data={overview.workCenter} />
+          </section>
 
-            {/* Fila Inferior Admin: Último Recibo de Mercancía + Solicitudes de Acceso */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+          {/* Grilla principal 2: Garantías y Logística (2 columnas en xl) */}
+          <section className="grid gap-6 xl:grid-cols-2" aria-label="Garantías y Logística">
+            {/* Widget 3: Garantías y Trazabilidad en Vivo */}
+            <AdminWarrantyWidget
+              cases={overview.recentWarrantyCases}
+              events={overview.recentWarrantyEvents}
+              counts={overview.warrantyCounts}
+            />
+
+            {/* Columna Derecha: Solicitudes de Almacén + Recibo + Solicitudes de Acceso */}
+            <div className="space-y-6">
+              {/* Solicitudes de Almacén */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-500/10">
+                      <ClipboardCheck size={20} strokeWidth={2.2} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold text-slate-900">Solicitudes de Almacén</h3>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${overview.pendingWarehouseRequestCount > 0 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200/60" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"}`}>
+                          {overview.pendingWarehouseRequestCount} pendiente{overview.pendingWarehouseRequestCount === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Entradas, salidas y transferencias pendientes de autorización.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/almacen/transferencias"
+                    className="focus-ring inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 hover:border-slate-300"
+                  >
+                    Ver almacén <ExternalLink size={12} />
+                  </Link>
+                </div>
+
+                {overview.pendingWarehouseRequests.length > 0 ? (
+                  <div className="divide-y divide-slate-100 p-2 sm:p-3">
+                    {overview.pendingWarehouseRequests.map((request) => (
+                      <Link
+                        key={request.id}
+                        href="/almacen/transferencias"
+                        className="group flex flex-col gap-2 rounded-xl p-3.5 transition-all hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">
+                              {request.requestCode}
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${request.type === "ENTRY" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60" : "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60"}`}>
+                              {request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}
+                            </span>
+                            <span className="text-[11px] text-slate-400">· {formatDate(request.createdAt)}</span>
+                          </div>
+                          <p className="mt-1 truncate text-sm font-semibold text-slate-900">{request.title}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            Por: <span className="font-medium text-slate-700">{request.requestedBy}</span> · Sucursal: <span className="font-medium text-slate-700">{request.branch}</span> · {request._count.items} línea{request._count.items === 1 ? "" : "s"}
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 group-hover:text-indigo-800">
+                          Revisar <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-6 py-9 text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/60">
+                      <PackageCheck size={20} />
+                    </div>
+                    <p className="mt-2.5 text-sm font-semibold text-slate-900">No hay solicitudes pendientes</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Todas las solicitudes de almacén están procesadas.</p>
+                  </div>
+                )}
+
+                <div className="border-t border-slate-100 bg-slate-50/40 px-5 py-3 text-right sm:px-6 rounded-b-2xl">
+                  <Link href="/almacen/transferencias" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                    Ir a transferencias y solicitudes <ArrowRight size={13} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Último Recibo */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
                 <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/10">
