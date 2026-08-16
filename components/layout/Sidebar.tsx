@@ -21,6 +21,7 @@ import {
   Wrench,
   Lock,
   X,
+  Sparkles,
 } from "lucide-react";
 
 interface SubNavItem {
@@ -123,38 +124,45 @@ export function Sidebar({
         <button
           type="button"
           aria-label="Cerrar navegación"
-          className="fixed inset-0 z-40 bg-[#101828]/45 backdrop-blur-[2px] md:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs md:hidden"
           onClick={onMobileClose}
         />
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-[#e4e7ec] bg-white transition-[width,transform] duration-200 print:hidden md:relative md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-slate-200/80 bg-white transition-[width,transform] duration-200 print:hidden md:relative md:translate-x-0 ${
           collapsed ? "w-[76px]" : "w-[276px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className={`flex h-[72px] items-center border-b border-[#f0f1f3] ${collapsed ? "justify-center px-3" : "justify-between px-5"}`}>
-          <Link href="/dashboard" className="focus-ring flex min-w-0 items-center gap-3 rounded-lg" onClick={onMobileClose}>
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-[#e4e7ec] bg-white">
-              <Image src="/logo.png" alt="" width={34} height={34} className="h-8 w-8 object-contain" priority unoptimized />
+        {/* Brand Header */}
+        <div className={`flex h-[72px] items-center border-b border-slate-100 ${collapsed ? "justify-center px-3" : "justify-between px-5"}`}>
+          <Link href="/dashboard" className="focus-ring flex min-w-0 items-center gap-3 rounded-xl p-1 transition-opacity hover:opacity-90" onClick={onMobileClose}>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
+              <Image src="/logo.png" alt="" width={34} height={34} className="h-7 w-7 object-contain" priority unoptimized />
             </span>
-            {!collapsed ? <span className="truncate text-[17px] font-bold tracking-[-0.025em] text-[#101828]">SDigitalCore</span> : null}
+            {!collapsed ? (
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-base font-bold tracking-tight text-slate-900">SDigitalCore</span>
+                <span className="block text-[10px] font-semibold text-indigo-600">Enterprise Suite</span>
+              </div>
+            ) : null}
           </Link>
           {!collapsed ? (
-            <button type="button" onClick={onMobileClose} className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-[#f2f4f7] md:hidden" aria-label="Cerrar menú">
+            <button type="button" onClick={onMobileClose} className="focus-ring rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700 md:hidden cursor-pointer" aria-label="Cerrar menú">
               <X size={19} />
             </button>
           ) : null}
         </div>
 
-        <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-3 py-4">
+        {/* Navigation items */}
+        <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
           {sections.map((section) => {
             const items = visibleItems.filter((item) => item.section === section);
             if (!items.length) return null;
             return (
-              <div key={section} className="mb-5 last:mb-0">
-                {!collapsed ? <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">{section}</p> : null}
-                <div className="space-y-1">
+              <div key={section} className="last:mb-0">
+                {!collapsed ? <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">{section}</p> : null}
+                <div className="space-y-0.5">
                   {items.map((item) => {
                     const Icon = item.icon;
                     const active = item.href === "/almacen" && pathname.startsWith("/almacen/recibos") ? false : isActive(item.href);
@@ -169,34 +177,36 @@ export function Sidebar({
                               onMobileClose?.();
                             }}
                             title={collapsed ? item.label : undefined}
-                            className={`focus-ring group flex min-h-11 flex-1 items-center gap-3 rounded-[10px] px-3 text-sm font-medium transition-colors ${
-                              active ? "bg-[#eef2ff] text-[#4338ca]" : "text-[#344054] hover:bg-[#f8fafc] hover:text-[#101828]"
+                            className={`focus-ring group flex min-h-10 flex-1 items-center gap-3 rounded-xl px-3 text-xs font-medium transition-all ${
+                              active
+                                ? "bg-indigo-50/80 text-indigo-700 font-semibold ring-1 ring-indigo-500/10 shadow-2xs"
+                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                             } ${collapsed ? "justify-center" : ""}`}
                           >
-                            <Icon size={19} strokeWidth={1.75} className={active ? "text-[#4f46e5]" : "text-[#667085] group-hover:text-[#344054]"} />
+                            <Icon size={18} strokeWidth={active ? 2.2 : 1.75} className={active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-700"} />
                             {!collapsed ? <span className="min-w-0 flex-1 truncate">{item.label}</span> : null}
                           </Link>
                           {!collapsed && item.children?.length ? (
                             <button
                               type="button"
                               onClick={() => setExpandedMenu(open ? "__closed" : item.moduleKey)}
-                              className="focus-ring absolute right-1.5 rounded-md p-2 text-[#98a2b3] hover:text-[#344054]"
+                              className="focus-ring absolute right-1.5 rounded-lg p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100/60 cursor-pointer"
                               aria-label={`${open ? "Ocultar" : "Mostrar"} opciones de ${item.label}`}
                               aria-expanded={open}
                             >
-                              <ChevronDown size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+                              <ChevronDown size={14} className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
                             </button>
                           ) : null}
                         </div>
                         {!collapsed && open && item.children?.length ? (
-                          <div className="ml-5 mt-1 space-y-0.5 border-l border-[#e4e7ec] pl-4">
+                          <div className="ml-5 mt-1 space-y-0.5 border-l border-slate-200/80 pl-3">
                             {item.children.filter((child) => child.href !== "/almacen/recibos" && (!child.adminOnly || roleCode === "ADMIN")).map((child) => (
                               <Link
                                 key={child.href}
                                 href={child.href}
                                 onClick={onMobileClose}
-                                className={`focus-ring block rounded-lg px-3 py-2 text-[13px] transition-colors ${
-                                  pathname === child.href ? "font-semibold text-[#4338ca]" : "text-[#667085] hover:bg-[#f8fafc] hover:text-[#344054]"
+                                className={`focus-ring block rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                                  pathname === child.href ? "font-bold text-indigo-600 bg-indigo-50/50" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                 }`}
                               >
                                 {child.label}
@@ -213,14 +223,15 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="border-t border-[#e4e7ec] p-3">
+        {/* Bottom Toggle Collapse */}
+        <div className="border-t border-slate-100 p-3">
           <button
             type="button"
             onClick={onToggleCollapse}
-            className={`focus-ring hidden h-11 w-full items-center rounded-[10px] text-sm font-medium text-[#475467] hover:bg-[#f8fafc] md:flex ${collapsed ? "justify-center" : "gap-3 px-3"}`}
+            className={`focus-ring hidden h-10 w-full items-center rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors md:flex cursor-pointer ${collapsed ? "justify-center" : "gap-2.5 px-3"}`}
             aria-label={collapsed ? "Expandir navegación" : "Colapsar navegación"}
           >
-            {collapsed ? <ChevronRight size={19} /> : <><ChevronLeft size={19} /><span>Colapsar</span></>}
+            {collapsed ? <ChevronRight size={18} /> : <><ChevronLeft size={18} /><span>Colapsar barra</span></>}
           </button>
         </div>
       </aside>

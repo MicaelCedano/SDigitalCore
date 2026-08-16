@@ -61,7 +61,7 @@ export function DashboardLayoutClient({
         .dashboard-shell {
           display: flex;
           min-height: 100dvh;
-          background: #f4f7fb;
+          background: #f8fafc;
           position: relative;
         }
 
@@ -81,13 +81,13 @@ export function DashboardLayoutClient({
 
         @media (min-width: 640px) {
           .dashboard-content {
-            padding: 32px 24px 48px;
+            padding: 28px 24px 48px;
           }
         }
 
         @media (min-width: 1024px) {
           .dashboard-content {
-            padding: 40px 32px 56px;
+            padding: 32px 32px 56px;
           }
         }
       `}</style>
