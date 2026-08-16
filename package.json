@@ -24,7 +24,11 @@
     "migration:legacy-qc:dry-run": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs",
     "migration:legacy-qc:apply": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs --apply",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "tauri": "tauri",
+    "mobile:android:init": "tauri android init",
+    "mobile:android:dev": "tauri android dev",
+    "mobile:android:build": "tauri android build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -48,6 +52,7 @@
     "react-dom": "19.2.8",
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",
+    "tauri-plugin-fcm": "0.1.9",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "./ServiceWorkerRegistration";
+import { FcmRegistration } from "./FcmRegistration";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -41,6 +42,7 @@ export default function RootLayout({
     <html lang="es" className={inter.variable} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
         <ServiceWorkerRegistration />
+        <FcmRegistration />
         {children}
       </body>
     </html>

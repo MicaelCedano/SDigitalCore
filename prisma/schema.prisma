@@ -66,8 +66,31 @@ model User {
   workTaskEvents             WorkTaskEvent[]
   workTaskAssignments        WorkTaskAssignee[] @relation("WorkTaskAssignmentUser")
   workTaskAssignmentsCreated WorkTaskAssignee[] @relation("WorkTaskAssignmentCreator")
+  pushDevices                PushDevice[]
 
   @@map("user")
+}
+
+enum PushDevicePlatform {
+  ANDROID
+
+  @@map("push_device_platform")
+}
+
+model PushDevice {
+  id          String            @id @default(cuid())
+  userId      String            @map("user_id")
+  token       String            @unique @db.Text
+  platform    PushDevicePlatform
+  appVersion  String?           @map("app_version") @db.VarChar(32)
+  lastSeenAt  DateTime          @default(now()) @map("last_seen_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform, lastSeenAt])
+  @@map("push_device")
 }
 
 model AuditLog {
