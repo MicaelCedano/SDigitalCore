@@ -22,7 +22,9 @@
     "migration:legacy-wallets:cutover": "node --env-file=.env.local scripts/migrate-legacy-users-wallets.mjs --cutover",
     "migration:legacy-wallets:reverse": "node --env-file=.env.local scripts/reverse-legacy-wallet-batch.mjs",
     "migration:legacy-qc:dry-run": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs",
-    "migration:legacy-qc:apply": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs --apply"
+    "migration:legacy-qc:apply": "node --env-file=.env.local scripts/migrate-legacy-qc-data.mjs --apply",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -51,6 +53,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2.5.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
