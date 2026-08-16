@@ -157,6 +157,15 @@ export function Sidebar({
               <X size={19} />
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="focus-ring hidden rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 md:flex"
+            aria-label={collapsed ? "Expandir navegación" : "Colapsar navegación"}
+            title={collapsed ? "Expandir barra" : "Colapsar barra"}
+          >
+            {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
+          </button>
         </div>
 
         {/* Navigation items */}

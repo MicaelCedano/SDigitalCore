@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { X } from "lucide-react";
 
 type FcmModule = typeof import("tauri-plugin-fcm");
 
@@ -41,6 +42,7 @@ export function FcmRegistration() {
   const started = useRef(false);
   const [status, setStatus] = useState<"idle" | "registering" | "denied" | "error" | "success">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const pendingRoute = useRef<string | null>(null);
@@ -163,8 +165,18 @@ export function FcmRegistration() {
     (typeof window === "undefined" || !isAndroidTauri())
   ) return null;
 
+  if (dismissed) return null;
+
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[100] rounded-2xl border border-amber-200 bg-white p-4 shadow-xl sm:left-auto sm:max-w-sm">
+    <div className="fixed bottom-4 left-4 right-4 z-[100] rounded-2xl border border-amber-200 bg-white p-4 pr-12 shadow-xl sm:left-auto sm:max-w-sm">
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+        aria-label="Cerrar aviso de notificaciones"
+      >
+        <X size={17} />
+      </button>
       <p className="text-sm font-semibold text-slate-900">
         {status === "registering" ? "Activando notificaciones…" : "Notificaciones sin activar"}
       </p>
