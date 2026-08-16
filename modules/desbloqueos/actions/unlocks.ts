@@ -323,6 +323,7 @@ export async function approveUnlockRequestAction(input: { requestId: string; act
     revalidatePath("/desbloqueos");
     revalidatePath("/desbloqueos/pagos");
     revalidatePath("/wallet");
+    revalidatePath("/dashboard");
   }
 }
 

@@ -204,6 +204,7 @@ export async function redeemWithdrawalAction(input: unknown): Promise<Result<{ i
     });
 
     revalidatePath("/wallet");
+    revalidatePath("/dashboard");
     return ok({ id: entry.id, redeemed: true });
   } catch (error) {
     if (error instanceof Error) return { success: false, error: error.message };
@@ -277,6 +278,7 @@ export async function cancelWithdrawalAction(input: unknown): Promise<Result<{ i
     });
 
     revalidatePath("/wallet");
+    revalidatePath("/dashboard");
     return ok({ id: entryId, cancelled: true });
   } catch (error) {
     if (error instanceof Error) return { success: false, error: error.message };

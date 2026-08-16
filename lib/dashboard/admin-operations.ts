@@ -168,6 +168,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         id: true,
         amount: true,
         description: true,
+        secureToken: true,
         createdAt: true,
         wallet: {
           select: { user: { select: { name: true, username: true } } },
@@ -188,6 +189,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   const repairPendingTotal = repairJobsPending.reduce((sum, job) => sum + Number(job.montoTotal), 0);
   const unlockPendingTotal = unlockRequestsPending.reduce((sum, req) => sum + Number(req.montoTotalPagado), 0);
   const qcPendingTotalDevices = qcBatchesPending.reduce((sum, batch) => sum + batch.totalDevices, 0);
+  const qcSubmittedBatches = qcBatchesPending.filter((b) => b.status === "SUBMITTED");
+  const qcSubmittedPendingTotal = qcSubmittedBatches.reduce((sum, b) => sum + b.reviewedDevices * 50, 0);
   const redemptionsPendingTotal = walletRedemptionsPending.reduce((sum, e) => sum + Number(e.amount), 0);
 
   return {
@@ -223,6 +226,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     qcBatchesPending,
     qcPendingCount: qcBatchesPending.length,
     qcPendingTotalDevices,
+    qcSubmittedCount: qcSubmittedBatches.length,
+    qcSubmittedPendingTotal,
     walletRedemptionsPending: walletRedemptionsPending.map((entry) => ({
       ...entry,
       amount: Number(entry.amount),

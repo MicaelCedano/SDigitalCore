@@ -122,7 +122,7 @@ export default async function DashboardPage() {
         ) : null}
       </section>
 
-      {overview && (overview.repairPendingCount > 0 || overview.unlockPendingCount > 0) ? (
+      {overview && (overview.repairPendingCount > 0 || overview.unlockPendingCount > 0 || overview.qcSubmittedCount > 0 || overview.redemptionsPendingCount > 0) ? (
         <div className="flex flex-col gap-3.5 rounded-2xl border border-[#fecdca] bg-gradient-to-r from-[#fffbfa] to-[#fef3f2] p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-start gap-3.5 sm:items-center">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fee4e2] text-[#d92d20] shadow-2xs">
@@ -130,18 +130,30 @@ export default async function DashboardPage() {
             </span>
             <div>
               <p className="text-sm font-bold text-[#b42318]">
-                Atención: Hay pagos pendientes de aprobación a técnicos
+                Atención: Hay pagos y aprobaciones pendientes en el sistema
               </p>
               <p className="mt-0.5 text-xs text-[#7a271a]">
                 {overview.repairPendingCount > 0 && (
                   <span>
-                    <strong>{overview.repairPendingCount} trabajo{overview.repairPendingCount === 1 ? "" : "s"}</strong> de reparación por <strong>RD$ {overview.repairPendingTotal.toLocaleString("es-DO")}</strong>
+                    <strong>{overview.repairPendingCount} trabajo{overview.repairPendingCount === 1 ? "" : "s"}</strong> de reparación (RD$ {overview.repairPendingTotal.toLocaleString("es-DO")})
                   </span>
                 )}
                 {overview.repairPendingCount > 0 && overview.unlockPendingCount > 0 && " · "}
                 {overview.unlockPendingCount > 0 && (
                   <span>
-                    <strong>{overview.unlockPendingCount} solicitud{overview.unlockPendingCount === 1 ? "" : "es"}</strong> de desbloqueo por <strong>RD$ {overview.unlockPendingTotal.toLocaleString("es-DO")}</strong>
+                    <strong>{overview.unlockPendingCount} solicitud{overview.unlockPendingCount === 1 ? "" : "es"}</strong> de desbloqueo (RD$ {overview.unlockPendingTotal.toLocaleString("es-DO")})
+                  </span>
+                )}
+                {(overview.repairPendingCount > 0 || overview.unlockPendingCount > 0) && overview.qcSubmittedCount > 0 && " · "}
+                {overview.qcSubmittedCount > 0 && (
+                  <span>
+                    <strong>{overview.qcSubmittedCount} lote{overview.qcSubmittedCount === 1 ? "" : "s"} QC</strong> listos para aceptar (RD$ {overview.qcSubmittedPendingTotal.toLocaleString("es-DO")})
+                  </span>
+                )}
+                {(overview.repairPendingCount > 0 || overview.unlockPendingCount > 0 || overview.qcSubmittedCount > 0) && overview.redemptionsPendingCount > 0 && " · "}
+                {overview.redemptionsPendingCount > 0 && (
+                  <span>
+                    <strong>{overview.redemptionsPendingCount} baucher{overview.redemptionsPendingCount === 1 ? "" : "es"}</strong> de retiro (RD$ {overview.redemptionsPendingTotal.toLocaleString("es-DO")})
                   </span>
                 )}
               </p>
@@ -152,7 +164,7 @@ export default async function DashboardPage() {
               href="/reparaciones/pagos"
               className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#d92d20] px-4 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-[#b42318]"
             >
-              Aprobar pagos ahora <ArrowRight size={14} />
+              Revisar pagos <ArrowRight size={14} />
             </Link>
           </div>
         </div>
@@ -206,13 +218,15 @@ export default async function DashboardPage() {
           </section>
 
           <section className="grid gap-5 xl:grid-cols-2" aria-label="Resumen de operaciones administrativas">
-            {/* Widget de Pagos a Técnicos (Aprobación Rápida) */}
+            {/* Widget de Pagos a Técnicos, Lotes QC y Desbloqueos (Aprobación Rápida) */}
             <AdminTechnicianPaymentsWidget
               repairJobs={overview.repairJobsPending}
               unlockRequests={overview.unlockRequestsPending}
+              qcBatches={overview.qcBatchesPending}
               walletRedemptions={overview.walletRedemptionsPending}
               repairPendingTotal={overview.repairPendingTotal}
               unlockPendingTotal={overview.unlockPendingTotal}
+              qcSubmittedPendingTotal={overview.qcSubmittedPendingTotal}
               redemptionsPendingTotal={overview.redemptionsPendingTotal}
             />
 
