@@ -268,6 +268,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
           },
         },
         orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+        take: 40,
       }),
       prisma.workTask.count({
         where: {

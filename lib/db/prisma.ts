@@ -17,6 +17,9 @@ function createPrismaClient(): PrismaClient {
 
   const pool = new Pool({
     connectionString,
+    max: 15,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
     ...(connectionString.includes(".pooler.supabase.com")
       ? { ssl: { rejectUnauthorized: false } }
       : {}),
@@ -25,10 +28,7 @@ function createPrismaClient(): PrismaClient {
 
   return new PrismaClient({
     adapter,
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    log: ["error", "warn"],
   });
 }
 

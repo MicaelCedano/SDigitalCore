@@ -50,20 +50,11 @@ export async function requirePermission(permission: string) {
 
 /**
  * Verifica si el usuario actual tiene un permiso. Retorna boolean.
- * Comprueba el permiso contra el rol y los módulos persistidos del usuario.
+ * Utiliza la consulta cacheada del usuario en memoria para máxima velocidad.
  */
 export async function can(permission: string): Promise<boolean> {
-  const user = await getCurrentUser();
-  if (!user) return false;
-
   try {
-    const { prisma } = await import("@/lib/db/prisma");
-    const persistedUser = await prisma.user.findFirst({
-      where: user.id
-        ? { id: user.id }
-        : { email: { equals: user.email ?? "", mode: "insensitive" } },
-      select: { roleCode: true, allowedModules: true, status: true },
-    });
+    const persistedUser = await getPersistedCurrentUser();
     if (!persistedUser || persistedUser.status !== "ACTIVE") return false;
     if (persistedUser.roleCode === "ADMIN") return true;
 
