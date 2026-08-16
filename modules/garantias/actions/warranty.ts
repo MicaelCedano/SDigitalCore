@@ -183,7 +183,11 @@ export async function listWarrantyCases(input?: {
     const cutoff = civilDate(santoDomingoDateString(new Date(Date.now() - 30 * 86_400_000)));
     const where: Prisma.WarrantyCaseWhereInput = {
       ...(archive === "active" ? { archivedAt: null } : archive === "archived" ? { archivedAt: { not: null } } : {}),
-      ...(status ? { status } : {}),
+      ...(status
+        ? { status }
+        : archive === "active"
+        ? { status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } }
+        : {}),
       ...(input?.olderThan30
         ? { status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: cutoff } }
         : {}),
@@ -233,7 +237,7 @@ export async function getWarrantyDashboardStats(): Promise<Result<Record<string,
     const [groups, open30, active] = await Promise.all([
       prisma.warrantyCase.groupBy({ by: ["status"], where: { archivedAt: null }, _count: { _all: true } }),
       prisma.warrantyCase.count({ where: { archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] }, entryDate: { lte: cutoff } } }),
-      prisma.warrantyCase.count({ where: { archivedAt: null } }),
+      prisma.warrantyCase.count({ where: { archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } } }),
     ]);
     return ok(Object.fromEntries([...groups.map((group) => [group.status, group._count._all]), ["OPEN_30_PLUS", open30], ["ACTIVE_TOTAL", active]]));
   } catch (error) {

@@ -180,7 +180,9 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   const warrantyCounts = warrantyGroupStats.reduce<Record<string, number>>(
     (acc, curr) => {
       acc[curr.status] = curr._count._all;
-      acc.totalActive = (acc.totalActive || 0) + curr._count._all;
+      if (curr.status !== "DELIVERED" && curr.status !== "CREDIT_NOTE") {
+        acc.totalActive = (acc.totalActive || 0) + curr._count._all;
+      }
       return acc;
     },
     { totalActive: 0 },
