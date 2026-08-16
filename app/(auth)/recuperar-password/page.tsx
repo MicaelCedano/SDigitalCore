@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { PasswordResetForm } from "./PasswordResetForm";
 
-export default function RecuperarPasswordPage() {
-  redirect("/login");
+export default async function RecuperarPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
+  const params = await searchParams;
+  return <PasswordResetForm token={params.token} />;
 }

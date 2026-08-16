@@ -74,7 +74,7 @@ docs/                  — Documentación de arquitectura
 |---|---|---|
 | `/` | — | Redirige a `/dashboard` |
 | `/login` | Pública | ✅ Implementada |
-| `/recuperar-password` | Pública | 🔲 Placeholder |
+| `/recuperar-password` | Pública | 🟡 Implementada; requiere Resend configurado |
 | `/dashboard` | Auth requerida | ✅ Resumen operativo |
 | `/almacen` | Auth + permisos | ✅ Recibos, stock y transferencias |
 | `/garantias` | Auth + permisos | ✅ Ingreso, flujos, documentos e historial |
