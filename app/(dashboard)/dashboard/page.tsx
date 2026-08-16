@@ -87,8 +87,6 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
             <span className="flex h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" />
             <span>{capitalizedDate}</span>
-            <span className="text-slate-300">·</span>
-            <span>Santo Domingo</span>
           </div>
           <h2 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-slate-900 sm:text-3xl">
             {greeting}, {firstName}
