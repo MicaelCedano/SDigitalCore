@@ -28,11 +28,13 @@ interface SubNavItem {
   label: string;
   href: string;
   adminOnly?: boolean;
+  nonAdminOnly?: boolean;
 }
 
 interface NavItem {
   label: string;
   href: string;
+  adminHref?: string;
   moduleKey: string;
   icon: React.ElementType;
   section: "Inicio" | "Operaciones" | "Comercial" | "Administración";
@@ -48,20 +50,20 @@ const navItems: NavItem[] = [
     { label: "Movimientos", href: "/almacen/movimientos", adminOnly: true },
     { label: "Solicitudes de almacén", href: "/almacen/transferencias" },
   ] },
-  { label: "Control de Calidad", href: "/qc", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
-    { label: "Panel QC", href: "/qc" },
+  { label: "Control de Calidad", href: "/qc", adminHref: "/qc/lotes", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
+    { label: "Panel QC", href: "/qc", nonAdminOnly: true },
     { label: "Compra de lotes", href: "/qc/lotes", adminOnly: true },
     { label: "Pagos QC", href: "/qc/pagos", adminOnly: true },
     { label: "Penalidades", href: "/qc/penalidades", adminOnly: true },
     { label: "Solicitudes de IMEIs", href: "/qc/solicitudes", adminOnly: true },
     { label: "Equipos revisados", href: "/qc/equipos-revisados", adminOnly: true },
   ] },
-  { label: "Reparaciones", href: "/reparaciones", moduleKey: "reparaciones", icon: Wrench, section: "Operaciones", children: [
-    { label: "Panel de reparaciones", href: "/reparaciones" },
+  { label: "Reparaciones", href: "/reparaciones", adminHref: "/reparaciones/pagos", moduleKey: "reparaciones", icon: Wrench, section: "Operaciones", children: [
+    { label: "Panel de reparaciones", href: "/reparaciones", nonAdminOnly: true },
     { label: "Aprobar pagos", href: "/reparaciones/pagos", adminOnly: true },
   ] },
-  { label: "Desbloqueos", href: "/desbloqueos", moduleKey: "desbloqueos", icon: Lock, section: "Operaciones", children: [
-    { label: "Panel de desbloqueos", href: "/desbloqueos" },
+  { label: "Desbloqueos", href: "/desbloqueos", adminHref: "/desbloqueos/pagos", moduleKey: "desbloqueos", icon: Lock, section: "Operaciones", children: [
+    { label: "Panel de desbloqueos", href: "/desbloqueos", nonAdminOnly: true },
     { label: "Aprobar y pagar", href: "/desbloqueos/pagos", adminOnly: true },
   ] },
   { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards, section: "Comercial" },
@@ -165,15 +167,24 @@ export function Sidebar({
                 <div className="space-y-0.5">
                   {items.map((item) => {
                     const Icon = item.icon;
+                    const targetHref = roleCode === "ADMIN" && item.adminHref ? item.adminHref : item.href;
                     const active = item.href === "/almacen" && pathname.startsWith("/almacen/recibos") ? false : isActive(item.href);
                     const open = expandedMenu === item.moduleKey || (expandedMenu === null && active);
+
+                    const filteredChildren = (item.children || []).filter((child) => {
+                      if (child.href === "/almacen/recibos") return false;
+                      if (child.adminOnly && roleCode !== "ADMIN") return false;
+                      if (child.nonAdminOnly && roleCode === "ADMIN") return false;
+                      return true;
+                    });
+
                     return (
                       <div key={item.href}>
                         <div className="relative flex items-center">
                           <Link
-                            href={item.href}
+                            href={targetHref}
                             onClick={() => {
-                              if (item.children?.length) setExpandedMenu(item.moduleKey);
+                              if (filteredChildren.length) setExpandedMenu(item.moduleKey);
                               onMobileClose?.();
                             }}
                             title={collapsed ? item.label : undefined}
@@ -186,7 +197,7 @@ export function Sidebar({
                             <Icon size={18} strokeWidth={active ? 2.2 : 1.75} className={active ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-700"} />
                             {!collapsed ? <span className="min-w-0 flex-1 truncate">{item.label}</span> : null}
                           </Link>
-                          {!collapsed && item.children?.length ? (
+                          {!collapsed && filteredChildren.length > 0 ? (
                             <button
                               type="button"
                               onClick={() => setExpandedMenu(open ? "__closed" : item.moduleKey)}
@@ -198,9 +209,9 @@ export function Sidebar({
                             </button>
                           ) : null}
                         </div>
-                        {!collapsed && open && item.children?.length ? (
+                        {!collapsed && open && filteredChildren.length > 0 ? (
                           <div className="ml-5 mt-1 space-y-0.5 border-l border-slate-200/80 pl-3">
-                            {item.children.filter((child) => child.href !== "/almacen/recibos" && (!child.adminOnly || roleCode === "ADMIN")).map((child) => (
+                            {filteredChildren.map((child) => (
                               <Link
                                 key={child.href}
                                 href={child.href}
