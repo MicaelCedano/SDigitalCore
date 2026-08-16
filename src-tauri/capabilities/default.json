@@ -3,6 +3,7 @@
   "identifier": "main-capability",
   "description": "Capacidades mínimas de la ventana principal de SDigitalCore",
   "windows": ["main"],
+  "remote": { "urls": ["https://sdigitalcore.vercel.app/*"] },
   "permissions": [
     "core:default",
     "opener:allow-default-urls",
