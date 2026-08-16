@@ -44,4 +44,5 @@ next-env.d.ts
 # Tauri generated artifacts
 /src-tauri/target/
 /src-tauri/gen/
+/*_android-signed.apk
 /.npm-cache/
