@@ -5,6 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 
 type FcmModule = typeof import("tauri-plugin-fcm");
 
+function isAndroidTauri() {
+  return "__TAURI_INTERNALS__" in window && /Android/i.test(navigator.userAgent);
+}
+
 function routeFromDeepLink(rawUrl: string) {
   try {
     const url = new URL(rawUrl);
@@ -49,7 +53,7 @@ export function FcmRegistration() {
   }, [pathname, router]);
 
   useEffect(() => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
+    if (!isAndroidTauri()) return;
     let unlisten: (() => void) | undefined;
     let disposed = false;
 
@@ -81,7 +85,7 @@ export function FcmRegistration() {
   }, [navigateToNotificationRoute]);
 
   const registerDevice = useCallback(async () => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
+    if (!isAndroidTauri()) return;
     setStatus("registering");
     setErrorMessage(null);
     started.current = true;
@@ -147,7 +151,7 @@ export function FcmRegistration() {
     if (
       started.current ||
       publicRoutes.includes(pathname) ||
-      !("__TAURI_INTERNALS__" in window)
+      !isAndroidTauri()
     ) return;
     void registerDevice();
   }, [pathname, registerDevice]);
@@ -156,7 +160,7 @@ export function FcmRegistration() {
     status === "idle" ||
     status === "success" ||
     ["/login", "/recuperar-password", "/solicitar-acceso"].includes(pathname) ||
-    !("__TAURI_INTERNALS__" in (typeof window === "undefined" ? {} : window))
+    (typeof window === "undefined" || !isAndroidTauri())
   ) return null;
 
   return (
