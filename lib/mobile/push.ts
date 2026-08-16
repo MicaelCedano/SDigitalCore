@@ -42,7 +42,9 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload) {
           type: payload.type ?? "system",
           route: payload.route ?? "/dashboard",
         },
-        android: { notification: { channelId: "sdigitalcore" } },
+      android: {
+        notification: { channelId: "sdigitalcore" },
+      },
       });
       response.responses.forEach((result, index) => {
         if (result.error?.code && INVALID_TOKEN_CODES.has(result.error.code)) invalidDeviceIds.push(batch[index].id);

@@ -42,7 +42,9 @@ export async function POST(request: Request) {
       // existe en su manifest de Android; al tocarla Android no tenía una
       // Activity válida que abrir. Sin una acción explícita, FCM usa la
       // Activity principal de la aplicación.
-      android: { notification: { channelId: "sdigitalcore" } },
+      android: {
+        notification: { channelId: "sdigitalcore" },
+      },
     });
 
     const invalidDeviceIds = response.responses.flatMap((result, index) => {

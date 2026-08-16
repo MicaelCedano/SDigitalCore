@@ -1,9 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type FcmModule = typeof import("tauri-plugin-fcm");
+
+function routeFromDeepLink(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "sdigitalcore:" || url.hostname !== "notification") return null;
+    const route = url.searchParams.get("route");
+    if (!route || !route.startsWith("/") || route.startsWith("//")) return null;
+    return route;
+  } catch {
+    return null;
+  }
+}
 
 function describeError(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -26,6 +38,47 @@ export function FcmRegistration() {
   const [status, setStatus] = useState<"idle" | "registering" | "denied" | "error" | "success">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+  const pendingRoute = useRef<string | null>(null);
+
+  const navigateToNotificationRoute = useCallback(() => {
+    const route = pendingRoute.current;
+    if (!route || pathname === "/login" || pathname === "/recuperar-password" || pathname === "/solicitar-acceso") return;
+    pendingRoute.current = null;
+    router.replace(route);
+  }, [pathname, router]);
+
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+
+    void import("@tauri-apps/plugin-deep-link").then(async ({ getCurrent, onOpenUrl }) => {
+      const consume = (urls: string[]) => {
+        const route = urls.map(routeFromDeepLink).find((value): value is string => Boolean(value));
+        if (!route) return;
+        pendingRoute.current = route;
+        navigateToNotificationRoute();
+      };
+      const initialUrls = await getCurrent();
+      if (initialUrls) consume(initialUrls);
+        const listener = await onOpenUrl(consume);
+        if (disposed) {
+          listener();
+        } else {
+          unlisten = listener;
+        }
+    }).catch((error) => console.error("[FCM] No se pudo preparar la navegación profunda", error));
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [navigateToNotificationRoute]);
+
+  useEffect(() => {
+    navigateToNotificationRoute();
+  }, [navigateToNotificationRoute]);
 
   const registerDevice = useCallback(async () => {
     if (!("__TAURI_INTERNALS__" in window)) return;
@@ -62,7 +115,7 @@ export function FcmRegistration() {
           await fetch("/api/mobile/push-token", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.2" }),
+            body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.3" }),
           });
         };
 

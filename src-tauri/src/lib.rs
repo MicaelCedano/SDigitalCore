@@ -25,6 +25,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(mobile)]
             app.handle().plugin(tauri_plugin_fcm::init())?;
+            #[cfg(mobile)]
+            app.handle().plugin(tauri_plugin_deep_link::init())?;
 
             let window_builder = WebviewWindowBuilder::new(
                 app,

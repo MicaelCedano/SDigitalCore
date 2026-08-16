@@ -1,4 +1,4 @@
-const APK_SOURCE = "https://github.com/MicaelCedano/SDigitalCore/releases/download/v0.1.2/SDigitalCore_0.1.2_android-arm64-signed.apk";
+const APK_SOURCE = "https://github.com/MicaelCedano/SDigitalCore/releases/download/v0.1.3/SDigitalCore_0.1.3_android-arm64-signed.apk";
 
 export async function GET() {
   const upstream = await fetch(APK_SOURCE, {
@@ -13,7 +13,7 @@ export async function GET() {
 
   const headers = new Headers({
     "Content-Type": "application/vnd.android.package-archive",
-    "Content-Disposition": 'attachment; filename="SDigitalCore_0.1.2_android-arm64-signed.apk"',
+    "Content-Disposition": 'attachment; filename="SDigitalCore_0.1.3_android-arm64-signed.apk"',
     "Cache-Control": "public, max-age=3600",
   });
   const contentLength = upstream.headers.get("content-length");
