@@ -7,59 +7,14 @@ import { AdminTechnicianPaymentsWidget } from "@/components/dashboard/AdminTechn
 import {
   ArrowRight,
   ClipboardCheck,
-  FileText,
   PackageCheck,
   Plus,
-  Settings,
   UserPlus,
-  Warehouse,
-  ShieldCheck,
-  Wrench,
-  Lock,
-  ScanSearch,
-  WalletCards,
-  Banknote,
   AlertCircle,
   Coins,
 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Resumen general" };
-
-const operations = [
-  { label: "Control de Calidad", href: "/qc", moduleKey: "qc", icon: ScanSearch },
-  { label: "Reparaciones", href: "/reparaciones", moduleKey: "reparaciones", icon: Wrench },
-  { label: "Desbloqueos", href: "/desbloqueos", moduleKey: "desbloqueos", icon: Lock },
-  { label: "Gestión de Garantías", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck },
-];
-
-const commercial = [
-  { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards },
-];
-
-const administration = [
-  { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings },
-];
-
-const groups = [
-  {
-    title: "Operaciones",
-    description: "Mercancía, movimientos y solicitudes persistidas.",
-    icon: Warehouse,
-    items: operations,
-  },
-  {
-    title: "Comercial",
-    description: "Precios y documentos comerciales conectados a la base central.",
-    icon: FileText,
-    items: commercial,
-  },
-  {
-    title: "Administración",
-    description: "Información consolidada y control del sistema.",
-    icon: Settings,
-    items: administration,
-  },
-];
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("es-DO", {
@@ -74,21 +29,11 @@ export default async function DashboardPage() {
     getCurrentUser(),
     getPersistedCurrentUser(),
   ]);
+
   const overview = persistedUser?.roleCode === "ADMIN"
     ? await getAdminOperationsOverview(persistedUser.id)
     : null;
-  const allowedModuleSet =
-    persistedUser?.roleCode === "ADMIN"
-      ? null
-      : new Set(persistedUser?.allowedModules ?? []);
-  const visibleGroups = groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) => allowedModuleSet === null || allowedModuleSet.has(item.moduleKey),
-      ),
-    }))
-    .filter((group) => group.items.length > 0);
+
   const hour = Number(
     new Date().toLocaleString("es-DO", {
       timeZone: "America/Santo_Domingo",
@@ -99,12 +44,9 @@ export default async function DashboardPage() {
   const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
   const firstName = user?.name?.split(" ")[0] ?? "usuario";
 
-  const totalTechnicianPending = overview
-    ? overview.repairPendingTotal + overview.unlockPendingTotal
-    : 0;
-
   return (
     <div className="mx-auto max-w-[1280px] space-y-7">
+      {/* Cabecera y accesos rápidos */}
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h2 className="text-3xl font-bold tracking-[-0.035em] text-[#101828] sm:text-[34px]">{greeting}, {firstName}</h2>
@@ -122,6 +64,7 @@ export default async function DashboardPage() {
         ) : null}
       </section>
 
+      {/* Banner de alerta de pagos y aprobaciones pendientes */}
       {overview && (overview.repairPendingCount > 0 || overview.unlockPendingCount > 0 || overview.qcSubmittedCount > 0 || overview.redemptionsPendingCount > 0) ? (
         <div className="flex flex-col gap-3.5 rounded-2xl border border-[#fecdca] bg-gradient-to-r from-[#fffbfa] to-[#fef3f2] p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-start gap-3.5 sm:items-center">
@@ -172,51 +115,7 @@ export default async function DashboardPage() {
 
       {overview ? (
         <>
-          {/* Resumen de módulos activos */}
-          <section aria-label="Resumen de módulos">
-            <div className="mb-3">
-              <h3 className="text-lg font-semibold tracking-[-0.02em] text-[#101828]">Resumen de módulos</h3>
-              <p className="mt-1 text-sm text-[#667085]">Lo que está pendiente de tu decisión en cada módulo.</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Link href="/reparaciones/pagos" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#fecdca] hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#fef3f2] text-[#b42318]"><Wrench size={18} /></span>
-                  <span className="rounded-full bg-[#fef3f2] px-2 py-0.5 text-xs font-bold text-[#b42318]">{overview.repairPendingCount} trabajo{overview.repairPendingCount === 1 ? "" : "s"}</span>
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">RD$ {overview.repairPendingTotal.toLocaleString("es-DO")}</p>
-                <p className="mt-1 text-xs font-medium text-[#667085]">Reparaciones por pagar</p>
-              </Link>
-
-              <Link href="/desbloqueos/pagos" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#fedf89] hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#fff4e5] text-[#b54708]"><Lock size={18} /></span>
-                  <span className="rounded-full bg-[#fff4e5] px-2 py-0.5 text-xs font-bold text-[#b54708]">{overview.unlockPendingCount} solicitud{overview.unlockPendingCount === 1 ? "" : "es"}</span>
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">RD$ {overview.unlockPendingTotal.toLocaleString("es-DO")}</p>
-                <p className="mt-1 text-xs font-medium text-[#667085]">Desbloqueos por aprobar</p>
-              </Link>
-
-              <Link href="/qc/lotes" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#c7d2fe] hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#eef2ff] text-[#4f46e5]"><ScanSearch size={18} /></span>
-                  <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-xs font-bold text-[#4338ca]">{overview.qcPendingCount} lote{overview.qcPendingCount === 1 ? "" : "s"}</span>
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">{overview.qcPendingTotalDevices} equipo{overview.qcPendingTotalDevices === 1 ? "" : "s"}</p>
-                <p className="mt-1 text-xs font-medium text-[#667085]">Lotes QC en revisión</p>
-              </Link>
-
-              <Link href="/wallet" className="enterprise-panel group p-4 transition-all hover:-translate-y-0.5 hover:border-[#a6f4c5] hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#ecfdf3] text-[#027a48]"><Banknote size={18} /></span>
-                  <span className="rounded-full bg-[#ecfdf3] px-2 py-0.5 text-xs font-bold text-[#027a48]">{overview.redemptionsPendingCount} baucher{overview.redemptionsPendingCount === 1 ? "" : "es"}</span>
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-[-0.02em] text-[#101828]">RD$ {overview.redemptionsPendingTotal.toLocaleString("es-DO")}</p>
-                <p className="mt-1 text-xs font-medium text-[#667085]">Retiros por canjear</p>
-              </Link>
-            </div>
-          </section>
-
+          {/* Fila principal de Widgets de Operación */}
           <section className="grid gap-5 xl:grid-cols-2" aria-label="Resumen de operaciones administrativas">
             {/* Widget de Pagos a Técnicos, Lotes QC y Desbloqueos (Aprobación Rápida) */}
             <AdminTechnicianPaymentsWidget
@@ -238,8 +137,9 @@ export default async function DashboardPage() {
             />
           </section>
 
+          {/* Fila secundaria: Almacén y accesos */}
           <section className="grid gap-5 xl:grid-cols-2" aria-label="Operaciones de Almacén y accesos">
-            {/* Operaciones de Almacén */}
+            {/* Solicitudes de Almacén */}
             <div className="enterprise-panel overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e4e7ec] px-5 py-4 sm:px-6">
                 <div className="flex items-center gap-3">
@@ -283,6 +183,7 @@ export default async function DashboardPage() {
             </div>
 
             <div className="space-y-5">
+              {/* Último Recibo de Mercancía */}
               <div className="enterprise-panel overflow-hidden">
                 <div className="border-b border-[#e4e7ec] px-5 py-4">
                   <div className="flex items-center gap-3">
@@ -315,6 +216,7 @@ export default async function DashboardPage() {
                 )}
               </div>
 
+              {/* Solicitudes de Acceso */}
               <Link href="/configuracion" className="enterprise-panel group flex items-center gap-3.5 p-4 transition-colors hover:border-[#c7d2fe]">
                 <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#eef2ff] text-[#4f46e5]"><UserPlus size={19} /></span>
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#101828]">Solicitudes de acceso</span><span className="mt-0.5 block text-xs text-[#667085]">{overview.pendingAccessRequestCount} usuario{overview.pendingAccessRequestCount === 1 ? "" : "s"} esperando aprobación</span></span>
@@ -324,50 +226,6 @@ export default async function DashboardPage() {
           </section>
         </>
       ) : null}
-
-      <section className="enterprise-panel overflow-hidden" aria-labelledby="operations-title">
-        <div className="border-b border-[#e4e7ec] px-5 py-5 sm:px-6">
-          <h3 id="operations-title" className="text-lg font-semibold tracking-[-0.02em] text-[#101828]">Centro de operaciones</h3>
-          <p className="mt-1 text-sm text-[#667085]">Accede a los módulos habilitados para tu cuenta.</p>
-        </div>
-
-        <div className="divide-y divide-[#e4e7ec]">
-          {visibleGroups.map((group) => {
-            const GroupIcon = group.icon;
-            return (
-              <div key={group.title} className="grid lg:grid-cols-[270px_1fr]">
-                <div className="flex gap-4 border-b border-[#e4e7ec] bg-[#fcfcfd] p-5 lg:border-b-0 lg:border-r lg:p-6">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#eef2ff] text-[#4f46e5]">
-                    <GroupIcon size={20} strokeWidth={1.75} />
-                  </span>
-                  <div>
-                    <h4 className="text-sm font-semibold text-[#101828]">{group.title}</h4>
-                    <p className="mt-1 text-[13px] leading-5 text-[#667085]">{group.description}</p>
-                  </div>
-                </div>
-                <div className="grid sm:grid-cols-2">
-                  {group.items.map((item, index) => {
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`group flex min-h-[58px] items-center gap-3 px-5 py-3.5 text-sm font-medium text-[#344054] outline-none transition-colors hover:bg-[#f8fafc] hover:text-[#4338ca] focus-visible:bg-[#eef2ff] ${
-                          index % 2 === 0 ? "sm:border-r sm:border-[#f0f1f3]" : ""
-                        } ${index >= 2 ? "border-t border-[#f0f1f3]" : ""}`}
-                      >
-                        <Icon size={19} strokeWidth={1.75} className="shrink-0 text-[#475467] group-hover:text-[#4f46e5]" />
-                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                        <ArrowRight size={16} className="shrink-0 text-[#98a2b3] transition-transform group-hover:translate-x-0.5 group-hover:text-[#4f46e5]" />
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
     </div>
   );
 }
