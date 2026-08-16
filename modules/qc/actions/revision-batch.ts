@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
+import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import { payReviewersForBatch, QC_REVIEW_RATE } from "../lib/batch-payment";
@@ -196,6 +197,12 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
         supplierName: createdBatch.supplierName,
         totalDevices: createdBatch.totalDevices,
       },
+    });
+    await sendPushToRole("QC", {
+      title: `Nuevo lote QC ${createdBatch.batchNumber}`,
+      body: `${createdBatch.totalDevices} equipo(s) disponibles para revisión.`,
+      route: `/qc/lotes/${createdBatch.id}`,
+      type: "qc_batch.created",
     });
 
     revalidatePath("/qc/lotes");
@@ -490,6 +497,12 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
       beforeData: { status: batch.status },
       afterData: { status: "SUBMITTED", batchNumber: batch.batchNumber },
     });
+    await sendPushToRole("ADMIN", {
+      title: `Lote ${batch.batchNumber} enviado a aprobación`,
+      body: "El lote QC terminó su revisión y espera aprobación.",
+      route: `/qc/lotes/${batch.id}`,
+      type: "qc_batch.submitted",
+    });
 
     revalidatePath("/qc/lotes");
     revalidatePath(`/qc/lotes/${batch.id}`);
@@ -532,6 +545,11 @@ export async function approveRevisionBatchAction(input: { id: string; reject?: b
       return { success: false, error: `Solo se puede aceptar un lote ENVIADO (estado actual: ${batch.status}).` };
     }
 
+    const assignedReviewerRows = await prisma.deviceUnit.findMany({
+      where: { batchId: batch.id, assignedToId: { not: null } },
+      select: { assignedToId: true },
+    });
+    const assignedReviewerIds = [...new Set(assignedReviewerRows.map((device) => device.assignedToId).filter((id): id is string => Boolean(id)))];
     let paidReviewers = 0;
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.qcRevisionBatch.update({
@@ -561,6 +579,12 @@ export async function approveRevisionBatchAction(input: { id: string; reject?: b
       entityId: batch.id,
       beforeData: { status: batch.status },
       afterData: { status: updated.status, paidReviewers },
+    });
+    await sendPushToUsers(assignedReviewerIds, {
+      title: parsed.data.reject ? `Lote ${batch.batchNumber} devuelto` : `Lote ${batch.batchNumber} aprobado`,
+      body: parsed.data.reject ? "El administrador devolvió el lote para continuar la revisión." : "El lote fue aprobado y el pago fue acreditado.",
+      route: `/qc/lotes/${batch.id}`,
+      type: parsed.data.reject ? "qc_batch.rejected" : "qc_batch.approved",
     });
 
     revalidatePath("/qc/lotes");

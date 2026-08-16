@@ -5,6 +5,7 @@ import { Prisma, UnlockRequestStatus } from "@prisma/client";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
+import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import { santoDomingoDateString } from "@/modules/garantias/lib/document-number";
 import { revalidatePath } from "next/cache";
 
@@ -144,6 +145,12 @@ export async function createUnlockRequestAction(input: unknown): Promise<Result<
       entityType: "UnlockRequest",
       entityId: request.id,
       afterData: { requestCode, model, totalEquipos: imeis.length, montoTotal: imeis.length * UNLOCK_RATE },
+    });
+    await sendPushToRole("ADMIN", {
+      title: `Solicitud ${requestCode} pendiente`,
+      body: `${imeis.length} equipo(s) enviados a desbloqueo por ${user?.name || user?.username || "un técnico"}.`,
+      route: "/desbloqueos",
+      type: "unlock_request.created",
     });
 
     revalidatePath("/desbloqueos");
@@ -314,6 +321,16 @@ export async function approveUnlockRequestAction(input: { requestId: string; act
 
       return { requestCode: request.requestCode, montoTotal };
     });
+
+    const recipient = await prisma.unlockRequest.findUnique({ where: { id: requestId }, select: { technicianId: true } });
+    if (recipient) {
+      await sendPushToUsers([recipient.technicianId], {
+        title: action === "approve" ? "Desbloqueo aprobado" : "Desbloqueo rechazado",
+        body: action === "approve" ? `Solicitud ${result.requestCode} aprobada y pago acreditado.` : `Solicitud ${result.requestCode} rechazada por el administrador.`,
+        route: "/desbloqueos",
+        type: action === "approve" ? "unlock_request.approved" : "unlock_request.rejected",
+      });
+    }
 
     return ok(result);
   } catch (error) {

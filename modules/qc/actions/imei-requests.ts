@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
+import { sendPushToUsers } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
 import {
   createImeiRequestSchema,
@@ -318,6 +319,12 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
       entityId: request.id,
       afterData: { imeiCount: imeis.length, assignedDevices: assigned },
     });
+    await sendPushToUsers([request.requesterId], {
+      title: validated.accept ? "Solicitud QC aceptada" : "Solicitud QC rechazada",
+      body: validated.accept ? `${assigned} IMEI(s) fueron asignados a tu revisión.` : "La solicitud de IMEI fue rechazada por el administrador.",
+      route: "/qc/solicitudes",
+      type: validated.accept ? "qc_imei_request.accepted" : "qc_imei_request.rejected",
+    });
 
     revalidatePath("/qc");
     revalidatePath("/qc/solicitudes");
@@ -390,6 +397,14 @@ export async function assignDeviceToQcAction(deviceId: string, qcId: string | nu
       beforeData: { assignedToId: device.assignedToId },
       afterData: { assignedToId: qcId, imei: device.imei },
     });
+    if (qcId) {
+      await sendPushToUsers([qcId], {
+        title: "Equipo QC asignado",
+        body: `Se te asignó el equipo ${device.imei || device.id} para revisión.`,
+        route: device.batchId ? `/qc/lotes/${device.batchId}` : "/qc",
+        type: "qc_device.assigned",
+      });
+    }
 
     revalidatePath("/qc/lotes");
     revalidatePath(`/qc/lotes/${device.batchId}`);

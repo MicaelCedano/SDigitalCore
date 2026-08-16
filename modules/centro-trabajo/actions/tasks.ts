@@ -111,6 +111,14 @@ export async function updateWorkTaskAction(taskId: string, input: unknown) {
     return task;
   });
   await logAudit({ userId: user.id, action: "work_task.update", module: "centro-trabajo", entityType: "work_task", entityId: updated.id, beforeData: { title: existing.title, priority: existing.priority, assigneeIds: existing.assignees.map((assignment) => assignment.userId) }, afterData: { title: updated.title, priority: updated.priority, assigneeIds } });
+  const previousAssigneeIds = new Set(existing.assignees.map((assignment) => assignment.userId));
+  const newlyAssignedIds = assigneeIds.filter((id) => !previousAssigneeIds.has(id));
+  await sendPushToUsers(newlyAssignedIds, {
+    title: "Nueva tarea asignada",
+    body: updated.title,
+    route: updated.sourceUrl || "/centro-trabajo",
+    type: "work_task.assigned",
+  });
   revalidatePath("/centro-trabajo");
   return { success: true };
 }
@@ -170,6 +178,14 @@ export async function claimWorkTaskAction(taskId: string) {
     await tx.workTask.update({ where: { id: taskId }, data: { assigneeId: task.assigneeId ?? user.id, status: task.status === "PENDING" ? "IN_PROGRESS" : undefined, events: { create: { actorId: user.id, type: "ASSIGNED", note: task.assignmentMode === "MULTIPLE" ? "La tarea fue cogida por un integrante del equipo." : "La tarea fue cogida.", afterData: { userId: user.id, assignmentMode: task.assignmentMode } } } } });
   });
   await logAudit({ userId: user.id, action: "work_task.claim", module: "centro-trabajo", entityType: "work_task", entityId: task.id, afterData: { assignmentMode: task.assignmentMode } });
+  if (task.creatorId !== user.id) {
+    await sendPushToUsers([task.creatorId], {
+      title: "Tarea tomada",
+      body: `${user.id === task.assigneeId ? "El responsable" : "Un integrante"} tomó la tarea: ${task.title}.`,
+      route: task.sourceUrl || "/centro-trabajo",
+      type: "work_task.claimed",
+    });
+  }
   revalidatePath("/centro-trabajo");
   return { success: true };
 }

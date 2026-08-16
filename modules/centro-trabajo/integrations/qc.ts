@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { sendPushToUsers } from "@/lib/mobile/push";
 
 type QcBatchForTasks = {
   id: string;
@@ -125,4 +126,12 @@ async function upsertQcTask(input: {
       events: { create: { actorId: input.creatorId, type: "CREATED", afterData: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } } },
     },
   });
+  if (input.assigneeId) {
+    await sendPushToUsers([input.assigneeId], {
+      title: "Lote QC asignado",
+      body: `${input.title}. Tienes ${input.progressTotal - input.progressDone} equipo(s) pendiente(s).`,
+      route: input.sourceUrl,
+      type: "qc_batch.assigned",
+    });
+  }
 }
