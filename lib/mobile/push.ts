@@ -55,6 +55,10 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload) {
 }
 
 export async function sendPushToRole(roleCode: string, payload: PushPayload) {
-  const users = await prisma.user.findMany({ where: { roleCode, status: "ACTIVE" }, select: { id: true } });
-  await sendPushToUsers(users.map((user) => user.id), payload);
+  try {
+    const users = await prisma.user.findMany({ where: { roleCode, status: "ACTIVE" }, select: { id: true } });
+    await sendPushToUsers(users.map((user) => user.id), payload);
+  } catch (error) {
+    console.error("[push] No se pudieron resolver los destinatarios:", error instanceof Error ? error.message : error);
+  }
 }
