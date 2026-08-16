@@ -58,6 +58,9 @@ export async function can(permission: string): Promise<boolean> {
     if (!persistedUser || persistedUser.status !== "ACTIVE") return false;
     if (persistedUser.roleCode === "ADMIN") return true;
 
+    // Cualquier usuario activo del sistema puede consultar su propia wallet personal
+    if (permission === "wallet.read") return true;
+
     const permissionModule = permission.split(".")[0];
     const moduleAliases: Record<string, string> = {
       inventory: "inventario",
