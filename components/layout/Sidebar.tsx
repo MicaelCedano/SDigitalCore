@@ -123,17 +123,19 @@ export function Sidebar({
 
   return (
     <>
-      {mobileOpen ? (
-        <button
-          type="button"
-          aria-label="Cerrar navegación"
-          className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs md:hidden"
-          onClick={onMobileClose}
-        />
-      ) : null}
+      <button
+        type="button"
+        aria-label="Cerrar navegación"
+        aria-hidden={!mobileOpen}
+        tabIndex={mobileOpen ? 0 : -1}
+        className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs transition-[opacity,backdrop-filter] duration-300 ease-out md:hidden ${
+          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={onMobileClose}
+      />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-slate-200/80 bg-white transition-[width,transform] duration-200 print:hidden md:relative md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-slate-200/80 bg-white shadow-[12px_0_32px_-20px_rgba(15,23,42,0.35)] transition-[width,transform,box-shadow] duration-300 ease-out will-change-transform print:hidden md:relative md:translate-x-0 md:shadow-none ${
           collapsed ? "w-[76px]" : "w-[276px]"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
