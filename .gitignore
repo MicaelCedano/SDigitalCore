@@ -45,4 +45,5 @@ next-env.d.ts
 /src-tauri/target/
 /src-tauri/gen/
 /*_android-signed.apk
+/*_android-arm64-signed.apk
 /.npm-cache/
