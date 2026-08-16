@@ -18,39 +18,51 @@ export function FcmRegistration() {
     started.current = true;
 
     const register = async () => {
-      const fcm: FcmModule = await import("tauri-plugin-fcm");
-      let permission = await fcm.checkPermissions();
-      if (permission === "prompt" || permission === "prompt-with-rationale") {
-        permission = await fcm.requestPermissions();
-      }
-      if (permission !== "granted") {
-        started.current = false;
-        setStatus("denied");
-        return;
-      }
+      let stage = "cargando el módulo FCM";
+      try {
+        const fcm: FcmModule = await import("tauri-plugin-fcm");
+        stage = "consultando el permiso de notificaciones";
+        let permission = await fcm.checkPermissions();
+        if (permission === "prompt" || permission === "prompt-with-rationale") {
+          stage = "solicitando el permiso de notificaciones";
+          permission = await fcm.requestPermissions();
+        }
+        if (permission !== "granted") {
+          started.current = false;
+          setStatus("denied");
+          return;
+        }
 
-      await fcm.createChannel({
-        id: "sdigitalcore",
-        name: "SDigitalCore",
-        importance: 4,
-      });
-      await fcm.register();
-
-      const sendToken = async (token: string) => {
-        await fetch("/api/mobile/push-token", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.1" }),
+        stage = "creando el canal de notificaciones";
+        await fcm.createChannel({
+          id: "sdigitalcore",
+          name: "SDigitalCore",
+          importance: 4,
         });
-      };
+        stage = "inicializando FCM";
+        await fcm.register();
 
-      const { token } = await fcm.getToken();
-      await sendToken(token);
+        const sendToken = async (token: string) => {
+          await fetch("/api/mobile/push-token", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.1" }),
+          });
+        };
 
-      await fcm.onTokenRefresh((event) => {
-        void sendToken(event.token);
-      });
-      setStatus("success");
+        stage = "obteniendo el token FCM";
+        const { token } = await fcm.getToken();
+        stage = "registrando el dispositivo en SDigitalCore";
+        await sendToken(token);
+
+        await fcm.onTokenRefresh((event) => {
+          void sendToken(event.token);
+        });
+        setStatus("success");
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "Error desconocido";
+        throw new Error(`${stage}: ${detail}`);
+      }
     };
 
     await register().catch((error) => {
