@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/auth/helpers";
-import { sendPushToUsers } from "@/lib/mobile/push";
+import { sendPushToModule, sendPushToUsers } from "@/lib/mobile/push";
 
 const taskSchema = z.object({
   title: z.string().trim().min(3, "Escribe un título más descriptivo.").max(160),
@@ -91,6 +91,13 @@ export async function createWorkTaskAction(input: unknown) {
       route: created.sourceUrl || "/centro-trabajo",
       type: "work_task.assigned",
     });
+  } else {
+    await sendPushToModule(parsed.sourceModule, {
+      title: "Nueva tarea disponible",
+      body: created.title,
+      route: created.sourceUrl || "/centro-trabajo",
+      type: "work_task.available",
+    }, [user.id]);
   }
   revalidatePath("/centro-trabajo");
   return { success: true, id: created.id };

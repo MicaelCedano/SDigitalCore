@@ -62,3 +62,15 @@ export async function sendPushToRole(roleCode: string, payload: PushPayload) {
     console.error("[push] No se pudieron resolver los destinatarios:", error instanceof Error ? error.message : error);
   }
 }
+
+export async function sendPushToModule(moduleKey: string, payload: PushPayload, excludeUserIds: string[] = []) {
+  try {
+    const users = await prisma.user.findMany({
+      where: { status: "ACTIVE", allowedModules: { has: moduleKey }, id: { notIn: excludeUserIds } },
+      select: { id: true },
+    });
+    await sendPushToUsers(users.map((user) => user.id), payload);
+  } catch (error) {
+    console.error("[push] No se pudieron resolver los usuarios del módulo:", error instanceof Error ? error.message : error);
+  }
+}
