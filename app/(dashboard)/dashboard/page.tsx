@@ -18,6 +18,8 @@ import {
   FilePlus,
   ExternalLink,
   Calendar,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Resumen general" };
@@ -79,18 +81,20 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1360px] space-y-6">
-      {/* 1. Cabecera principal con fecha y accesos directos */}
+      {/* 1. Header principal con estado en vivo y botones de acción rápida */}
       <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#667085]">
-            <Calendar size={13} className="text-[#4f46e5]" />
-            <span>{capitalizedDate} · Santo Domingo</span>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" />
+            <span>{capitalizedDate}</span>
+            <span className="text-slate-300">·</span>
+            <span>Santo Domingo</span>
           </div>
-          <h2 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-[#101828] sm:text-3xl">
+          <h2 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-slate-900 sm:text-3xl">
             {greeting}, {firstName}
           </h2>
-          <p className="mt-0.5 text-xs text-[#667085] sm:text-sm">
-            Control de operaciones, pagos a personal y actividad en tiempo real.
+          <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
+            Control de operaciones, pagos a técnicos y trazabilidad en tiempo real.
           </p>
         </div>
 
@@ -98,19 +102,19 @@ export default async function DashboardPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/qc/lotes"
-              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] bg-[#4f46e5] px-3.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#4338ca]"
+              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 text-xs font-bold text-white shadow-sm shadow-indigo-600/20 transition-all hover:bg-indigo-700 active:scale-[0.98]"
             >
               <Plus size={15} /> Nueva compra (QC)
             </Link>
             <Link
               href="/garantias/ingreso"
-              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] border border-[#d0d5dd] bg-white px-3.5 text-xs font-semibold text-[#344054] shadow-2xs transition-colors hover:bg-[#f8fafc]"
+              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300"
             >
               <FilePlus size={15} /> Nueva garantía
             </Link>
             <Link
               href="/almacen/transferencias"
-              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] border border-[#d0d5dd] bg-white px-3.5 text-xs font-semibold text-[#344054] shadow-2xs transition-colors hover:bg-[#f8fafc]"
+              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300"
             >
               <Warehouse size={15} /> Solicitud almacén
             </Link>
@@ -120,94 +124,94 @@ export default async function DashboardPage() {
 
       {overview ? (
         <>
-          {/* 2. Barra de KPIs Operativos Clave (Cómoda y Ejecutiva) */}
+          {/* 2. Barra de KPIs Operativos Clave (Moderna y Ergonómica) */}
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicadores clave">
             {/* KPI 1: Pagos a técnicos y personal */}
-            <div className="enterprise-panel relative flex flex-col justify-between overflow-hidden p-4">
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#fef3f2] text-[#d92d20]">
-                  <Coins size={16} />
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${totalPendingCount > 0 ? "bg-[#fef3f2] text-[#b42318]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 ring-1 ring-rose-500/10">
+                  <Coins size={18} strokeWidth={2.2} />
+                </div>
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${totalPendingCount > 0 ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"}`}>
                   {totalPendingCount > 0 ? `${totalPendingCount} pendiente${totalPendingCount === 1 ? "" : "s"}` : "Al día"}
                 </span>
               </div>
-              <div className="mt-3">
-                <p className="font-mono text-xl font-bold tracking-tight text-[#101828] sm:text-2xl">
+              <div className="mt-3.5">
+                <p className="font-mono text-2xl font-bold tracking-tight text-slate-900">
                   RD$ {totalPendingPayouts.toLocaleString("es-DO")}
                 </p>
-                <p className="mt-0.5 text-xs font-medium text-[#667085]">Pagos por autorizar</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">Pagos por autorizar</p>
               </div>
             </div>
 
             {/* KPI 2: Garantías activas */}
-            <div className="enterprise-panel relative flex flex-col justify-between overflow-hidden p-4">
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f46e5]">
-                  <ShieldCheck size={16} />
-                </span>
-                <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11px] font-bold text-[#4338ca]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/10">
+                  <ShieldCheck size={18} strokeWidth={2.2} />
+                </div>
+                <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-200/60">
                   {overview.warrantyCounts.IN_REPAIR ?? 0} en taller
                 </span>
               </div>
-              <div className="mt-3">
-                <p className="font-mono text-xl font-bold tracking-tight text-[#101828] sm:text-2xl">
+              <div className="mt-3.5">
+                <p className="font-mono text-2xl font-bold tracking-tight text-slate-900">
                   {overview.warrantyCounts.totalActive ?? 0}
                 </p>
-                <p className="mt-0.5 text-xs font-medium text-[#667085]">Garantías en curso</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">Garantías en curso</p>
               </div>
             </div>
 
             {/* KPI 3: Lotes QC */}
-            <div className="enterprise-panel relative flex flex-col justify-between overflow-hidden p-4">
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f4f3ff] text-[#5925dc]">
-                  <ScanSearch size={16} />
-                </span>
-                <span className="rounded-full bg-[#f4f3ff] px-2 py-0.5 text-[11px] font-bold text-[#5925dc]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-purple-500/10">
+                  <ScanSearch size={18} strokeWidth={2.2} />
+                </div>
+                <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-700 ring-1 ring-purple-200/60">
                   {overview.qcPendingTotalDevices} equipos
                 </span>
               </div>
-              <div className="mt-3">
-                <p className="font-mono text-xl font-bold tracking-tight text-[#101828] sm:text-2xl">
+              <div className="mt-3.5">
+                <p className="font-mono text-2xl font-bold tracking-tight text-slate-900">
                   {overview.qcPendingCount}
                 </p>
-                <p className="mt-0.5 text-xs font-medium text-[#667085]">Lotes QC en proceso</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">Lotes QC en proceso</p>
               </div>
             </div>
 
             {/* KPI 4: Solicitudes Almacén */}
-            <div className="enterprise-panel relative flex flex-col justify-between overflow-hidden p-4">
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#fff4e5] text-[#b54708]">
-                  <Warehouse size={16} />
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${overview.pendingWarehouseRequestCount > 0 ? "bg-[#fff4e5] text-[#b54708]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-500/10">
+                  <Warehouse size={18} strokeWidth={2.2} />
+                </div>
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${overview.pendingWarehouseRequestCount > 0 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200/60" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"}`}>
                   {overview.pendingWarehouseRequestCount > 0 ? `${overview.pendingWarehouseRequestCount} pendientes` : "Al día"}
                 </span>
               </div>
-              <div className="mt-3">
-                <p className="font-mono text-xl font-bold tracking-tight text-[#101828] sm:text-2xl">
+              <div className="mt-3.5">
+                <p className="font-mono text-2xl font-bold tracking-tight text-slate-900">
                   {overview.pendingWarehouseRequestCount}
                 </p>
-                <p className="mt-0.5 text-xs font-medium text-[#667085]">Solicitudes de almacén</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">Solicitudes de almacén</p>
               </div>
             </div>
           </section>
 
-          {/* 3. Alerta inteligente si hay pendientes */}
+          {/* 3. Alerta inteligente con gradiente suave */}
           {totalPendingCount > 0 ? (
-            <div className="flex flex-col gap-3 rounded-2xl border border-[#fecdca] bg-gradient-to-r from-[#fffbfa] to-[#fef3f2] p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-4.5">
+            <div className="flex flex-col gap-3.5 rounded-2xl border border-amber-200/70 bg-gradient-to-r from-amber-50/70 via-orange-50/30 to-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-4.5">
               <div className="flex items-start gap-3 sm:items-center">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fee4e2] text-[#d92d20] shadow-2xs">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-amber-700">
                   <AlertCircle size={20} strokeWidth={2.2} />
-                </span>
+                </div>
                 <div>
-                  <p className="text-sm font-bold text-[#b42318]">
-                    Atención: Tienes {totalPendingCount} pago{totalPendingCount === 1 ? "" : "s"} y lote{totalPendingCount === 1 ? "" : "s"} pendientes de aprobación
+                  <p className="text-sm font-bold text-amber-900">
+                    Atención: Tienes {totalPendingCount} pago{totalPendingCount === 1 ? "" : "s"} y lote{totalPendingCount === 1 ? "" : "s"} listos para autorización
                   </p>
-                  <p className="mt-0.5 text-xs text-[#7a271a]">
-                    Monto total acumulado a pagar: <strong>RD$ {totalPendingPayouts.toLocaleString("es-DO")}</strong>. Puedes aprobarlos directamente abajo en 1 clic.
+                  <p className="mt-0.5 text-xs text-amber-800/80">
+                    Monto total acumulado: <strong>RD$ {totalPendingPayouts.toLocaleString("es-DO")}</strong>. Puedes aprobarlos directamente abajo en 1 clic.
                   </p>
                 </div>
               </div>
@@ -239,20 +243,20 @@ export default async function DashboardPage() {
           {/* 5. Grilla secundaria: Logística y Accesos */}
           <section className="grid gap-6 xl:grid-cols-2" aria-label="Logística y Control de Accesos">
             {/* Solicitudes de Almacén */}
-            <div className="enterprise-panel overflow-hidden border-[#eaecf0] shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e4e7ec] bg-gradient-to-r from-white via-[#fcfcfd] to-[#f8f9fc] px-5 py-4 sm:px-6">
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4 sm:px-6">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#fff4e5] text-[#b54708] shadow-xs">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-500/10">
                     <ClipboardCheck size={20} strokeWidth={2.2} />
-                  </span>
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-[#101828]">Solicitudes de Almacén</h3>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${overview.pendingWarehouseRequestCount > 0 ? "bg-[#fff4e5] text-[#b54708]" : "bg-[#ecfdf3] text-[#027a48]"}`}>
+                      <h3 className="text-base font-bold text-slate-900">Solicitudes de Almacén</h3>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${overview.pendingWarehouseRequestCount > 0 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200/60" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"}`}>
                         {overview.pendingWarehouseRequestCount} pendiente{overview.pendingWarehouseRequestCount === 1 ? "" : "s"}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs text-[#667085]">
+                    <p className="mt-0.5 text-xs text-slate-500">
                       Entradas, salidas y transferencias pendientes de autorización.
                     </p>
                   </div>
@@ -260,34 +264,36 @@ export default async function DashboardPage() {
 
                 <Link
                   href="/almacen/transferencias"
-                  className="focus-ring inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#344054] shadow-2xs hover:bg-[#f8fafc]"
+                  className="focus-ring inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:bg-slate-50 hover:border-slate-300"
                 >
-                  Ver almacén <ExternalLink size={13} />
+                  Ver almacén <ExternalLink size={12} />
                 </Link>
               </div>
 
               {overview.pendingWarehouseRequests.length > 0 ? (
-                <div className="divide-y divide-[#f0f1f3]">
+                <div className="divide-y divide-slate-100 p-2 sm:p-3">
                   {overview.pendingWarehouseRequests.map((request) => (
                     <Link
                       key={request.id}
                       href="/almacen/transferencias"
-                      className="group grid gap-3 px-5 py-3.5 transition-colors hover:bg-[#fafafa] sm:grid-cols-[1fr_auto] sm:items-center sm:px-6"
+                      className="group flex flex-col gap-2 rounded-xl p-3.5 transition-all hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[#4f46e5]">{request.requestCode}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${request.type === "ENTRY" ? "bg-[#ecfdf3] text-[#027a48]" : "bg-[#fef3f2] text-[#b42318]"}`}>
+                          <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">
+                            {request.requestCode}
+                          </span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${request.type === "ENTRY" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60" : "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60"}`}>
                             {request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}
                           </span>
-                          <span className="text-[11px] text-[#667085]">· {formatDate(request.createdAt)}</span>
+                          <span className="text-[11px] text-slate-400">· {formatDate(request.createdAt)}</span>
                         </div>
-                        <p className="mt-1 truncate text-sm font-semibold text-[#344054]">{request.title}</p>
-                        <p className="mt-0.5 text-xs text-[#667085]">
-                          Por: <span className="font-medium text-[#344054]">{request.requestedBy}</span> · Sucursal: <span className="font-medium text-[#344054]">{request.branch}</span> · {request._count.items} línea{request._count.items === 1 ? "" : "s"}
+                        <p className="mt-1 truncate text-sm font-semibold text-slate-900">{request.title}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Por: <span className="font-medium text-slate-700">{request.requestedBy}</span> · Sucursal: <span className="font-medium text-slate-700">{request.branch}</span> · {request._count.items} línea{request._count.items === 1 ? "" : "s"}
                         </p>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#4338ca]">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 group-hover:text-indigo-800">
                         Revisar <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                       </span>
                     </Link>
@@ -295,16 +301,16 @@ export default async function DashboardPage() {
                 </div>
               ) : (
                 <div className="px-6 py-9 text-center">
-                  <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#ecfdf3] text-[#027a48]">
-                    <PackageCheck size={22} />
-                  </span>
-                  <p className="mt-2.5 text-sm font-semibold text-[#101828]">No hay solicitudes pendientes</p>
-                  <p className="mt-0.5 text-xs text-[#667085]">Todas las solicitudes de almacén están procesadas.</p>
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/60">
+                    <PackageCheck size={20} />
+                  </div>
+                  <p className="mt-2.5 text-sm font-semibold text-slate-900">No hay solicitudes pendientes</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Todas las solicitudes de almacén están procesadas.</p>
                 </div>
               )}
 
-              <div className="border-t border-[#f0f1f3] bg-[#fcfcfd] px-5 py-3 text-right sm:px-6">
-                <Link href="/almacen/transferencias" className="text-xs font-semibold text-[#4f46e5] hover:text-[#4338ca]">
+              <div className="border-t border-slate-100 bg-slate-50/40 px-5 py-3 text-right sm:px-6 rounded-b-2xl">
+                <Link href="/almacen/transferencias" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
                   Ir a transferencias y solicitudes <ArrowRight size={13} />
                 </Link>
               </div>
@@ -313,15 +319,15 @@ export default async function DashboardPage() {
             {/* Recibo reciente y solicitudes de acceso */}
             <div className="space-y-6">
               {/* Último Recibo */}
-              <div className="enterprise-panel overflow-hidden border-[#eaecf0] shadow-xs">
-                <div className="border-b border-[#e4e7ec] bg-gradient-to-r from-white via-[#fcfcfd] to-[#f8f9fc] px-5 py-4">
+              <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
+                <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#ecfdf3] text-[#027a48] shadow-xs">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/10">
                       <PackageCheck size={20} strokeWidth={2.2} />
-                    </span>
+                    </div>
                     <div>
-                      <h3 className="text-base font-bold text-[#101828]">Último Recibo de Mercancía</h3>
-                      <p className="mt-0.5 text-xs text-[#667085]">Registro de ingreso de productos más reciente.</p>
+                      <h3 className="text-base font-bold text-slate-900">Último Recibo de Mercancía</h3>
+                      <p className="mt-0.5 text-xs text-slate-500">Registro de ingreso de productos más reciente.</p>
                     </div>
                   </div>
                 </div>
@@ -330,40 +336,40 @@ export default async function DashboardPage() {
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <span className="font-mono text-xs font-bold text-[#4f46e5]">{overview.latestReceipt.receiptNumber}</span>
-                        <h4 className="mt-1 text-base font-bold text-[#101828]">{overview.latestReceipt.supplierName}</h4>
-                        <p className="mt-0.5 text-xs text-[#667085]">
-                          Sucursal: <span className="font-medium text-[#344054]">{overview.latestReceipt.branch}</span> · Recibido por: <span className="font-medium text-[#344054]">{overview.latestReceipt.receivedBy}</span>
+                        <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/60">{overview.latestReceipt.receiptNumber}</span>
+                        <h4 className="mt-1 text-base font-bold text-slate-900">{overview.latestReceipt.supplierName}</h4>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Sucursal: <span className="font-medium text-slate-700">{overview.latestReceipt.branch}</span> · Recibido por: <span className="font-medium text-slate-700">{overview.latestReceipt.receivedBy}</span>
                         </p>
                       </div>
-                      <span className="rounded-full bg-[#ecfdf3] px-2.5 py-1 text-[11px] font-bold text-[#027a48]">
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200/60">
                         {overview.latestReceipt.status === "DRAFT" ? "BORRADOR" : "COMPLETADO"}
                       </span>
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-[#eaecf0] bg-[#f8fafc] p-3 text-center">
-                        <p className="font-mono text-xl font-bold text-[#101828]">{overview.latestReceipt.itemCount}</p>
-                        <p className="mt-0.5 text-xs font-medium text-[#667085]">modelos / líneas</p>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-center">
+                        <p className="font-mono text-xl font-bold text-slate-900">{overview.latestReceipt.itemCount}</p>
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">modelos / líneas</p>
                       </div>
-                      <div className="rounded-xl border border-[#eaecf0] bg-[#f8fafc] p-3 text-center">
-                        <p className="font-mono text-xl font-bold text-[#101828]">{overview.latestReceipt.unitCount}</p>
-                        <p className="mt-0.5 text-xs font-medium text-[#667085]">unidades totales</p>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-center">
+                        <p className="font-mono text-xl font-bold text-slate-900">{overview.latestReceipt.unitCount}</p>
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">unidades totales</p>
                       </div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between border-t border-[#f0f1f3] pt-3">
-                      <span className="text-xs text-[#667085]">{formatDate(overview.latestReceipt.receivedAt)}</span>
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span className="text-xs text-slate-500">{formatDate(overview.latestReceipt.receivedAt)}</span>
                       <Link
                         href="/almacen/recibos"
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#4f46e5] hover:text-[#4338ca]"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
                       >
                         Abrir recibos de almacén <ArrowRight size={13} />
                       </Link>
                     </div>
                   </div>
                 ) : (
-                  <div className="px-5 py-6 text-center text-sm text-[#667085]">
+                  <div className="px-5 py-6 text-center text-sm text-slate-500">
                     Todavía no hay recibos de mercancía registrados.
                   </div>
                 )}
@@ -372,15 +378,15 @@ export default async function DashboardPage() {
               {/* Solicitudes de Acceso de Usuarios */}
               <Link
                 href="/configuracion"
-                className="enterprise-panel group flex items-center justify-between gap-3.5 border-[#eaecf0] p-4.5 shadow-xs transition-all hover:border-[#c7d2fe] hover:shadow-sm"
+                className="group flex items-center justify-between gap-3.5 rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-indigo-300 hover:shadow-md"
               >
                 <div className="flex items-center gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#eef2ff] text-[#4f46e5] shadow-xs">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/10">
                     <UserPlus size={19} strokeWidth={2.2} />
-                  </span>
+                  </div>
                   <div>
-                    <h4 className="text-sm font-bold text-[#101828]">Solicitudes de Acceso al Sistema</h4>
-                    <p className="mt-0.5 text-xs text-[#667085]">
+                    <h4 className="text-sm font-bold text-slate-900">Solicitudes de Acceso al Sistema</h4>
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {overview.pendingAccessRequestCount > 0
                         ? `${overview.pendingAccessRequestCount} usuario(s) esperando aprobación de cuenta`
                         : "No hay solicitudes de nuevos usuarios pendientes"}
@@ -390,11 +396,11 @@ export default async function DashboardPage() {
 
                 <div className="flex items-center gap-2">
                   {overview.pendingAccessRequestCount > 0 && (
-                    <span className="rounded-full bg-[#eef2ff] px-2 py-0.5 text-xs font-bold text-[#4338ca]">
+                    <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200/60">
                       {overview.pendingAccessRequestCount}
                     </span>
                   )}
-                  <ArrowRight size={16} className="text-[#98a2b3] transition-transform group-hover:translate-x-0.5 group-hover:text-[#4f46e5]" />
+                  <ArrowRight size={16} className="text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-indigo-600" />
                 </div>
               </Link>
             </div>
