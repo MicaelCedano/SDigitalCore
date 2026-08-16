@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser, requirePermission } from "@/lib/auth/helpers";
@@ -93,6 +94,38 @@ async function requireUserAdmin() {
   }
   if (!user.id) throw new Error("La sesión no tiene un usuario identificable.");
   return { ...user, id: user.id };
+}
+
+export async function generateAdminPasswordResetTokenAction(userId: string) {
+  try {
+    const actor = await requireUserAdmin();
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, status: true } });
+    if (!user) return { success: false as const, error: "Usuario no encontrado." };
+    if (user.status !== "ACTIVE") return { success: false as const, error: "Activa el usuario antes de generar el enlace." };
+
+    const rawToken = randomBytes(32).toString("hex");
+    const token = createHash("sha256").update(rawToken).digest("hex");
+    const expires = new Date(Date.now() + 30 * 60 * 1000);
+
+    await prisma.$transaction([
+      prisma.verificationToken.deleteMany({ where: { identifier: user.email } }),
+      prisma.verificationToken.create({ data: { identifier: user.email, token, expires } }),
+      prisma.auditLog.create({
+        data: {
+          userId: actor.id,
+          action: "password.reset.admin_token_created",
+          module: "configuracion",
+          entityType: "user",
+          entityId: user.id,
+          afterData: { expiresAt: expires.toISOString() },
+        },
+      }),
+    ]);
+
+    return { success: true as const, data: { token: rawToken, expiresAt: expires.toISOString() } };
+  } catch (error) {
+    return { success: false as const, error: messageFrom(error, "No se pudo generar el enlace de recuperación.") };
+  }
 }
 
 export async function getUserManagementDataAction() {

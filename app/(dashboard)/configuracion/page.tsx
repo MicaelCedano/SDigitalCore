@@ -13,6 +13,7 @@ import {
   createDirectUserAction,
   deleteAccessRequestAction,
   deleteUserAction,
+  generateAdminPasswordResetTokenAction,
   getUserManagementDataAction,
   rejectAccessRequestAction,
   toggleUserModuleAction,
@@ -85,6 +86,7 @@ export default function ConfiguracionPage() {
   // Notification Toast
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState<SystemUser | null>(null);
+  const [passwordResetLink, setPasswordResetLink] = useState<{ user: SystemUser; url: string; expiresAt: string } | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -270,6 +272,29 @@ export default function ConfiguracionPage() {
     setIsSaving(false);
   }
 
+  async function handleGeneratePasswordReset(user: SystemUser) {
+    setIsSaving(true);
+    const result = await generateAdminPasswordResetTokenAction(user.id);
+    if (result.success) {
+      setPasswordResetLink({
+        user,
+        url: `${window.location.origin}/recuperar-password?token=${encodeURIComponent(result.data.token)}`,
+        expiresAt: result.data.expiresAt,
+      });
+    } else {
+      setActionNotice(result.error);
+      setTimeout(() => setActionNotice(null), 3500);
+    }
+    setIsSaving(false);
+  }
+
+  async function copyPasswordResetLink() {
+    if (!passwordResetLink) return;
+    await navigator.clipboard.writeText(passwordResetLink.url);
+    setActionNotice("Enlace copiado. Compártelo con el usuario.");
+    setTimeout(() => setActionNotice(null), 3000);
+  }
+
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Page Header */}
@@ -435,6 +460,18 @@ export default function ConfiguracionPage() {
                         title="Eliminar usuario"
                       >
                         Eliminar
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-amber-200 text-amber-700 hover:bg-amber-50"
+                        onClick={() => void handleGeneratePasswordReset(u)}
+                        disabled={isSaving || u.status !== "ACTIVE"}
+                        title="Generar enlace temporal para cambiar la contraseña"
+                      >
+                        <LockKeyhole size={13} />
+                        Clave
                       </Button>
                     </div>
                   </div>
@@ -648,6 +685,26 @@ export default function ConfiguracionPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {passwordResetLink && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Enlace de cambio de contraseña</h2>
+                <p className="mt-1 text-sm text-slate-500">Para @{passwordResetLink.user.username}. Vence en 30 minutos.</p>
+              </div>
+              <button type="button" onClick={() => setPasswordResetLink(null)} className="text-slate-400 hover:text-slate-700" aria-label="Cerrar">×</button>
+            </div>
+            <p className="mt-4 text-xs font-semibold text-amber-700">Compártelo únicamente con el usuario. El enlace solo puede usarse una vez.</p>
+            <textarea readOnly value={passwordResetLink.url} className="mt-2 min-h-24 w-full resize-none rounded-lg border border-slate-300 bg-slate-50 p-3 text-xs text-slate-700" />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setPasswordResetLink(null)}>Cerrar</Button>
+              <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => void copyPasswordResetLink()}>Copiar enlace</Button>
+            </div>
+          </div>
         </div>
       )}
 
