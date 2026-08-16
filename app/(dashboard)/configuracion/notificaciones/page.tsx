@@ -9,10 +9,11 @@ export default async function AdminNotificationsPage() {
   const actor = await getPersistedCurrentUser();
   if (actor?.roleCode !== "ADMIN" || actor.status !== "ACTIVE") redirect("/dashboard");
 
-  const testUser = await prisma.user.findUnique({
-    where: { username: "test" },
+  const notificationUsers = await prisma.user.findMany({
+    where: { username: { in: ["test", "admin"] } },
     select: { username: true, status: true, pushDevices: { select: { platform: true, appVersion: true, lastSeenAt: true } } },
   });
+  const testUser = notificationUsers.find((user) => user.username === "test");
 
   return (
     <main className="mx-auto w-full max-w-4xl space-y-6">
@@ -30,7 +31,7 @@ export default async function AdminNotificationsPage() {
         {testUser?.pushDevices.length ? <div className="mt-4 space-y-2">{testUser.pushDevices.map((device, index) => <div key={`${device.platform}-${index}`} className="flex justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600"><span>{device.platform} · APK {device.appVersion ?? "sin versión"}</span><span>Último uso: {device.lastSeenAt.toLocaleString("es-DO")}</span></div>)}</div> : null}
       </section>
 
-      <PushTestPanel available={Boolean(testUser?.pushDevices.length)} />
+      <PushTestPanel targets={notificationUsers.filter((user) => user.username).map((user) => ({ username: user.username!, status: user.status, deviceCount: user.pushDevices.length }))} />
     </main>
   );
 }

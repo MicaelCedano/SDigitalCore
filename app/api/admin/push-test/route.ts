@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 
 const payloadSchema = z.object({
-  username: z.literal("test").default("test"),
+  username: z.enum(["test", "admin"]).default("test"),
   title: z.string().trim().min(1).max(80),
   body: z.string().trim().min(1).max(240),
 });
