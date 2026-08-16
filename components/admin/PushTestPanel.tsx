@@ -41,7 +41,10 @@ export function PushTestPanel({ targets }: { targets: PushTarget[] }) {
       const response = await fetch("/api/admin/push-test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: targetUsername, title, body }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "No se pudo enviar.");
-      setStatus(`Enviada: ${result.sent} dispositivo(s). Fallidas: ${result.failed}.`);
+      const failureDetail = result.failures?.[0]
+        ? ` ${result.failures[0].code}: ${result.failures[0].message}`
+        : "";
+      setStatus(`Enviada: ${result.sent} dispositivo(s). Fallidas: ${result.failed}.${failureDetail}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo enviar la notificación.");
     } finally {

@@ -60,7 +60,13 @@ export async function POST(request: Request) {
       afterData: { targetUsername: target.username, requested: target.pushDevices.length, success: response.successCount, failure: response.failureCount },
     });
 
-    return NextResponse.json({ sent: response.successCount, failed: response.failureCount });
+    const failures = response.responses.flatMap((result, index) => result.success ? [] : [{
+      deviceId: target.pushDevices[index].id,
+      code: result.error?.code ?? "messaging/unknown",
+      message: result.error?.message ?? "Firebase rechazó el envío.",
+    }]);
+
+    return NextResponse.json({ sent: response.successCount, failed: response.failureCount, failures });
   } catch (error) {
     console.error("[push-test] No se pudo enviar la notificación:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "No se pudo enviar la notificación." }, { status: 503 });
