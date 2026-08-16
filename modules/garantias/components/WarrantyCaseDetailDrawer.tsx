@@ -6,11 +6,16 @@ import {
   ArrowUpRight,
   Calendar,
   Check,
+  CheckCircle2,
   ClipboardList,
   Copy,
+  FileCheck2,
   ShieldCheck,
   Smartphone,
+  Truck,
   UserRound,
+  UserRoundCheck,
+  Wrench,
   X,
 } from "lucide-react";
 import { WarrantyArchiveButton } from "@/modules/garantias/components/WarrantyArchiveButton";
@@ -18,6 +23,7 @@ import { WarrantyCaseEditButton } from "@/modules/garantias/components/WarrantyC
 import { WarrantyStatusBadge } from "@/modules/garantias/components/WarrantyStatusBadge";
 import { SendToRepairsButton } from "@/modules/reparaciones/components/SendToRepairsButton";
 import { WARRANTY_STATUS_LABELS } from "@/modules/garantias/lib/status-machine";
+import type { WarrantyFlowOperation } from "@/modules/garantias/components/WarrantyFlow";
 
 export type DetailCaseRow = {
   id: string;
@@ -76,6 +82,25 @@ export function WarrantyCaseDetailDrawer({
     if (copyResetTimer.current !== null) window.clearTimeout(copyResetTimer.current);
     copyResetTimer.current = window.setTimeout(() => setCopiedField(null), 2000);
   }
+
+  function triggerFlow(operation: WarrantyFlowOperation) {
+    if (!item) return;
+    onClose();
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent("open-warranty-flow", {
+          detail: {
+            operation,
+            caseCode: item.caseCode,
+            counterparty: operation === "deliver" ? item.clientName : undefined,
+          },
+        })
+      );
+    }, 50);
+  }
+
+  const isClosed =
+    item.status === "DELIVERED" || item.status === "CREDIT_NOTE";
 
   return (
     <div
@@ -136,7 +161,9 @@ export function WarrantyCaseDetailDrawer({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado</p>
-              <div className="mt-2.5"><WarrantyStatusBadge status={item.status} /></div>
+              <div className="mt-2.5">
+                <WarrantyStatusBadge status={item.status} />
+              </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
               <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Cliente</p>
@@ -146,19 +173,99 @@ export function WarrantyCaseDetailDrawer({
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Fecha de admisión</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                Fecha de admisión
+              </p>
               <p className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-900">
                 <Calendar size={16} className="shrink-0 text-red-600" />
                 {formatDate(item.entryDate)}
               </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Registro</p>
-              <p className={`mt-2 text-sm font-bold ${item.archivedAt ? "text-slate-600" : "text-emerald-700"}`}>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                Registro
+              </p>
+              <p
+                className={`mt-2 text-sm font-bold ${
+                  item.archivedAt ? "text-slate-600" : "text-emerald-700"
+                }`}
+              >
                 {item.archivedAt ? "Caso archivado" : "Caso activo"}
               </p>
             </div>
           </div>
+
+          {/* Acciones de flujo rápidas para este caso */}
+          {!isClosed && !item.archivedAt && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+                Siguiente acción para este caso
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                {(item.status === "RECEIVED" || item.status === "RECEIVED_FROM_SUPPLIER") && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => triggerFlow("assign")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition"
+                    >
+                      <UserRoundCheck size={15} /> Enviar a técnico
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerFlow("sendSupplier")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-orange-700 transition"
+                    >
+                      <Truck size={15} /> Enviar a suplidor
+                    </button>
+                  </>
+                )}
+                {item.status === "IN_REPAIR" && (
+                  <button
+                    type="button"
+                    onClick={() => triggerFlow("receiveTech")}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
+                  >
+                    <Wrench size={15} /> Recibir del técnico
+                  </button>
+                )}
+                {item.status === "RECEIVED_FROM_TECHNICIAN" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => triggerFlow("deliver")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+                    >
+                      <CheckCircle2 size={15} /> Despachar al cliente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerFlow("sendSupplier")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-orange-700 transition"
+                    >
+                      <Truck size={15} /> Enviar a suplidor
+                    </button>
+                  </>
+                )}
+                {item.status === "SENT_TO_SUPPLIER" && (
+                  <button
+                    type="button"
+                    onClick={() => triggerFlow("receiveSupplier")}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition"
+                  >
+                    <FileCheck2 size={15} /> Recibir de suplidor
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => triggerFlow("credit")}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition"
+                >
+                  <FileCheck2 size={15} /> Crear nota de crédito
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-red-100 bg-red-50/45 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-red-700">
@@ -174,7 +281,9 @@ export function WarrantyCaseDetailDrawer({
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-slate-700">
                 <Smartphone size={16} className="text-red-600" /> Equipo recibido
               </p>
-              <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">1 equipo</span>
+              <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">
+                1 equipo
+              </span>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -185,7 +294,9 @@ export function WarrantyCaseDetailDrawer({
               </div>
               <div className="grid gap-4 px-5 py-4 sm:grid-cols-[1.15fr_1fr_1fr] sm:items-center sm:gap-0">
                 <div>
-                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">IMEI</p>
+                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
+                    IMEI
+                  </p>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-bold text-slate-900">{item.imei}</span>
                     <button
@@ -195,16 +306,24 @@ export function WarrantyCaseDetailDrawer({
                       aria-label="Copiar IMEI"
                       title="Copiar IMEI"
                     >
-                      {copiedField === "imei" ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
+                      {copiedField === "imei" ? (
+                        <Check size={15} className="text-emerald-600" />
+                      ) : (
+                        <Copy size={15} />
+                      )}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">Modelo / equipo</p>
+                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
+                    Modelo / equipo
+                  </p>
                   <p className="text-sm font-bold text-slate-900">{item.model}</p>
                 </div>
                 <div>
-                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">Cliente</p>
+                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
+                    Cliente
+                  </p>
                   <p className="text-sm font-semibold text-slate-700">{item.clientName}</p>
                 </div>
               </div>

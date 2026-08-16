@@ -14,8 +14,18 @@ const actions: Array<{ operation: WarrantyFlowOperation; label: string; descript
   { operation: "credit", label: "Crear nota de crédito", description: "Cierra un caso abierto con su motivo.", icon: FileCheck2, tone: "red" },
 ];
 
-export function WarrantyQuickActions({ cases, canCreate, canTransition }: { cases: Partial<Record<WarrantyFlowOperation, WarrantyFlowCase[]>>; canCreate: boolean; canTransition: boolean }) {
+export function WarrantyQuickActions({
+  cases,
+  canCreate,
+  canTransition,
+}: {
+  cases: Partial<Record<WarrantyFlowOperation, WarrantyFlowCase[]>>;
+  canCreate: boolean;
+  canTransition: boolean;
+}) {
   const [openOperation, setOpenOperation] = useState<WarrantyFlowOperation | null>(null);
+  const [initialSelected, setInitialSelected] = useState<string[]>([]);
+  const [defaultCounterparty, setDefaultCounterparty] = useState("");
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const active = actions.find((item) => item.operation === openOperation);
@@ -30,10 +40,35 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
       event.preventDefault();
       setIntakeOpen(true);
     };
+
+    const handleOpenFlow = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        operation: WarrantyFlowOperation;
+        caseCode?: string;
+        counterparty?: string;
+      }>;
+      if (customEvent.detail?.operation) {
+        setOpenOperation(customEvent.detail.operation);
+        if (customEvent.detail.caseCode) {
+          setInitialSelected([customEvent.detail.caseCode]);
+        } else {
+          setInitialSelected([]);
+        }
+        if (customEvent.detail.counterparty) {
+          setDefaultCounterparty(customEvent.detail.counterparty);
+        } else {
+          setDefaultCounterparty("");
+        }
+      }
+    };
+
     window.addEventListener("open-warranty-intake", openIntake);
+    window.addEventListener("open-warranty-flow", handleOpenFlow as EventListener);
     if (canCreate) document.addEventListener("click", interceptRegisterLink, true);
+
     return () => {
       window.removeEventListener("open-warranty-intake", openIntake);
+      window.removeEventListener("open-warranty-flow", handleOpenFlow as EventListener);
       document.removeEventListener("click", interceptRegisterLink, true);
     };
   }, [canCreate]);
@@ -45,10 +80,25 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
         setIntakeOpen(false);
         setMenuOpen(false);
       }
+      // Atajo 'n' para nuevo ingreso si no se está escribiendo en un input
+      if (
+        (e.key === "n" || e.key === "N") &&
+        !intakeOpen &&
+        !openOperation &&
+        canCreate &&
+        !(
+          document.activeElement instanceof HTMLInputElement ||
+          document.activeElement instanceof HTMLTextAreaElement ||
+          document.activeElement instanceof HTMLSelectElement
+        )
+      ) {
+        e.preventDefault();
+        setIntakeOpen(true);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [canCreate, intakeOpen, openOperation]);
 
   const totalPendingTransitions = useMemo(() => {
     return Object.values(cases).reduce((acc, curr) => acc + (curr?.length ?? 0), 0);
@@ -62,6 +112,7 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
             type="button"
             onClick={() => setIntakeOpen(true)}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#5750f1] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#463ec5] active:scale-[0.98]"
+            title="Registrar ingreso (Atajo: tecla N)"
           >
             <Plus size={17} /> Registrar ingreso
           </button>
@@ -97,6 +148,8 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                           key={operation}
                           type="button"
                           onClick={() => {
+                            setInitialSelected([]);
+                            setDefaultCounterparty("");
                             setOpenOperation(operation);
                             setMenuOpen(false);
                           }}
@@ -121,7 +174,9 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                               <Icon size={15} />
                             </span>
                             <span className="min-w-0">
-                              <span className="block truncate text-xs font-semibold text-slate-700">{label}</span>
+                              <span className="block truncate text-xs font-semibold text-slate-700">
+                                {label}
+                              </span>
                             </span>
                           </div>
                           {count > 0 && (
@@ -140,10 +195,15 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
         )}
       </div>
 
-      {/* Modal Centrado para Registrar Ingreso (estilo Nuevo Recibo de Mercancía) */}
+      {/* Modal Centrado para Registrar Ingreso */}
       {intakeOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]" role="dialog" aria-modal="true" aria-label="Registrar ingreso">
+          <div
+            className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Registrar ingreso"
+          >
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
@@ -151,7 +211,9 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">Registrar Ingreso de Garantía</h2>
-                  <p className="text-xs text-slate-500">Crea uno o varios casos para el mismo cliente y genera el recibo.</p>
+                  <p className="text-xs text-slate-500">
+                    Crea uno o varios casos para el mismo cliente y genera el recibo.
+                  </p>
                 </div>
               </div>
               <button
@@ -170,10 +232,15 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
         </div>
       )}
 
-      {/* Modal Centrado para Operaciones de Flujo (estilo Nuevo Recibo de Mercancía) */}
+      {/* Modal Centrado para Operaciones de Flujo */}
       {active && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]" role="dialog" aria-modal="true" aria-label={active.label}>
+          <div
+            className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-label={active.label}
+          >
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
@@ -194,7 +261,13 @@ export function WarrantyQuickActions({ cases, canCreate, canTransition }: { case
               </button>
             </div>
             <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
-              <WarrantyFlow operation={active.operation} cases={activeCases} embedded />
+              <WarrantyFlow
+                operation={active.operation}
+                cases={activeCases}
+                defaultCounterparty={defaultCounterparty}
+                initialSelectedCases={initialSelected}
+                embedded
+              />
             </div>
           </div>
         </div>
