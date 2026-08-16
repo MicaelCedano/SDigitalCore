@@ -119,6 +119,9 @@ export default function LoginPage() {
               <ShieldCheck size={14} className="text-emerald-600" />
               <span>Conexión segura y auditada con Auth.js</span>
             </div>
+            <div className="mt-4 text-center text-xs text-slate-500">
+              ¿Necesitas la aplicación? <a href="/descargas" className="font-semibold text-indigo-600 hover:text-indigo-700">Descargar SDigitalCore</a>
+            </div>
           </div>
         </div>
       </section>

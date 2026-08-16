@@ -52,8 +52,13 @@ Firebase. El build Android también debe aplicar el plugin Google Services en el
 proyecto Gradle generado.
 
 La migración
-`prisma/migrations/20260816170000_add_push_devices/migration.sql` debe aplicarse
+`prisma/migrations/20260816213511_add_push_devices/migration.sql` debe aplicarse
 manualmente en Supabase antes de probar el registro de tokens en producción.
+
+Para enviar notificaciones desde la página administrativa de prueba, Vercel debe
+tener configurada `FIREBASE_SERVICE_ACCOUNT_JSON` (o las variables equivalentes
+`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY`). La cuenta
+de servicio es únicamente del servidor y nunca debe entrar al APK ni al repositorio.
 
 No se agregan todavía tablas ni credenciales de producción. La inicialización del
 target Android y la integración FCM deben validarse en un teléfono Android real.

@@ -83,6 +83,7 @@ const navItems: NavItem[] = [
   { label: "Recibo de mercancía", href: "/almacen/recibos", moduleKey: "almacen", icon: ClipboardList, section: "Operaciones" },
   { label: "Configuración", href: "/configuracion", moduleKey: "configuracion", icon: Settings, section: "Administración", children: [
     { label: "Usuarios y permisos", href: "/configuracion" },
+    { label: "Prueba de notificaciones", href: "/configuracion/notificaciones", adminOnly: true },
     { label: "Sucursales", href: "/configuracion/sucursales" },
     { label: "Clientes y proveedores", href: "/configuracion/clientes-proveedores" },
     { label: "Proveedores de control de calidad", href: "/configuracion/proveedores-qc" },
