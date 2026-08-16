@@ -165,7 +165,7 @@ export function Topbar({
             <div
               role="dialog"
               aria-label="Centro de notificaciones"
-              className="animate-fade-in absolute right-0 mt-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_44px_-12px_rgba(16,24,40,.20)] z-50"
+              className="animate-fade-in fixed left-3 right-3 top-[68px] z-[60] w-auto overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_44px_-12px_rgba(16,24,40,.20)] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[min(380px,calc(100vw-2rem))]"
             >
               <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4 py-3.5">
                 <div>
