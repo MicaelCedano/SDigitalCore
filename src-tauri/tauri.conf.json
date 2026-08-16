@@ -5,7 +5,7 @@
   "identifier": "com.sdigitalcore.desktop",
   "build": {
     "devUrl": "https://sdigitalcore.vercel.app",
-    "frontendDist": "../public"
+    "frontendDist": "https://sdigitalcore.vercel.app"
   },
   "app": {
     "windows": [],
