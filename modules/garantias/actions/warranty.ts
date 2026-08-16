@@ -13,6 +13,7 @@ import { civilDate, nextWarrantyNumber, santoDomingoDateString } from "@/modules
 import { Prisma, WarrantyDocumentType, WarrantyEventType, WarrantyStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ensureCustomerForWarranty } from "@/modules/configuracion/actions/business-partner";
+import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 type ArchiveFilter = "active" | "archived" | "all";
@@ -329,6 +330,12 @@ export async function createWarrantyCases(input: unknown): Promise<Result<{ case
       });
       return { caseCodes: created.map((item) => item.caseCode), documentCode: document.documentCode };
     });
+    await sendPushToRole("ADMIN", {
+      title: `Nueva garantía ${result.caseCodes[0]}`,
+      body: `${result.caseCodes.length} caso(s) recibido(s) de ${normalizeName(parsed.data.clientName)}.`,
+      route: `/garantias/${result.caseCodes[0]}`,
+      type: "warranty.created",
+    });
     revalidateWarranty(result.caseCodes, result.documentCode);
     return ok(result);
   } catch (error) {
@@ -483,6 +490,20 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       });
       return { documentCode: document.documentCode, status: rule.toStatus };
     });
+    await sendPushToRole("ADMIN", {
+      title: `Garantía ${data.caseCodes[0]} actualizada`,
+      body: `${data.caseCodes.length} caso(s): ${rule.toStatus.toLowerCase().replaceAll("_", " ")}.`,
+      route: `/garantias/${data.caseCodes[0]}`,
+      type: `warranty.${operation}`,
+    });
+    if (operation === "assign" && technicianId) {
+      await sendPushToUsers([technicianId], {
+        title: "Garantía asignada",
+        body: `${data.caseCodes.length} caso(s) fueron asignados para reparación.`,
+        route: "/reparaciones",
+        type: "warranty.assigned",
+      });
+    }
     revalidateWarranty(data.caseCodes, result.documentCode);
     return ok(result);
   } catch (error) {

@@ -15,6 +15,7 @@ import {
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import { sendPushToRole } from "@/lib/mobile/push";
 import type { Prisma } from "@prisma/client";
 
 const legacyWarehouseProductSelect = {
@@ -419,6 +420,12 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
       });
     });
     await logAudit({ userId: user.id, action: "warehouse_request.create", module: "almacen", entityType: "warehouse_request", entityId: created.id, afterData: { requestCode: created.requestCode, status: created.status } });
+    await sendPushToRole("ADMIN", {
+      title: `Solicitud ${created.requestCode} pendiente`,
+      body: `${created.requestedBy} solicita una ${created.type === "ENTRY" ? "entrada" : "salida"} para ${created.branch}.`,
+      route: "/almacen/transferencias",
+      type: "warehouse_request.created",
+    });
 
     revalidatePath("/almacen/transferencias");
     revalidatePath("/dashboard");

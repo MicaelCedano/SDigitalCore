@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 import { requirePermission } from "@/lib/auth/helpers";
+import { sendPushToUsers } from "@/lib/mobile/push";
 
 const taskSchema = z.object({
   title: z.string().trim().min(3, "Escribe un título más descriptivo.").max(160),
@@ -83,6 +84,14 @@ export async function createWorkTaskAction(input: unknown) {
     },
   });
   await logAudit({ userId: user.id, action: "work_task.create", module: "centro-trabajo", entityType: "work_task", entityId: created.id, afterData: { title: created.title, sourceModule: created.sourceModule, priority: created.priority } });
+  if (requestedAssigneeIds.length) {
+    await sendPushToUsers(requestedAssigneeIds, {
+      title: "Nueva tarea asignada",
+      body: created.title,
+      route: created.sourceUrl || "/centro-trabajo",
+      type: "work_task.assigned",
+    });
+  }
   revalidatePath("/centro-trabajo");
   return { success: true, id: created.id };
 }
@@ -130,11 +139,20 @@ export async function deleteWorkTaskAction(taskId: string) {
 export async function updateWorkTaskStatusAction(taskId: string, nextStatus: string) {
   const user = await actor();
   const status = statusSchema.parse(nextStatus);
-  const task = await prisma.workTask.findUnique({ where: { id: taskId } });
+  const task = await prisma.workTask.findUnique({ where: { id: taskId }, select: { id: true, title: true, status: true, creatorId: true, assigneeId: true, sourceUrl: true, sourceModule: true } });
   if (!task || !canAccessTask(user, task)) throw new Error("No puedes modificar esta tarea.");
   const completedAt = status === "COMPLETED" ? new Date() : null;
   const updated = await prisma.workTask.update({ where: { id: taskId }, data: { status, completedAt, events: { create: { actorId: user.id, type: status === "COMPLETED" ? "COMPLETED" : "STATUS_CHANGED", beforeData: { status: task.status }, afterData: { status }, } } } });
   await logAudit({ userId: user.id, action: "work_task.status.update", module: "centro-trabajo", entityType: "work_task", entityId: task.id, beforeData: { status: task.status }, afterData: { status: updated.status } });
+  const recipients = [task.creatorId, task.assigneeId].filter((id): id is string => Boolean(id && id !== user.id));
+  if (recipients.length) {
+    await sendPushToUsers(recipients, {
+      title: updated.status === "COMPLETED" ? "Tarea completada" : "Estado de tarea actualizado",
+      body: `${task.title}: ${updated.status === "COMPLETED" ? "completada" : updated.status.toLowerCase().replaceAll("_", " ")}.`,
+      route: task.sourceUrl || "/centro-trabajo",
+      type: updated.status === "COMPLETED" ? "work_task.completed" : "work_task.status_changed",
+    });
+  }
   revalidatePath("/centro-trabajo");
   return { success: true };
 }

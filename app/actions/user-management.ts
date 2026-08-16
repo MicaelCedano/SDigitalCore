@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser, requirePermission } from "@/lib/auth/helpers";
 import { hashPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
+import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import { linkLegacyIdentity } from "@/lib/wallet/legacy-identity";
 import { accessRequestSchema, type AccessRequestInput } from "@/lib/validation/access-request";
 import {
@@ -191,6 +192,12 @@ export async function submitAccessRequestAction(input: AccessRequestInput) {
     } else {
       await prisma.accessRequest.create({ data: { name: validated.name, username, email, phone: validated.phone, passwordHash } });
     }
+    await sendPushToRole("ADMIN", {
+      title: "Nueva solicitud de acceso",
+      body: `${validated.name} solicita una cuenta para SDigitalCore.`,
+      route: "/configuracion",
+      type: "access_request.created",
+    });
     revalidatePath("/configuracion");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
@@ -267,6 +274,12 @@ export async function approveAccessRequestAction(requestId: string, roleCode: st
     revalidatePath("/configuracion");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
+    await sendPushToUsers([approval.user.id], {
+      title: "Acceso aprobado",
+      body: "Tu cuenta de SDigitalCore fue aprobada. Ya puedes iniciar sesión.",
+      route: "/dashboard",
+      type: "access_request.approved",
+    });
     return { success: true as const, data: serializeUser(approval.user) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo aprobar la solicitud.") };

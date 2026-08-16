@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
+import { sendPushToRole } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
 import {
   goodsReceiptSchema,
@@ -162,6 +163,14 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
           });
         });
         await logAudit({ userId: user.id, action: "goods_receipt.update", module: "almacen", entityType: "goods_receipt", entityId: updated.id, afterData: { receiptNumber: updated.receiptNumber, status: updated.status, itemCount: updated.items.length } });
+        if (updated.status === "COMPLETED") {
+          await sendPushToRole("ADMIN", {
+            title: `Recibo ${updated.receiptNumber} completado`,
+            body: `${updated.supplierName} · ${updated.items.length} línea(s) recibida(s).`,
+            route: "/almacen/recibos",
+            type: "goods_receipt.completed",
+          });
+        }
 
         revalidatePath("/almacen/recibos");
         revalidatePath("/dashboard");
@@ -186,6 +195,14 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
       });
     });
     await logAudit({ userId: user.id, action: "goods_receipt.create", module: "almacen", entityType: "goods_receipt", entityId: created.id, afterData: { receiptNumber: created.receiptNumber, status: created.status, itemCount: created.items.length } });
+    if (created.status === "COMPLETED") {
+      await sendPushToRole("ADMIN", {
+        title: `Recibo ${created.receiptNumber} completado`,
+        body: `${created.supplierName} · ${created.items.length} línea(s) recibida(s).`,
+        route: "/almacen/recibos",
+        type: "goods_receipt.completed",
+      });
+    }
 
     revalidatePath("/almacen/recibos");
     revalidatePath("/dashboard");
