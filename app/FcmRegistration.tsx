@@ -18,15 +18,16 @@ export function FcmRegistration() {
     ) return;
     started.current = true;
 
-    let unregisterRefresh: (() => Promise<void>) | undefined;
-
     const register = async () => {
       const fcm: FcmModule = await import("tauri-plugin-fcm");
       let permission = await fcm.checkPermissions();
       if (permission === "prompt" || permission === "prompt-with-rationale") {
         permission = await fcm.requestPermissions();
       }
-      if (permission !== "granted") return;
+      if (permission !== "granted") {
+        started.current = false;
+        return;
+      }
 
       await fcm.createChannel({
         id: "sdigitalcore",
@@ -39,27 +40,23 @@ export function FcmRegistration() {
         await fetch("/api/mobile/push-token", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.0" }),
+          body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.1" }),
         });
       };
 
       const { token } = await fcm.getToken();
       await sendToken(token);
 
-      const listener = await fcm.onTokenRefresh((event) => {
+      await fcm.onTokenRefresh((event) => {
         void sendToken(event.token);
       });
-      unregisterRefresh = () => listener.unregister();
     };
 
     void register().catch((error) => {
+      started.current = false;
       console.error("[FCM] No se pudo registrar el dispositivo", error);
     });
-
-    return () => {
-      void unregisterRefresh?.();
-    };
-  }, []);
+  }, [pathname]);
 
   return null;
 }
