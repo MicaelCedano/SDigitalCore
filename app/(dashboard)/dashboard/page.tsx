@@ -4,6 +4,7 @@ import { getCurrentUser, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { getAdminOperationsOverview } from "@/lib/dashboard/admin-operations";
 import { AdminWarrantyWidget } from "@/components/dashboard/AdminWarrantyWidget";
 import { AdminTechnicianPaymentsWidget } from "@/components/dashboard/AdminTechnicianPaymentsWidget";
+import { AdminWorkCenterWidget } from "@/components/dashboard/AdminWorkCenterWidget";
 import {
   ArrowRight,
   ClipboardCheck,
@@ -20,6 +21,7 @@ import {
   Calendar,
   Sparkles,
   TrendingUp,
+  BriefcaseBusiness,
 } from "lucide-react";
 
 export const metadata: Metadata = { title: "Resumen general" };
@@ -92,15 +94,21 @@ export default async function DashboardPage() {
             {greeting}, {firstName}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
-            Control de operaciones, pagos a técnicos y trazabilidad en tiempo real.
+            Control de operaciones, tareas del equipo, pagos a técnicos y trazabilidad en tiempo real.
           </p>
         </div>
 
         {overview ? (
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href="/centro-trabajo"
+              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3.5 text-xs font-bold text-white shadow-sm shadow-violet-600/20 transition-all hover:bg-violet-700 active:scale-[0.98]"
+            >
+              <BriefcaseBusiness size={15} /> Centro de trabajo
+            </Link>
+            <Link
               href="/qc/lotes"
-              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 text-xs font-bold text-white shadow-sm shadow-indigo-600/20 transition-all hover:bg-indigo-700 active:scale-[0.98]"
+              className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300"
             >
               <Plus size={15} /> Nueva compra (QC)
             </Link>
@@ -123,7 +131,7 @@ export default async function DashboardPage() {
       {overview ? (
         <>
           {/* 2. Barra de KPIs Operativos Clave (Moderna y Ergonómica) */}
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Indicadores clave">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Indicadores clave">
             {/* KPI 1: Pagos a técnicos y personal */}
             <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
@@ -142,7 +150,25 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* KPI 2: Garantías activas */}
+            {/* KPI 2: Centro de Trabajo */}
+            <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600 ring-1 ring-violet-500/10">
+                  <BriefcaseBusiness size={18} strokeWidth={2.2} />
+                </div>
+                <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-bold text-violet-700 ring-1 ring-violet-200/60">
+                  {overview.workCenter.inProgressCount} en proceso
+                </span>
+              </div>
+              <div className="mt-3.5">
+                <p className="font-mono text-2xl font-bold tracking-tight text-slate-900">
+                  {overview.workCenter.totalActive}
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">Tareas Centro de Trabajo</p>
+              </div>
+            </div>
+
+            {/* KPI 3: Garantías activas */}
             <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/10">
@@ -160,7 +186,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* KPI 3: Lotes QC */}
+            {/* KPI 4: Lotes QC */}
             <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-purple-500/10">
@@ -178,7 +204,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* KPI 4: Solicitudes Almacén */}
+            {/* KPI 5: Solicitudes Almacén */}
             <div className="group rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] transition-all hover:border-slate-300 hover:shadow-md">
               <div className="flex items-center justify-between">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-500/10">
@@ -230,16 +256,19 @@ export default async function DashboardPage() {
               redemptionsPendingTotal={overview.redemptionsPendingTotal}
             />
 
-            {/* Widget 2: Garantías y Trazabilidad en Vivo */}
+            {/* Widget 2: Centro de Trabajo Operativo en Vivo */}
+            <AdminWorkCenterWidget data={overview.workCenter} />
+          </section>
+
+          {/* 5. Grilla secundaria: Garantías y Logística */}
+          <section className="grid gap-6 xl:grid-cols-2" aria-label="Garantías y Logística">
+            {/* Widget 3: Garantías y Trazabilidad en Vivo */}
             <AdminWarrantyWidget
               cases={overview.recentWarrantyCases}
               events={overview.recentWarrantyEvents}
               counts={overview.warrantyCounts}
             />
-          </section>
 
-          {/* 5. Grilla secundaria: Logística y Accesos */}
-          <section className="grid gap-6 xl:grid-cols-2" aria-label="Logística y Control de Accesos">
             {/* Solicitudes de Almacén */}
             <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden transition-all">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-b from-slate-50/50 to-white px-5 py-4 sm:px-6">
