@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { listShipmentHistory, listShipments, serializeShipment } from "@/modules/envios/data";
 import { geocodeAddress } from "@/modules/envios/geocoding";
 import { isLocationInDominicanRepublic } from "@/modules/envios/data";
+import { createShipmentWorkTask } from "@/modules/centro-trabajo/integrations/envios";
 
 const createShipmentSchema = z.object({
   title: z.string().trim().min(3).max(160),
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       include: { driver: { select: { id: true, name: true, username: true } }, locations: true, stops: true },
     });
     await logAudit({ userId: actor.id, action: "shipment.create", module: "envios", entityType: "shipment", entityId: shipment.id, afterData: { code: shipment.code, title: shipment.title, driverId: shipment.driverId } });
+    await createShipmentWorkTask({ shipmentId: shipment.id, code: shipment.code, title: shipment.title, driverId: parsed.data.driverId, creatorId: actor.id, destination, stopCount: stops.length });
     return NextResponse.json({ shipment: serializeShipment(shipment) }, { status: 201 });
   } catch (error) {
     console.error("[envios] No se pudo crear el envío", error);

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { sendPushToRole } from "@/lib/mobile/push";
 import { isLocationInDominicanRepublic } from "@/modules/envios/data";
+import { completeShipmentWorkTask } from "@/modules/centro-trabajo/integrations/envios";
 
 const locationSchema = z.object({
   latitude: z.number().min(-90).max(90),
@@ -69,6 +70,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         route: "/envios",
         type: "shipment.delivered",
       });
+      await completeShipmentWorkTask(id, "COMPLETED", user.id);
     }
     return NextResponse.json({ accepted: true, delivered: result.delivered, recordedAt: result.created.recordedAt.toISOString() });
   } catch (error) {

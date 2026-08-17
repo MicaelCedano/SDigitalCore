@@ -16,7 +16,7 @@ type ActiveUser = { id: string; name: string | null; email: string; image: strin
 
 const statusLabels: Record<string, string> = { PENDING: "Pendiente", IN_PROGRESS: "En proceso", IN_REVIEW: "En revisión", COMPLETED: "Completada", CANCELLED: "Cancelada" };
 const priorityLabels: Record<string, string> = { LOW: "Baja", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente" };
-const moduleLabels: Record<string, string> = { qc: "QC", garantias: "Garantías", almacen: "Almacén", compras: "Compras", pagos: "Pagos", transferencias: "Transferencias", administracion: "Administración" };
+const moduleLabels: Record<string, string> = { qc: "QC", garantias: "Garantías", almacen: "Almacén", compras: "Compras", pagos: "Pagos", transferencias: "Transferencias", administracion: "Administración", envios: "Envíos" };
 const tabs = ["Mis pendientes", "Mis tareas", "Todas", "Tablero", "Calendario", "Actividad", "Historial"];
 
 function dateLabel(value: Date | null) { return value ? new Intl.DateTimeFormat("es-DO", { timeZone: "America/Santo_Domingo", dateStyle: "medium" }).format(new Date(value)) : "Sin fecha límite"; }
