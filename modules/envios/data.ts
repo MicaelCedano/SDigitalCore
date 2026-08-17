@@ -61,6 +61,20 @@ export async function listShipments() {
   return shipments.map(serializeShipment);
 }
 
+export async function listShipmentHistory() {
+  await requirePermission("envios.read");
+  const shipments = await prisma.shipment.findMany({
+    where: { status: { in: ["DELIVERED", "CANCELLED"] } },
+    orderBy: { deliveredAt: "desc" },
+    include: {
+      driver: { select: { id: true, name: true, username: true } },
+      locations: { orderBy: { recordedAt: "asc" } },
+      stops: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  return shipments.map(serializeShipment);
+}
+
 export async function listShipmentAddresses() {
   await requirePermission("envios.read");
   return prisma.shipmentAddress.findMany({

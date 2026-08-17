@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
-import { listShipments, serializeShipment } from "@/modules/envios/data";
+import { listShipmentHistory, listShipments, serializeShipment } from "@/modules/envios/data";
 import { geocodeAddress } from "@/modules/envios/geocoding";
 import { isLocationInDominicanRepublic } from "@/modules/envios/data";
 
@@ -23,9 +23,10 @@ function makeShipmentCode() {
   return `ENV-${stamp}-${suffix}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return NextResponse.json({ shipments: await listShipments() });
+    const history = new URL(request.url).searchParams.get("history") === "true";
+    return NextResponse.json({ shipments: history ? await listShipmentHistory() : await listShipments() });
   } catch (error) {
     console.error("[envios] No se pudieron listar los envíos", error);
     return NextResponse.json({ error: "No se pudieron cargar los envíos." }, { status: 500 });
