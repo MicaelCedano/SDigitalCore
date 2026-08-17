@@ -10,7 +10,7 @@ const createShipmentSchema = z.object({
   destination: z.string().trim().min(3).max(300),
   destinationAddressId: z.string().trim().min(1).optional(),
   vehicleLabel: z.string().trim().max(120).optional(),
-  driverId: z.string().trim().min(1).optional(),
+  driverId: z.string().trim().min(1),
   notes: z.string().trim().max(2000).optional(),
 });
 
@@ -35,10 +35,8 @@ export async function POST(request: Request) {
     const parsed = createShipmentSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: "Datos del envío inválidos." }, { status: 400 });
 
-    if (parsed.data.driverId) {
-      const driver = await prisma.user.findFirst({ where: { id: parsed.data.driverId, status: "ACTIVE" }, select: { id: true } });
-      if (!driver) return NextResponse.json({ error: "El conductor no está activo." }, { status: 400 });
-    }
+    const driver = await prisma.user.findFirst({ where: { id: parsed.data.driverId, status: "ACTIVE" }, select: { id: true } });
+    if (!driver) return NextResponse.json({ error: "El conductor no está activo." }, { status: 400 });
     const defaultOrigin = await prisma.shipmentAddress.findFirst({ where: { status: "ACTIVE", isDefaultOrigin: true }, select: { id: true, address: true } });
     if (!defaultOrigin) return NextResponse.json({ error: "Configura primero una dirección de origen predeterminada." }, { status: 400 });
     const addressIds = [parsed.data.destinationAddressId].filter((value): value is string => Boolean(value));
