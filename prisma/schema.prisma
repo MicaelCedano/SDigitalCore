@@ -80,14 +80,14 @@ enum PushDevicePlatform {
 }
 
 model PushDevice {
-  id          String            @id @default(cuid())
-  userId      String            @map("user_id")
-  token       String            @unique @db.Text
-  platform    PushDevicePlatform
-  appVersion  String?           @map("app_version") @db.VarChar(32)
-  lastSeenAt  DateTime          @default(now()) @map("last_seen_at")
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id         String             @id @default(cuid())
+  userId     String             @map("user_id")
+  token      String             @unique @db.Text
+  platform   PushDevicePlatform
+  appVersion String?            @map("app_version") @db.VarChar(32)
+  lastSeenAt DateTime           @default(now()) @map("last_seen_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -107,34 +107,55 @@ enum ShipmentStatus {
 }
 
 model Shipment {
-  id                 String         @id @default(cuid())
-  code               String         @unique @db.VarChar(40)
-  title              String         @db.VarChar(160)
-  origin             String         @db.VarChar(300)
-  destination        String         @db.VarChar(300)
-  vehicleLabel       String?        @map("vehicle_label") @db.VarChar(120)
-  notes              String?        @db.Text
-  status             ShipmentStatus @default(DRAFT)
-  createdById         String         @map("created_by_id")
-  driverId            String?        @map("driver_id")
-  startedAt           DateTime?      @map("started_at")
-  deliveredAt         DateTime?      @map("delivered_at")
-  lastLatitude        Decimal?       @map("last_latitude") @db.Decimal(10, 7)
-  lastLongitude       Decimal?       @map("last_longitude") @db.Decimal(10, 7)
-  lastAccuracyMeters  Decimal?       @map("last_accuracy_meters") @db.Decimal(8, 2)
-  lastSpeedMps        Decimal?       @map("last_speed_mps") @db.Decimal(8, 2)
-  lastHeading         Decimal?       @map("last_heading") @db.Decimal(6, 2)
-  lastLocationAt      DateTime?      @map("last_location_at")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
+  id                   String         @id @default(cuid())
+  code                 String         @unique @db.VarChar(40)
+  title                String         @db.VarChar(160)
+  origin               String         @db.VarChar(300)
+  destination          String         @db.VarChar(300)
+  originAddressId      String?        @map("origin_address_id")
+  destinationAddressId String?        @map("destination_address_id")
+  vehicleLabel         String?        @map("vehicle_label") @db.VarChar(120)
+  notes                String?        @db.Text
+  status               ShipmentStatus @default(DRAFT)
+  createdById          String         @map("created_by_id")
+  driverId             String?        @map("driver_id")
+  startedAt            DateTime?      @map("started_at")
+  deliveredAt          DateTime?      @map("delivered_at")
+  lastLatitude         Decimal?       @map("last_latitude") @db.Decimal(10, 7)
+  lastLongitude        Decimal?       @map("last_longitude") @db.Decimal(10, 7)
+  lastAccuracyMeters   Decimal?       @map("last_accuracy_meters") @db.Decimal(8, 2)
+  lastSpeedMps         Decimal?       @map("last_speed_mps") @db.Decimal(8, 2)
+  lastHeading          Decimal?       @map("last_heading") @db.Decimal(6, 2)
+  lastLocationAt       DateTime?      @map("last_location_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
 
-  createdBy User              @relation("ShipmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  driver    User?             @relation("ShipmentDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  locations ShipmentLocation[]
+  createdBy          User               @relation("ShipmentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  driver             User?              @relation("ShipmentDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  originAddress      ShipmentAddress?   @relation("ShipmentOriginAddress", fields: [originAddressId], references: [id], onDelete: SetNull)
+  destinationAddress ShipmentAddress?   @relation("ShipmentDestinationAddress", fields: [destinationAddressId], references: [id], onDelete: SetNull)
+  locations          ShipmentLocation[]
 
   @@index([status, lastLocationAt])
   @@index([driverId, status])
   @@map("shipment")
+}
+
+model ShipmentAddress {
+  id              String   @id @default(cuid())
+  name            String   @db.VarChar(160)
+  address         String   @db.VarChar(400)
+  mapsUrl         String?  @map("maps_url") @db.VarChar(1000)
+  isDefaultOrigin Boolean  @default(false) @map("is_default_origin")
+  status          String   @default("ACTIVE") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  originShipments      Shipment[] @relation("ShipmentOriginAddress")
+  destinationShipments Shipment[] @relation("ShipmentDestinationAddress")
+
+  @@index([status, name])
+  @@map("shipment_address")
 }
 
 model ShipmentLocation {

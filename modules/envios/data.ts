@@ -56,3 +56,12 @@ export async function listShipments() {
   });
   return shipments.map(serializeShipment);
 }
+
+export async function listShipmentAddresses() {
+  await requirePermission("envios.read");
+  return prisma.shipmentAddress.findMany({
+    where: { status: "ACTIVE" },
+    orderBy: [{ isDefaultOrigin: "desc" }, { name: "asc" }],
+    select: { id: true, name: true, address: true, mapsUrl: true, isDefaultOrigin: true },
+  });
+}
