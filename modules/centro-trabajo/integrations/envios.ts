@@ -14,6 +14,17 @@ type ShipmentTaskInput = {
   stopCount: number;
 };
 
+export async function syncShipmentWorkTasks(actorId: string) {
+  const shipments = await prisma.shipment.findMany({
+    where: { status: { notIn: ["DELIVERED", "CANCELLED"] }, driverId: { not: null } },
+    select: { id: true, code: true, title: true, destination: true, driverId: true, stops: { select: { id: true } } },
+  });
+  for (const shipment of shipments) {
+    if (!shipment.driverId) continue;
+    await createShipmentWorkTask({ shipmentId: shipment.id, code: shipment.code, title: shipment.title, driverId: shipment.driverId, creatorId: actorId, destination: shipment.destination, stopCount: shipment.stops.length });
+  }
+}
+
 export async function createShipmentWorkTask(input: ShipmentTaskInput) {
   const existing = await prisma.workTask.findFirst({ where: { sourceType: SHIPMENT_TASK_SOURCE, sourceId: input.shipmentId } });
   if (existing) return existing;

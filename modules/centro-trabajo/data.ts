@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
+import { syncShipmentWorkTasks } from "@/modules/centro-trabajo/integrations/envios";
 import { Prisma, WorkTaskStatus } from "@prisma/client";
 
 const taskInclude = {
@@ -63,6 +64,7 @@ export async function getWorkCenterData() {
 
   try {
     await syncQcWorkTasks(user.id);
+    await syncShipmentWorkTasks(user.id);
 
     const scope = user.roleCode === "ADMIN"
       ? {}
