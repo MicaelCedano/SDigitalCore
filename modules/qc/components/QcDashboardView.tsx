@@ -165,6 +165,10 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
           >
             <Send className="w-4 h-4" /> Solicitar IMEIs
           </button>
+          <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-700">
+            <Package className="w-3.5 h-3.5" />
+            {stats.availableForReview ?? 0} disponibles para revisar
+          </span>
           <button
             type="button"
             onClick={refresh}

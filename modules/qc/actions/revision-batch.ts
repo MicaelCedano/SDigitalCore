@@ -1225,7 +1225,7 @@ export async function getQcDashboardAction() {
 
     const startOfDay = santoDomingoStartOfDay();
 
-    const [devices, hoyInspecciones, myRequests, wallet] = await Promise.all([
+    const [devices, hoyInspecciones, myRequests, wallet, availableDevices] = await Promise.all([
       prisma.deviceUnit.findMany({
         where: { assignedToId: persisted.id, batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } } },
         orderBy: { updatedAt: "desc" },
@@ -1262,7 +1262,26 @@ export async function getQcDashboardAction() {
         where: { userId: persisted.id },
         select: { balance: true },
       }),
+      // Es la misma regla usada al solicitar IMEIs: equipos libres, en un
+      // lote vigente y sin una inspección completada en ese lote.
+      prisma.deviceUnit.findMany({
+        where: { assignedToId: null, batch: { status: { not: "CANCELLED" } } },
+        select: {
+          batch: { select: { createdAt: true } },
+          inspections: {
+            where: { status: "COMPLETED" },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
+      }),
     ]);
+
+    const availableForReview = availableDevices.filter((device) => {
+      const batchStart = device.batch?.createdAt ?? new Date(0);
+      return (device.inspections[0]?.createdAt ?? new Date(0)) < batchStart;
+    }).length;
 
     // Revisados hoy: equipos únicos (la última revisión del día gana)
     const hoyPorEquipo = new Map<string, string | null>();
@@ -1305,9 +1324,10 @@ export async function getQcDashboardAction() {
       data: {
         devices: devicesConInspeccion,
         myRequests: visibleRequests,
-        stats: {
-          asignados: devices.length,
-          revisados,
+          stats: {
+            asignados: devices.length,
+            availableForReview,
+            revisados,
           pendientes: devices.length - revisados,
           revisadosHoy: hoyPorEquipo.size,
           aprobadosHoy: hoyFuncional,
