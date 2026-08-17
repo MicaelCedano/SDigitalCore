@@ -71,16 +71,17 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
   { key: "reparaciones", label: "Reparaciones", permission: "reparaciones.read", description: "Cola de reparaciones y pago a técnicos" },
   { key: "desbloqueos", label: "Desbloqueos", permission: "desbloqueos.read", description: "Solicitudes de desbloqueo y pago a técnicos" },
   { key: "centro-trabajo", label: "Centro de trabajo", permission: "centro-trabajo.read", description: "Pendientes, tareas y actividad operativa" },
+  { key: "envios", label: "Envíos", permission: "envios.read", description: "Pedidos, vehículos y seguimiento GPS" },
   { key: "wallet", label: "Mi Wallet / Finanzas", permission: "wallet.read", description: "Billetera digital, saldos y retiros" },
   { key: "configuracion", label: "Configuración", permission: "settings.read", description: "Usuarios y roles" },
 ];
 
 export const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
-  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "reparaciones", "desbloqueos", "centro-trabajo", "wallet", "configuracion"],
+  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "reparaciones", "desbloqueos", "centro-trabajo", "envios", "wallet", "configuracion"],
   ALMACEN: ["almacen"],
   VENTAS: ["precios", "facturas"],
   TECNICO: ["reparaciones", "desbloqueos", "wallet"],
   QC: ["qc", "wallet"],
-  SUPERVISOR: ["almacen", "precios", "facturas", "garantias"],
+  SUPERVISOR: ["almacen", "precios", "facturas", "garantias", "envios"],
   PERSONALIZADO: [],
 };

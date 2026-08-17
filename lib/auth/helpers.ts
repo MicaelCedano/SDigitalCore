@@ -76,6 +76,7 @@ export async function can(permission: string): Promise<boolean> {
       warranties: "garantias",
       qc: "qc",
       wallet: "wallet",
+      envios: "envios",
     };
     const moduleKey = moduleAliases[permissionModule] ?? permissionModule;
     return persistedUser.allowedModules.includes(moduleKey);

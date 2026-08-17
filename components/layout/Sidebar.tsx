@@ -22,6 +22,7 @@ import {
   Lock,
   X,
   Sparkles,
+  Truck,
 } from "lucide-react";
 
 interface SubNavItem {
@@ -44,6 +45,9 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", moduleKey: "dashboard", icon: LayoutDashboard, section: "Inicio" },
   { label: "Centro de trabajo", href: "/centro-trabajo", moduleKey: "centro-trabajo", icon: BriefcaseBusiness, section: "Inicio" },
+  { label: "Envíos", href: "/envios", moduleKey: "envios", icon: Truck, section: "Operaciones", children: [
+    { label: "Seguimiento", href: "/envios" },
+  ] },
   { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse, section: "Operaciones", children: [
     { label: "Productos", href: "/almacen" },
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
