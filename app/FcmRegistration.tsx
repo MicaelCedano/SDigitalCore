@@ -121,7 +121,7 @@ export function FcmRegistration() {
           await fetch("/api/mobile/push-token", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.4" }),
+            body: JSON.stringify({ token, platform: "ANDROID", appVersion: "0.1.5" }),
           });
         };
 
