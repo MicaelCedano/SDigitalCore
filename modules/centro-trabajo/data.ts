@@ -141,11 +141,11 @@ export async function getWorkCenterData() {
     };
   } catch (error) {
     if (!isMissingWorkCenterSchema(error)) throw error;
-    console.error("[centro-trabajo] Falta aplicar la migración del Centro de trabajo.");
+    console.error("[centro-trabajo] Falta aplicar una migración del Centro de trabajo o de su integración.");
     return emptyWorkCenterData(user.id, user.roleCode);
   }
 }
 
 function isMissingWorkCenterSchema(error: unknown) {
-  return error instanceof Error && /(work_task|work_task_event|work_task_assignee|P2021|does not exist)/i.test(error.message);
+  return error instanceof Error && /(work_task|work_task_event|work_task_assignee|started_at|qc_revision_batch|device_unit|qc_inspection|P2021|does not exist)/i.test(error.message);
 }
