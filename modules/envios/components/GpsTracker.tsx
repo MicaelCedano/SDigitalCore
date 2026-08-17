@@ -31,7 +31,12 @@ export function GpsTracker({ shipmentId, active }: { shipmentId: string; active:
       return;
     }
     const resumeTimer = window.localStorage.getItem(trackingStorageKey(shipmentId)) === "active" ? window.setTimeout(start, 0) : undefined;
-    return () => { if (resumeTimer) window.clearTimeout(resumeTimer); if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current); watchId.current = null; };
+    return () => {
+      if (resumeTimer) window.clearTimeout(resumeTimer);
+      if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+      if (!active) window.localStorage.removeItem(trackingStorageKey(shipmentId));
+    };
     // El rastreo se conserva mientras el envío esté activo, incluso si se recarga la página.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, shipmentId]);
