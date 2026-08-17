@@ -44,3 +44,5 @@ CREATE INDEX "shipment_location_shipment_id_recorded_at_idx" ON "shipment_locati
 ALTER TABLE "shipment" ADD CONSTRAINT "shipment_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "shipment" ADD CONSTRAINT "shipment_driver_id_fkey" FOREIGN KEY ("driver_id") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "shipment_location" ADD CONSTRAINT "shipment_location_shipment_id_fkey" FOREIGN KEY ("shipment_id") REFERENCES "shipment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "shipment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "shipment_location" ENABLE ROW LEVEL SECURITY;
