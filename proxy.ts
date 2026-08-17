@@ -8,9 +8,11 @@ export default auth((req) => {
   // Rutas públicas — no requieren autenticación
   const isPublicRoute =
     nextUrl.pathname.startsWith("/login") ||
+    nextUrl.pathname.startsWith("/descargas") ||
     nextUrl.pathname.startsWith("/solicitar-acceso") ||
     nextUrl.pathname.startsWith("/recuperar-password") ||
-    nextUrl.pathname.startsWith("/api/auth");
+    nextUrl.pathname.startsWith("/api/auth") ||
+    nextUrl.pathname.startsWith("/api/downloads/");
 
   if (isPublicRoute) {
     // Si ya está logueado y va al login, redirigir al dashboard
