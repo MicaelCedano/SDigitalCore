@@ -10,7 +10,7 @@ import { isLocationInDominicanRepublic } from "@/modules/envios/data";
 const createShipmentSchema = z.object({
   title: z.string().trim().min(3).max(160),
   destination: z.string().trim().min(3).max(300).optional(),
-  destinationAddressId: z.string().trim().min(1).optional(),
+  destinationAddressId: z.union([z.string().trim().min(1), z.literal("")]).optional(),
   stopAddressIds: z.array(z.string().trim().min(1)).max(20).optional(),
   vehicleLabel: z.string().trim().max(120).optional(),
   driverId: z.string().trim().min(1),
