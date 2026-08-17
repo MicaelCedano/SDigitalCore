@@ -182,7 +182,7 @@ export async function claimWorkTaskAction(taskId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.workTaskAssignee.create({ data: { taskId, userId: user.id, assignedById: user.id } });
-    await tx.workTask.update({ where: { id: taskId }, data: { assigneeId: task.assigneeId ?? user.id, status: task.status === "PENDING" ? "IN_PROGRESS" : undefined, startedAt: task.status === "PENDING" && !task.startedAt ? new Date() : undefined, events: { create: { actorId: user.id, type: "ASSIGNED", note: task.assignmentMode === "MULTIPLE" ? "La tarea fue cogida por un integrante del equipo." : "La tarea fue cogida.", afterData: { userId: user.id, assignmentMode: task.assignmentMode } } } } });
+    await tx.workTask.update({ where: { id: taskId }, data: { assigneeId: task.assigneeId ?? user.id, status: task.status === "PENDING" ? "IN_PROGRESS" : undefined, startedAt: !task.startedAt ? new Date() : undefined, events: { create: { actorId: user.id, type: "ASSIGNED", note: task.assignmentMode === "MULTIPLE" ? "La tarea fue cogida por un integrante del equipo." : "La tarea fue cogida.", afterData: { userId: user.id, assignmentMode: task.assignmentMode } } } } });
   });
   await logAudit({ userId: user.id, action: "work_task.claim", module: "centro-trabajo", entityType: "work_task", entityId: task.id, afterData: { assignmentMode: task.assignmentMode } });
   if (task.creatorId !== user.id) {
