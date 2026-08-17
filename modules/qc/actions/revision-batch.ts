@@ -1265,7 +1265,13 @@ export async function getQcDashboardAction() {
       // Es la misma regla usada al solicitar IMEIs: equipos libres, en un
       // lote vigente y sin una inspección completada en ese lote.
       prisma.deviceUnit.findMany({
-        where: { assignedToId: null, batch: { status: { not: "CANCELLED" } } },
+        // AVAILABLE ya fue revisado y solo está listo para venta; no debe
+        // aparecer como equipo pendiente para el QC.
+        where: {
+          status: "PENDING_QC",
+          assignedToId: null,
+          batch: { status: { not: "CANCELLED" } },
+        },
         select: {
           batch: { select: { createdAt: true } },
           inspections: {
