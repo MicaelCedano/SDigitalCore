@@ -23,7 +23,7 @@ export function ShipmentsManager({ initialShipments, drivers, addresses, current
   const [routeShipmentId, setRouteShipmentId] = useState<string | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
   const selected = shipments.find((shipment) => shipment.id === selectedId) ?? null;
-  const routeStartKey = selected?.lastLocation?.recordedAt ?? null;
+  const routeStartKey = selected?.locations[0]?.recordedAt ?? null;
 
   useEffect(() => {
     if (!selectedId) return;

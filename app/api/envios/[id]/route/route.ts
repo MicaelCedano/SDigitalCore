@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     await requirePermission("envios.read");
     const { id } = await params;
-    const shipment = await prisma.shipment.findUnique({ where: { id }, include: { destinationAddress: { select: { address: true, mapsUrl: true } }, locations: { orderBy: { recordedAt: "desc" }, take: 1 } } });
+    const shipment = await prisma.shipment.findUnique({ where: { id }, include: { destinationAddress: { select: { address: true, mapsUrl: true } }, locations: { orderBy: { recordedAt: "asc" }, take: 1 } } });
     if (!shipment) return NextResponse.json({ error: "Envío no encontrado." }, { status: 404 });
     const start = shipment.locations[0] ? { latitude: Number(shipment.locations[0].latitude), longitude: Number(shipment.locations[0].longitude), label: "Inicio GPS" } : null;
     if (!start) return NextResponse.json({ error: "Activa el GPS del conductor para calcular la trayectoria." }, { status: 409 });

@@ -9,14 +9,6 @@ export function GpsTracker({ shipmentId, active }: { shipmentId: string; active:
   const [tracking, setTracking] = useState(false);
   const [message, setMessage] = useState("GPS detenido");
 
-  const stop = (persist = true) => {
-    if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
-    watchId.current = null;
-    setTracking(false);
-    setMessage("GPS detenido");
-    if (persist) window.localStorage.removeItem(trackingStorageKey(shipmentId));
-  };
-
   const start = () => {
     if (!navigator.geolocation) { setMessage("Este dispositivo no ofrece GPS."); return; }
     if (watchId.current !== null) return;
@@ -45,5 +37,5 @@ export function GpsTracker({ shipmentId, active }: { shipmentId: string; active:
   }, [active, shipmentId]);
 
   if (!active) return null;
-  return <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" onClick={() => tracking ? stop() : start()} className={`rounded-xl px-3 py-2 text-xs font-bold ${tracking ? "bg-rose-100 text-rose-700" : "bg-indigo-600 text-white"}`}>{tracking ? "Detener GPS" : "Activar GPS"}</button><span className="text-xs text-slate-500">{tracking ? `${message} · se reanudará al actualizar` : message}</span></div>;
+  return <div className="mt-3 flex flex-wrap items-center gap-2">{tracking ? <span className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">GPS activo</span> : <button type="button" onClick={start} className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white">Activar GPS</button>}<span className="text-xs text-slate-500">{tracking ? `${message} · seguirá activo hasta terminar o cancelar` : message}</span></div>;
 }
