@@ -66,6 +66,11 @@ export function ShipmentsManager({ initialShipments, drivers, addresses, current
     const response = await fetch(`/api/envios/${selected.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
     if (!response.ok) { window.alert("No se pudo actualizar el viaje."); return; }
     const data = await response.json() as { shipment: Shipment };
+    if (["DELIVERED", "CANCELLED"].includes(data.shipment.status)) {
+      setShipments((current) => current.filter((shipment) => shipment.id !== data.shipment.id));
+      setSelectedId((current) => current === data.shipment.id ? "" : current);
+      return;
+    }
     setShipments((current) => current.map((shipment) => shipment.id === data.shipment.id ? data.shipment : shipment));
   };
 

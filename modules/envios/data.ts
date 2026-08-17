@@ -47,6 +47,7 @@ export function serializeShipment(shipment: ShipmentForSerialization): ShipmentD
 export async function listShipments() {
   await requirePermission("envios.read");
   const shipments = await prisma.shipment.findMany({
+    where: { status: { notIn: ["DELIVERED", "CANCELLED"] } },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
     take: 100,
     include: {
