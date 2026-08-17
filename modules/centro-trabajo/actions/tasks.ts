@@ -154,10 +154,10 @@ export async function deleteWorkTaskAction(taskId: string) {
 export async function updateWorkTaskStatusAction(taskId: string, nextStatus: string) {
   const user = await actor();
   const status = statusSchema.parse(nextStatus);
-  const task = await prisma.workTask.findUnique({ where: { id: taskId }, select: { id: true, title: true, status: true, creatorId: true, assigneeId: true, sourceUrl: true, sourceModule: true } });
+  const task = await prisma.workTask.findUnique({ where: { id: taskId }, select: { id: true, title: true, status: true, startedAt: true, creatorId: true, assigneeId: true, sourceUrl: true, sourceModule: true } });
   if (!task || !canAccessTask(user, task)) throw new Error("No puedes modificar esta tarea.");
   const completedAt = status === "COMPLETED" ? new Date() : null;
-  const updated = await prisma.workTask.update({ where: { id: taskId }, data: { status, completedAt, events: { create: { actorId: user.id, type: status === "COMPLETED" ? "COMPLETED" : "STATUS_CHANGED", beforeData: { status: task.status }, afterData: { status }, } } } });
+  const updated = await prisma.workTask.update({ where: { id: taskId }, data: { status, startedAt: status === "IN_PROGRESS" && !task.startedAt ? new Date() : undefined, completedAt, events: { create: { actorId: user.id, type: status === "COMPLETED" ? "COMPLETED" : "STATUS_CHANGED", beforeData: { status: task.status }, afterData: { status }, } } } });
   await logAudit({ userId: user.id, action: "work_task.status.update", module: "centro-trabajo", entityType: "work_task", entityId: task.id, beforeData: { status: task.status }, afterData: { status: updated.status } });
   const recipients = [task.creatorId, task.assigneeId].filter((id): id is string => Boolean(id && id !== user.id));
   if (recipients.length) {
@@ -182,7 +182,7 @@ export async function claimWorkTaskAction(taskId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.workTaskAssignee.create({ data: { taskId, userId: user.id, assignedById: user.id } });
-    await tx.workTask.update({ where: { id: taskId }, data: { assigneeId: task.assigneeId ?? user.id, status: task.status === "PENDING" ? "IN_PROGRESS" : undefined, events: { create: { actorId: user.id, type: "ASSIGNED", note: task.assignmentMode === "MULTIPLE" ? "La tarea fue cogida por un integrante del equipo." : "La tarea fue cogida.", afterData: { userId: user.id, assignmentMode: task.assignmentMode } } } } });
+    await tx.workTask.update({ where: { id: taskId }, data: { assigneeId: task.assigneeId ?? user.id, status: task.status === "PENDING" ? "IN_PROGRESS" : undefined, startedAt: task.status === "PENDING" && !task.startedAt ? new Date() : undefined, events: { create: { actorId: user.id, type: "ASSIGNED", note: task.assignmentMode === "MULTIPLE" ? "La tarea fue cogida por un integrante del equipo." : "La tarea fue cogida.", afterData: { userId: user.id, assignmentMode: task.assignmentMode } } } } });
   });
   await logAudit({ userId: user.id, action: "work_task.claim", module: "centro-trabajo", entityType: "work_task", entityId: task.id, afterData: { assignmentMode: task.assignmentMode } });
   if (task.creatorId !== user.id) {

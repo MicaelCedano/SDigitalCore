@@ -1,0 +1,1 @@
+ALTER TABLE "work_task" ADD COLUMN IF NOT EXISTS "started_at" TIMESTAMP(3);

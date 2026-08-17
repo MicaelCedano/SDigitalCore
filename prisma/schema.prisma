@@ -331,6 +331,7 @@ model WorkTask {
   creatorId      String                 @map("creator_id")
   assigneeId     String?                @map("assignee_id")
   dueAt          DateTime?              @map("due_at")
+  startedAt      DateTime?              @map("started_at")
   completedAt    DateTime?              @map("completed_at")
   progressDone   Int                    @default(0) @map("progress_done")
   progressTotal  Int?                   @map("progress_total")
