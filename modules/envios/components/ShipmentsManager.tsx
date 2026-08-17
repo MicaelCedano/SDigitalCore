@@ -50,7 +50,7 @@ export function ShipmentsManager({ initialShipments, drivers, addresses, current
 
   const selectDestination = (id: string) => {
     const address = addresses.find((item) => item.id === id);
-    setForm((current) => ({ ...current, destinationAddressId: id, destination: address?.address ?? "" }));
+    setForm((current) => ({ ...current, title: address?.name ?? current.title, destinationAddressId: id, destination: address?.address ?? "" }));
   };
 
   const createShipment = async (event: React.FormEvent) => {
