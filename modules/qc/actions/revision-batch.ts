@@ -1285,11 +1285,26 @@ export async function getQcDashboardAction() {
       return { ...d, lastInspection: vigente };
     });
 
+    // El panel muestra solicitudes activas, no el historial de solicitudes ya
+    // atendidas. Cuando el lote fue completado y pagado, sus equipos dejan de
+    // estar asignados al QC; por eso una solicitud ACCEPTED sin ningún IMEI
+    // activo ya no debe aparecer en "Mis Solicitudes de IMEIs".
+    const activeImeis = new Set(
+      devicesConInspeccion.map((device) => device.imei).filter((imei): imei is string => Boolean(imei))
+    );
+    const visibleRequests = myRequests.filter((request) => {
+      if (request.status !== "ACCEPTED") return true;
+      const requestedImeis = Array.isArray(request.imeis)
+        ? (request.imeis as Array<{ imei?: unknown }>)
+        : [];
+      return requestedImeis.some((item) => typeof item.imei === "string" && activeImeis.has(item.imei));
+    });
+
     return {
       success: true,
       data: {
         devices: devicesConInspeccion,
-        myRequests,
+        myRequests: visibleRequests,
         stats: {
           asignados: devices.length,
           revisados,
