@@ -22,6 +22,7 @@ type ShipmentForSerialization = {
   id: string; code: string; title: string; origin: string; destination: string; vehicleLabel: string | null; notes: string | null; status: string; startedAt: Date | null; deliveredAt: Date | null; lastLatitude: Prisma.Decimal | null; lastLongitude: Prisma.Decimal | null; lastAccuracyMeters: Prisma.Decimal | null; lastSpeedMps: Prisma.Decimal | null; lastHeading: Prisma.Decimal | null; lastLocationAt: Date | null;
   driver: { id: string; name: string | null; username: string | null } | null;
   locations: { latitude: Prisma.Decimal; longitude: Prisma.Decimal; accuracyMeters: Prisma.Decimal | null; speedMps: Prisma.Decimal | null; heading: Prisma.Decimal | null; recordedAt: Date }[];
+  stops: { id: string; name: string; address: string; mapsUrl: string | null; latitude: Prisma.Decimal; longitude: Prisma.Decimal; status: string; arrivedAt: Date | null }[];
 };
 
 export function serializeShipment(shipment: ShipmentForSerialization): ShipmentDto {
@@ -41,6 +42,7 @@ export function serializeShipment(shipment: ShipmentForSerialization): ShipmentD
       ? { latitude: Number(shipment.lastLatitude), longitude: Number(shipment.lastLongitude), accuracyMeters: shipment.lastAccuracyMeters ? Number(shipment.lastAccuracyMeters) : null, speedMps: shipment.lastSpeedMps ? Number(shipment.lastSpeedMps) : null, heading: shipment.lastHeading ? Number(shipment.lastHeading) : null, recordedAt: shipment.lastLocationAt.toISOString() }
       : null,
     locations: shipment.locations.map((location) => ({ latitude: Number(location.latitude), longitude: Number(location.longitude), accuracyMeters: location.accuracyMeters ? Number(location.accuracyMeters) : null, speedMps: location.speedMps ? Number(location.speedMps) : null, heading: location.heading ? Number(location.heading) : null, recordedAt: location.recordedAt.toISOString() })),
+    stops: shipment.stops.map((stop) => ({ id: stop.id, name: stop.name, address: stop.address, mapsUrl: stop.mapsUrl, latitude: Number(stop.latitude), longitude: Number(stop.longitude), status: stop.status as "PENDING" | "ARRIVED", arrivedAt: stop.arrivedAt?.toISOString() ?? null })),
   };
 }
 
@@ -53,6 +55,7 @@ export async function listShipments() {
     include: {
       driver: { select: { id: true, name: true, username: true } },
       locations: { orderBy: { recordedAt: "asc" }, take: 1000 },
+      stops: { orderBy: { createdAt: "asc" } },
     },
   });
   return shipments.map(serializeShipment);

@@ -12,6 +12,18 @@ export type Shipment = {
   deliveredAt: string | null;
   lastLocation: LocationPoint | null;
   locations: LocationPoint[];
+  stops: ShipmentStop[];
+};
+
+export type ShipmentStop = {
+  id: string;
+  name: string;
+  address: string;
+  mapsUrl: string | null;
+  latitude: number;
+  longitude: number;
+  status: "PENDING" | "ARRIVED";
+  arrivedAt: string | null;
 };
 
 export type LocationPoint = { latitude: number; longitude: number; accuracyMeters: number | null; speedMps: number | null; heading: number | null; recordedAt: string };

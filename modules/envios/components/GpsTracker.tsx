@@ -39,7 +39,17 @@ export function GpsTracker({ shipmentId, active, destination, onDelivered }: { s
     watchId.current = navigator.geolocation.watchPosition(async (position) => {
       const payload = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracyMeters: position.coords.accuracy, speedMps: position.coords.speed, heading: position.coords.heading, recordedAt: new Date(position.timestamp).toISOString() };
       const response = await fetch(`/api/envios/${shipmentId}/locations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-      if (!response.ok) { const data = await response.json().catch(() => null); setMessage(data?.error ?? "No se pudo enviar la ubicación."); return; }
+      const locationResult = await response.json().catch(() => null) as { delivered?: boolean; error?: string } | null;
+      if (!response.ok) { setMessage(locationResult?.error ?? "No se pudo enviar la ubicación."); return; }
+      if (locationResult?.delivered) {
+        if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+        watchId.current = null;
+        window.localStorage.removeItem(trackingStorageKey(shipmentId));
+        setTracking(false);
+        setMessage("Pedido entregado; GPS apagado.");
+        onDeliveredRef.current();
+        return;
+      }
       const distance = distanceInMeters(position.coords.latitude, position.coords.longitude, destinationRef.current);
       if (distance <= ARRIVAL_RADIUS_METERS) {
         const deliveredResponse = await fetch(`/api/envios/${shipmentId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "DELIVERED" }) });

@@ -106,6 +106,13 @@ enum ShipmentStatus {
   @@map("shipment_status")
 }
 
+enum ShipmentStopStatus {
+  PENDING
+  ARRIVED
+
+  @@map("shipment_stop_status")
+}
+
 model Shipment {
   id                   String         @id @default(cuid())
   code                 String         @unique @db.VarChar(40)
@@ -135,10 +142,30 @@ model Shipment {
   originAddress      ShipmentAddress?   @relation("ShipmentOriginAddress", fields: [originAddressId], references: [id], onDelete: SetNull)
   destinationAddress ShipmentAddress?   @relation("ShipmentDestinationAddress", fields: [destinationAddressId], references: [id], onDelete: SetNull)
   locations          ShipmentLocation[]
+  stops              ShipmentStop[]
 
   @@index([status, lastLocationAt])
   @@index([driverId, status])
   @@map("shipment")
+}
+
+model ShipmentStop {
+  id          String            @id @default(cuid())
+  shipmentId  String            @map("shipment_id")
+  name        String            @db.VarChar(160)
+  address     String            @db.VarChar(400)
+  mapsUrl     String?           @map("maps_url") @db.VarChar(1000)
+  latitude    Decimal           @db.Decimal(10, 7)
+  longitude   Decimal           @db.Decimal(10, 7)
+  status      ShipmentStopStatus @default(PENDING)
+  arrivedAt   DateTime?         @map("arrived_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId, status])
+  @@map("shipment_stop")
 }
 
 model ShipmentAddress {

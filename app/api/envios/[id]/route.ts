@@ -11,7 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   try {
     await requirePermission("envios.read");
     const { id } = await context.params;
-    const shipment = await prisma.shipment.findUnique({ where: { id }, include: { driver: { select: { id: true, name: true, username: true } }, locations: { orderBy: { recordedAt: "asc" }, take: 5000 } } });
+    const shipment = await prisma.shipment.findUnique({ where: { id }, include: { driver: { select: { id: true, name: true, username: true } }, locations: { orderBy: { recordedAt: "asc" }, take: 5000 }, stops: { orderBy: { createdAt: "asc" } } } });
     if (!shipment) return NextResponse.json({ error: "Envío no encontrado." }, { status: 404 });
     return NextResponse.json({ shipment: serializeShipment(shipment) });
   } catch (error) {
@@ -29,7 +29,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const existing = await prisma.shipment.findUnique({ where: { id }, select: { status: true, driverId: true } });
     if (!existing) return NextResponse.json({ error: "Envío no encontrado." }, { status: 404 });
     const now = new Date();
-    const updated = await prisma.shipment.update({ where: { id }, data: { status: parsed.data.status, startedAt: parsed.data.status === "IN_TRANSIT" ? (existing.status === "IN_TRANSIT" ? undefined : now) : undefined, deliveredAt: parsed.data.status === "DELIVERED" ? now : undefined }, include: { driver: { select: { id: true, name: true, username: true } }, locations: { orderBy: { recordedAt: "asc" }, take: 1000 } } });
+    const updated = await prisma.shipment.update({ where: { id }, data: { status: parsed.data.status, startedAt: parsed.data.status === "IN_TRANSIT" ? (existing.status === "IN_TRANSIT" ? undefined : now) : undefined, deliveredAt: parsed.data.status === "DELIVERED" ? now : undefined }, include: { driver: { select: { id: true, name: true, username: true } }, locations: { orderBy: { recordedAt: "asc" }, take: 1000 }, stops: { orderBy: { createdAt: "asc" } } } });
     await logAudit({ userId: actor.id, action: "shipment.status.update", module: "envios", entityType: "shipment", entityId: id, beforeData: { status: existing.status }, afterData: { status: updated.status } });
     return NextResponse.json({ shipment: serializeShipment(updated) });
   } catch (error) {
