@@ -43,7 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       }
       const segments = await Promise.all(pendingStops.map(async (stop) => {
         const segment = await getDrivingRoute(current, { latitude: Number(stop.latitude), longitude: Number(stop.longitude), label: stop.name });
-        return { id: stop.id, name: stop.name, address: stop.address, status: stop.status, ...segment };
+        return { id: stop.id, name: stop.name, address: stop.address, status: stop.status, latitude: Number(stop.latitude), longitude: Number(stop.longitude), ...segment };
       }));
       const nearest = [...segments].sort((left, right) => left.durationMinutes - right.durationMinutes)[0];
       return NextResponse.json({ origin: current, destination: nearest.destination, distanceKm: nearest.distanceKm, durationMinutes: nearest.durationMinutes, coordinates: nearest.coordinates, stops: segments, returnToOrigin: false });
