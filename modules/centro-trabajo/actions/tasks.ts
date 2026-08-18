@@ -177,7 +177,36 @@ export async function claimWorkTaskAction(taskId: string) {
   const task = await prisma.workTask.findUnique({ where: { id: taskId }, include: { assignees: true } });
   if (!task || !user.allowedModules.includes(task.sourceModule) && user.roleCode !== "ADMIN") throw new Error("No puedes coger esta tarea.");
   if (["COMPLETED", "CANCELLED"].includes(task.status)) throw new Error("Esta tarea ya no está disponible.");
-  if (task.assignees.some((assignment) => assignment.userId === user.id)) return { success: true };
+  if (task.assignees.some((assignment) => assignment.userId === user.id)) {
+    if (!task.startedAt || task.status === "PENDING") {
+      await prisma.workTask.update({
+        where: { id: taskId },
+        data: {
+          status: task.status === "PENDING" ? "IN_PROGRESS" : undefined,
+          startedAt: task.startedAt ?? new Date(),
+          events: {
+            create: {
+              actorId: user.id,
+              type: "STATUS_CHANGED",
+              note: "El responsable confirmó que tomó la tarea.",
+              beforeData: { status: task.status, startedAt: task.startedAt },
+              afterData: { status: task.status === "PENDING" ? "IN_PROGRESS" : task.status, startedAt: "confirmed" },
+            },
+          },
+        },
+      });
+      await logAudit({
+        userId: user.id,
+        action: "work_task.claim",
+        module: "centro-trabajo",
+        entityType: "work_task",
+        entityId: task.id,
+        afterData: { assignmentMode: task.assignmentMode, alreadyAssigned: true },
+      });
+      revalidatePath("/centro-trabajo");
+    }
+    return { success: true };
+  }
   if (task.assignmentMode === "SINGLE" && task.assignees.length > 0) throw new Error("Esta tarea ya fue cogida por otra persona.");
 
   await prisma.$transaction(async (tx) => {
