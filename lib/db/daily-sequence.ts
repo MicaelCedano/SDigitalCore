@@ -27,3 +27,20 @@ export async function nextOperationalNumber(
 
   return `${prefix}-${dateString.replaceAll("-", "")}-${String(sequence.lastValue).padStart(3, "0")}`;
 }
+
+/**
+ * Genera el folio consecutivo global de los lotes QC.
+ *
+ * Se mantiene separado de las secuencias diarias para que el folio sea fácil
+ * de identificar en operación: LOT-115, LOT-116, LOT-117...
+ */
+export async function nextQcBatchNumber(tx: Prisma.TransactionClient) {
+  const sequenceDate = new Date("1970-01-01T00:00:00.000Z");
+  const sequence = await tx.operationalDailySequence.upsert({
+    where: { sequenceDate_sequenceType: { sequenceDate, sequenceType: "QC_BATCH_GLOBAL" } },
+    create: { sequenceDate, sequenceType: "QC_BATCH_GLOBAL", lastValue: 115 },
+    update: { lastValue: { increment: 1 } },
+  });
+
+  return `LOT-${sequence.lastValue}`;
+}

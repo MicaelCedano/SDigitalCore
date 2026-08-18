@@ -5,7 +5,7 @@ import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
-import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import { nextQcBatchNumber } from "@/lib/db/daily-sequence";
 import { payReviewersForBatch, QC_REVIEW_RATE } from "../lib/batch-payment";
 import {
   createRevisionBatchSchema,
@@ -134,7 +134,7 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
     const totalDevices = newDevicesToCreate.length + reingresoUnits.length;
 
     const createdBatch = await prisma.$transaction(async (tx) => {
-      const batchNumber = validated.batchNumber?.trim() || (await nextOperationalNumber(tx, "REVISION_BATCH", "LOT"));
+      const batchNumber = validated.batchNumber?.trim() || (await nextQcBatchNumber(tx));
 
       const batch = await tx.qcRevisionBatch.create({
         data: {
