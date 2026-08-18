@@ -390,10 +390,11 @@ function startOfCurrentWeekInSantoDomingo() {
 }
 
 export const getAdminNotificationCounts = cache(async () => {
-  const [pendingWarehouseRequestCount, pendingAccessRequestCount] = await Promise.all([
+  const [pendingWarehouseRequestCount, pendingAccessRequestCount, pendingQcImeiRequestCount] = await Promise.all([
     prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
     prisma.accessRequest.count({ where: { status: "PENDING" } }),
+    prisma.qcImeiRequest.count({ where: { status: "PENDING" } }),
   ]);
 
-  return { pendingWarehouseRequestCount, pendingAccessRequestCount };
+  return { pendingWarehouseRequestCount, pendingAccessRequestCount, pendingQcImeiRequestCount };
 });

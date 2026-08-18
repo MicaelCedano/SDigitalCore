@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
-import { sendPushToUsers } from "@/lib/mobile/push";
+import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
 import {
   createImeiRequestSchema,
@@ -100,6 +100,13 @@ export async function createImeiRequestAction(input: CreateImeiRequestInput) {
       entityType: "qc_imei_request",
       entityId: request.id,
       afterData: { count: validImeis.length, imeis: validImeis },
+    });
+
+    await sendPushToRole("ADMIN", {
+      title: "Nueva solicitud de IMEIs",
+      body: `${user.name || user.email} solicitó revisar ${validImeis.length} IMEI(s).`,
+      route: "/qc/solicitudes",
+      type: "qc_imei_request.created",
     });
 
     revalidatePath("/qc");

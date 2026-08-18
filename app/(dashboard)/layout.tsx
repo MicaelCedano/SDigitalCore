@@ -38,7 +38,7 @@ export default async function DashboardLayout({
       userAvatarUrl={persistedUser?.image}
       allowedModules={allowedModules}
       walletBalance={walletBalance}
-      notificationCount={(notificationCounts?.pendingWarehouseRequestCount ?? 0) + (notificationCounts?.pendingAccessRequestCount ?? 0)}
+      notificationCount={(notificationCounts?.pendingWarehouseRequestCount ?? 0) + (notificationCounts?.pendingAccessRequestCount ?? 0) + (notificationCounts?.pendingQcImeiRequestCount ?? 0)}
     >
       {children}
     </DashboardLayoutClient>
