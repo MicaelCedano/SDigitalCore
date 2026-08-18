@@ -113,7 +113,9 @@ export function AdminTechnicianPaymentsWidget({
   qcSubmittedPendingTotal: initialQcTotal,
   redemptionsPendingTotal: initialRedemptionsTotal,
 }: AdminTechnicianPaymentsWidgetProps) {
-  const [activeTab, setActiveTab] = useState<"repairs" | "unlocks" | "qc" | "wallet">("repairs");
+  const [activeTab, setActiveTab] = useState<"repairs" | "unlocks" | "qc" | "wallet">(() =>
+    initialQcBatches.some((batch) => batch.status === "SUBMITTED") ? "qc" : "repairs",
+  );
 
   // Local state for immediate reactive UI
   const [repairJobs, setRepairJobs] = useState<PendingRepairJobSummary[]>(initialRepairJobs);
