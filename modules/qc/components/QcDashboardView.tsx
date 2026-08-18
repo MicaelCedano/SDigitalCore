@@ -32,6 +32,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [showSolicitar, setShowSolicitar] = useState(false);
   const [confirmLote, setConfirmLote] = useState<any>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; title: string; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   if (!data) {
@@ -60,10 +61,18 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     setRefreshing(false);
     setConfirmLote(null);
     if (res.success) {
-      alert(res.message ?? "Lote enviado.");
+      setFeedback({
+        type: "success",
+        title: "¡Porción enviada!",
+        message: res.message ?? "Tu porción quedó enviada para aprobación y pago.",
+      });
       refresh();
     } else {
-      alert(res.error || "No se pudo enviar el lote.");
+      setFeedback({
+        type: "error",
+        title: "No se pudo enviar",
+        message: res.error || "No se pudo enviar tu porción.",
+      });
     }
   };
 
@@ -468,6 +477,41 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
               >
                 {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {refreshing ? "Enviando…" : "Enviar mi porción"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {feedback ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setFeedback(null);
+          }}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="feedback-title"
+          >
+            <div className={`px-6 pb-5 pt-7 text-center ${feedback.type === "success" ? "bg-emerald-50" : "bg-rose-50"}`}>
+              <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${feedback.type === "success" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25" : "bg-rose-600 text-white shadow-lg shadow-rose-600/25"}`}>
+                {feedback.type === "success" ? <CheckCheck className="h-7 w-7" /> : <XCircle className="h-7 w-7" />}
+              </div>
+              <h2 id="feedback-title" className="mt-4 text-xl font-black tracking-tight text-slate-900">{feedback.title}</h2>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">{feedback.message}</p>
+            </div>
+            <div className="border-t border-slate-100 bg-white px-6 py-4">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setFeedback(null)}
+                className={`w-full rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-colors ${feedback.type === "success" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"}`}
+              >
+                Listo
               </button>
             </div>
           </div>
