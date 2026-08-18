@@ -16,6 +16,7 @@ type QcBatchForTasks = {
  * Es idempotente: volver a abrir el Centro no duplica tareas.
  */
 export async function syncQcWorkTasks(actorId: string) {
+  const qcDeadline = nextMondayDeadline();
   const batches = await prisma.qcRevisionBatch.findMany({
     where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW"] } },
     select: {
@@ -56,6 +57,7 @@ export async function syncQcWorkTasks(actorId: string) {
       progressDone: batch.reviewedDevices,
       progressTotal: batch.totalDevices,
       status: "IN_PROGRESS",
+      dueAt: qcDeadline,
       sourceCode: batch.batchNumber,
       sourceUrl: `/qc/lotes/${batch.id}`,
     });
@@ -95,6 +97,7 @@ export async function syncQcWorkTasks(actorId: string) {
         progressDone: progress.done,
         progressTotal: progress.total,
         status: progress.done >= progress.total && progress.total > 0 ? "COMPLETED" : "IN_PROGRESS",
+        dueAt: qcDeadline,
         sourceCode: batch.batchNumber,
         sourceUrl: `/qc/lotes/${batch.id}`,
       });
@@ -111,12 +114,29 @@ export async function syncQcWorkTasks(actorId: string) {
   }
 }
 
+function nextMondayDeadline(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santo_Domingo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  const localDate = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = localDate.getUTCDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+  // Mediodía local evita que una fecha sin hora termine mostrándose el día anterior.
+  return new Date(Date.UTC(year, month - 1, day + daysUntilMonday, 16));
+}
+
 async function upsertQcTask(input: {
-  sourceType: string; sourceId: string; assigneeId: string | null; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; sourceCode: string; sourceUrl: string;
+  sourceType: string; sourceId: string; assigneeId: string | null; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
 }) {
   const existing = await prisma.workTask.findFirst({ where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } });
   if (existing) {
-    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, status: input.status, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
+    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
     return;
   }
   await prisma.workTask.create({
@@ -133,6 +153,7 @@ async function upsertQcTask(input: {
       sourceUrl: input.sourceUrl,
       creatorId: input.creatorId,
       assigneeId: input.assigneeId,
+      dueAt: input.dueAt,
       progressDone: input.progressDone,
       progressTotal: input.progressTotal,
       startedAt: input.status === "IN_PROGRESS" ? new Date() : null,
