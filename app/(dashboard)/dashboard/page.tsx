@@ -6,6 +6,7 @@ import { getUserOperationsOverview } from "@/lib/dashboard/user-operations";
 import { AdminWarrantyWidget } from "@/components/dashboard/AdminWarrantyWidget";
 import { AdminTechnicianPaymentsWidget } from "@/components/dashboard/AdminTechnicianPaymentsWidget";
 import { AdminWorkCenterWidget } from "@/components/dashboard/AdminWorkCenterWidget";
+import { AdminQcRequestsWidget } from "@/components/dashboard/AdminQcRequestsWidget";
 import { UserSalesWidget } from "@/components/dashboard/UserSalesWidget";
 import { UserWorkCenterWidget } from "@/components/dashboard/UserWorkCenterWidget";
 import { UserWarrantyWidget } from "@/components/dashboard/UserWarrantyWidget";
@@ -367,6 +368,8 @@ export default async function DashboardPage() {
             {/* Widget 2: Centro de Trabajo Operativo en Vivo */}
             <AdminWorkCenterWidget data={overview.workCenter} />
           </section>
+
+          <AdminQcRequestsWidget requests={overview.pendingQcImeiRequests} />
 
           {/* Grilla principal 2: Garantías y Logística (2 columnas en xl) */}
           <section className="grid gap-6 xl:grid-cols-2" aria-label="Garantías y Logística">

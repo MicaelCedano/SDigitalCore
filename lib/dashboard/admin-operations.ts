@@ -23,6 +23,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     repairJobsPending,
     unlockRequestsPending,
     qcBatchesPending,
+    pendingQcImeiRequests,
     walletRedemptionsPending,
   ] = await Promise.all([
     prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
@@ -157,6 +158,17 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         totalDevices: true,
         reviewedDevices: true,
         createdAt: true,
+      },
+    }),
+    prisma.qcImeiRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        createdAt: true,
+        imeis: true,
+        requester: { select: { name: true, username: true, email: true } },
       },
     }),
     // Wallet: retiros pendientes de canje (bauchers generados sin redimir)
@@ -364,6 +376,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     qcPendingTotalDevices,
     qcSubmittedCount: qcSubmittedBatches.length,
     qcSubmittedPendingTotal,
+    pendingQcImeiRequests,
     walletRedemptionsPending: walletRedemptionsPending.map((entry) => ({
       ...entry,
       amount: Number(entry.amount),
