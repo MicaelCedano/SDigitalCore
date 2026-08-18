@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
+import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
 import { revalidatePath } from "next/cache";
 import { nextQcBatchNumber } from "@/lib/db/daily-sequence";
 import { payReviewersForBatch, QC_REVIEW_RATE } from "../lib/batch-payment";
@@ -204,8 +205,16 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
       route: `/qc/lotes/${createdBatch.id}`,
       type: "qc_batch.created",
     });
+    try {
+      await syncQcWorkTasks(user.id);
+    } catch (syncError) {
+      // El lote ya fue creado; si Centro de trabajo aún no tiene su migración,
+      // se podrá proyectar en la próxima carga del Centro.
+      console.error("[qc] No se pudo proyectar el lote en Centro de trabajo:", syncError);
+    }
 
     revalidatePath("/qc/lotes");
+    revalidatePath("/centro-trabajo");
     revalidatePath("/qc/equipos-revisados");
     revalidatePath("/dashboard");
 

@@ -54,6 +54,7 @@ export async function syncQcWorkTasks(actorId: string) {
       creatorId,
       title: `Completar revisión QC · ${batch.batchNumber}`,
       description: `${batch.reviewedDevices}/${batch.totalDevices} equipos revisados. Esta tarea está disponible para el equipo QC.`,
+      assignmentMode: "MULTIPLE",
       progressDone: batch.reviewedDevices,
       progressTotal: batch.totalDevices,
       status: "IN_PROGRESS",
@@ -94,6 +95,7 @@ export async function syncQcWorkTasks(actorId: string) {
         creatorId,
         title: `Revisar lote QC asignado · ${batch.batchNumber}`,
         description: `Tienes ${progress.total} equipo${progress.total === 1 ? "" : "s"} asignado${progress.total === 1 ? "" : "s"} en este lote.`,
+        assignmentMode: "SINGLE",
         progressDone: progress.done,
         progressTotal: progress.total,
         status: progress.done >= progress.total && progress.total > 0 ? "COMPLETED" : "IN_PROGRESS",
@@ -132,11 +134,11 @@ function nextMondayDeadline(now = new Date()) {
 }
 
 async function upsertQcTask(input: {
-  sourceType: string; sourceId: string; assigneeId: string | null; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
+  sourceType: string; sourceId: string; assigneeId: string | null; assignmentMode: "SINGLE" | "MULTIPLE"; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
 }) {
   const existing = await prisma.workTask.findFirst({ where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } });
   if (existing) {
-    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
+    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, assignmentMode: input.assignmentMode, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
     return;
   }
   await prisma.workTask.create({
@@ -144,6 +146,7 @@ async function upsertQcTask(input: {
       title: input.title,
       description: input.description,
       kind: "AUTOMATIC",
+      assignmentMode: input.assignmentMode,
       status: input.status,
       priority: input.progressDone < input.progressTotal ? "HIGH" : "NORMAL",
       sourceModule: "qc",
