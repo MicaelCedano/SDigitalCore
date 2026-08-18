@@ -38,12 +38,7 @@ export async function POST(request: Request) {
       tokens: target.pushDevices.map((device) => device.token),
       notification: { title: parsed.data.title, body: parsed.data.body },
       data: { type: "admin_test", route: "/dashboard" },
-      android: {
-        notification: {
-          channelId: "sdigitalcore",
-          clickAction: "com.sdigitalcore.NOTIFICATION_CLICK",
-        },
-      },
+      android: { notification: { channelId: "sdigitalcore" } },
     });
 
     const invalidDeviceIds = response.responses.flatMap((result, index) => {

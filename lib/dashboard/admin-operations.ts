@@ -202,8 +202,66 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
 
   const repairPendingTotal = repairJobsPending.reduce((sum, job) => sum + Number(job.montoTotal), 0);
   const unlockPendingTotal = unlockRequestsPending.reduce((sum, req) => sum + Number(req.montoTotalPagado), 0);
-  const qcPendingTotalDevices = qcBatchesPending.reduce((sum, batch) => sum + batch.totalDevices, 0);
-  const qcSubmittedBatches = qcBatchesPending.filter((b) => b.status === "SUBMITTED");
+
+  // Las porciones QC se envían y se pagan por revisor. Se proyectan desde la
+  // auditoría para no bloquear el dashboard hasta que termine el lote global.
+  const assignmentAudits = await prisma.auditLog.findMany({
+    where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
+    orderBy: { createdAt: "desc" },
+    take: 300,
+    select: { entityId: true, action: true, createdAt: true, afterData: true },
+  });
+  const latestAssignments = new Map<string, { batchId: string; reviewerId: string; reviewerName: string; totalDevices: number; reviewedDevices: number; submittedAt: Date }>();
+  const seenAssignments = new Set<string>();
+  for (const audit of assignmentAudits) {
+    const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
+    const reviewerId = typeof data.reviewerId === "string" ? data.reviewerId : null;
+    if (!audit.entityId || !reviewerId) continue;
+    const key = `${audit.entityId}:${reviewerId}`;
+    if (seenAssignments.has(key)) continue;
+    seenAssignments.add(key);
+    if (audit.action !== "qc_batch.assignment_submit") continue;
+    latestAssignments.set(key, {
+      batchId: audit.entityId,
+      reviewerId,
+      reviewerName: typeof data.reviewerName === "string" ? data.reviewerName : "QC",
+      totalDevices: Number(data.assignedDevices) || 0,
+      reviewedDevices: Number(data.reviewedDevices) || 0,
+      submittedAt: audit.createdAt,
+    });
+  }
+  const assignmentBatchIds = [...new Set([...latestAssignments.values()].map((item) => item.batchId))];
+  const assignmentBatches = await prisma.qcRevisionBatch.findMany({
+    where: { id: { in: assignmentBatchIds } },
+    select: { id: true, batchNumber: true, supplierName: true },
+  });
+  const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
+  const assignmentPaymentKeys = [...latestAssignments.values()].map((item) => `qc-payment:${item.batchId}:${item.reviewerId}`);
+  const paidAssignments = await prisma.walletLedgerEntry.findMany({
+    where: { externalKey: { in: assignmentPaymentKeys }, type: "CREDIT", status: "POSTED" },
+    select: { externalKey: true },
+  });
+  const paidAssignmentKeys = new Set(paidAssignments.map((entry) => entry.externalKey));
+  const partialQcBatches: any[] = [];
+  for (const assignment of latestAssignments.values()) {
+    const batch = assignmentBatchById.get(assignment.batchId);
+    if (!batch || paidAssignmentKeys.has(`qc-payment:${assignment.batchId}:${assignment.reviewerId}`)) continue;
+    partialQcBatches.push({
+      id: assignment.batchId,
+      assignmentKey: `qc-payment:${assignment.batchId}:${assignment.reviewerId}`,
+      reviewerId: assignment.reviewerId,
+      reviewerName: assignment.reviewerName,
+      batchNumber: batch.batchNumber,
+      supplierName: batch.supplierName,
+      status: "SUBMITTED",
+      totalDevices: assignment.totalDevices,
+      reviewedDevices: assignment.reviewedDevices,
+      createdAt: assignment.submittedAt,
+    });
+  }
+  const qcBatchesForDashboard: any[] = [...qcBatchesPending, ...partialQcBatches];
+  const qcPendingTotalDevices = qcBatchesForDashboard.reduce((sum, batch) => sum + batch.totalDevices, 0);
+  const qcSubmittedBatches = qcBatchesForDashboard.filter((b) => b.status === "SUBMITTED");
   const qcSubmittedPendingTotal = qcSubmittedBatches.reduce((sum, b) => sum + b.reviewedDevices * 50, 0);
   const redemptionsPendingTotal = walletRedemptionsPending.reduce((sum, e) => sum + Number(e.amount), 0);
 
@@ -371,8 +429,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     })),
     unlockPendingCount: unlockRequestsPending.length,
     unlockPendingTotal,
-    qcBatchesPending,
-    qcPendingCount: qcBatchesPending.length,
+    qcBatchesPending: qcBatchesForDashboard,
+    qcPendingCount: qcBatchesForDashboard.length,
     qcPendingTotalDevices,
     qcSubmittedCount: qcSubmittedBatches.length,
     qcSubmittedPendingTotal,

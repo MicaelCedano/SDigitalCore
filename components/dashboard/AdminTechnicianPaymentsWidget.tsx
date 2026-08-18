@@ -51,6 +51,9 @@ export type PendingUnlockRequestSummary = {
 
 export type PendingQcBatchSummary = {
   id: string;
+  assignmentKey?: string;
+  reviewerId?: string | null;
+  reviewerName?: string | null;
   batchNumber: string;
   supplierName: string;
   status: string;
@@ -194,11 +197,12 @@ export function AdminTechnicianPaymentsWidget({
   // 3. Aceptar Lote QC
   async function handleApproveQcBatch(batch: PendingQcBatchSummary) {
     if (processingId) return;
-    setProcessingId(`qc-${batch.id}`);
+    const actionKey = batch.assignmentKey || batch.id;
+    setProcessingId(`qc-${actionKey}`);
     setToastMessage(null);
 
     try {
-      const res = await approveRevisionBatchAction({ id: batch.id });
+      const res = await approveRevisionBatchAction({ id: batch.id, reviewerId: batch.reviewerId || undefined });
       if (!res.success) {
         setToastMessage({ type: "error", text: res.error || "No se pudo aceptar el lote." });
         setProcessingId(null);
@@ -208,10 +212,12 @@ export function AdminTechnicianPaymentsWidget({
       const payout = batch.reviewedDevices * 50;
       setToastMessage({
         type: "success",
-        text: `¡Lote ${batch.batchNumber} aceptado! Se acreditaron RD$ ${payout.toLocaleString("es-DO")} a los revisores.`,
+        text: batch.reviewerId
+          ? `¡Porción de ${batch.reviewerName || "QC"} aprobada! Se acreditaron RD$ ${payout.toLocaleString("es-DO")} en su wallet.`
+          : `¡Lote ${batch.batchNumber} aceptado! Se acreditaron RD$ ${payout.toLocaleString("es-DO")} a los revisores.`,
       });
 
-      setQcBatches((prev) => prev.filter((item) => item.id !== batch.id));
+      setQcBatches((prev) => prev.filter((item) => (item.assignmentKey || item.id) !== actionKey));
       setQcPendingTotal((prev) => Math.max(0, prev - payout));
     } catch {
       setToastMessage({ type: "error", text: "Error inesperado al aceptar el lote." });
@@ -562,7 +568,8 @@ export function AdminTechnicianPaymentsWidget({
           <>
             {qcBatches.length > 0 ? (
               qcBatches.map((batch) => {
-                const isProcessing = processingId === `qc-${batch.id}`;
+                const actionKey = batch.assignmentKey || batch.id;
+                const isProcessing = processingId === `qc-${actionKey}`;
                 const isSubmitted = batch.status === "SUBMITTED";
                 const estimatedPayout = batch.reviewedDevices * 50;
                 return (
@@ -595,6 +602,7 @@ export function AdminTechnicianPaymentsWidget({
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-slate-600">
+                          {batch.reviewerName ? <><span className="font-semibold text-slate-900">{batch.reviewerName}</span> · </> : null}
                           Suplidor: <span className="font-semibold text-slate-900">{batch.supplierName}</span> · Revisados:{" "}
                           <span className="font-bold text-slate-900">{batch.reviewedDevices}</span> / {batch.totalDevices} equipos
                         </p>
