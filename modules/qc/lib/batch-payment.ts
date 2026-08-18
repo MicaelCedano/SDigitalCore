@@ -10,7 +10,11 @@ export const QC_REVIEW_RATE = 50; // RD$ por equipo revisado (fórmula SDigitalS
  * de cada equipo. Idempotente: cada pago tiene externalKey único
  * `qc-payment:{batchId}:{reviewerId}`.
  */
-export async function payReviewersForBatch(batchId: string, tx: Prisma.TransactionClient = prisma) {
+export async function payReviewersForBatch(
+  batchId: string,
+  tx: Prisma.TransactionClient = prisma,
+  onlyReviewerId?: string,
+) {
   const batch = await tx.qcRevisionBatch.findUnique({
     where: { id: batchId },
     select: { id: true, batchNumber: true, createdAt: true },
@@ -23,7 +27,7 @@ export async function payReviewersForBatch(batchId: string, tx: Prisma.Transacti
   // historial previo de un reingreso NO cuenta. El resultado no importa:
   // funcional o no funcional, la revisión se paga igual.
   const devices = await tx.deviceUnit.findMany({
-    where: { batchId: batch.id },
+    where: { batchId: batch.id, ...(onlyReviewerId ? { assignedToId: onlyReviewerId } : {}) },
     select: {
       inspections: {
         where: { createdAt: { gte: batch.createdAt } },

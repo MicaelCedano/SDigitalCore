@@ -82,7 +82,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
   );
 
   const handleApprove = async (id: string, reject: boolean) => {
-    const batch = pending.find((b: any) => b.id === id);
+    const batch = pending.find((b: any) => (b.assignmentKey || b.id) === id);
     if (!batch) return;
     // Abre el modal moderno de confirmación en lugar del confirm() genérico
     setConfirmTarget({ batch, reject });
@@ -92,8 +92,9 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
     if (!confirmTarget) return;
     const { batch, reject } = confirmTarget;
 
-    setProcessingId(batch.id);
-    const res = await approveRevisionBatchAction({ id: batch.id, reject });
+    const actionId = batch.assignmentKey || batch.id;
+    setProcessingId(actionId);
+    const res = await approveRevisionBatchAction({ id: batch.id, reviewerId: batch.reviewerId || undefined, reject });
     setProcessingId(null);
     setConfirmTarget(null);
     if (res.success) {
@@ -116,7 +117,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">Pagos de Control de Calidad</h1>
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              Acepta los lotes enviados por el QC y se acredita el pago a los revisores automáticamente.
+              Acepta cada porción enviada por el QC y acredita su pago sin esperar al lote completo.
             </p>
           </div>
         </div>
@@ -188,7 +189,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
               <Send className="w-4 h-4 text-violet-600" /> Lotes enviados por el QC
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Al aceptar un lote se acredita el pago a los revisores (RD$ {RATE} por equipo).
+              Al aceptar una porción se acredita el pago al revisor (RD$ {RATE} por equipo).
             </p>
           </div>
           {pending.length > 0 && (
@@ -203,7 +204,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
             <Inbox className="w-10 h-10 mx-auto text-slate-300" />
             <p className="text-sm font-bold text-slate-700">No hay lotes por aceptar</p>
             <p className="text-xs text-slate-500">
-              Cuando el QC termine de revisar y envíe un lote, aparecerá aquí para que lo aceptes y se pague.
+              Cuando un QC termine su porción y la envíe, aparecerá aquí para que la aceptes y se pague.
             </p>
           </div>
         ) : (
@@ -252,11 +253,11 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleApprove(b.id, false)}
-                          disabled={processingId === b.id}
+                          onClick={() => handleApprove(b.assignmentKey || b.id, false)}
+                          disabled={processingId === (b.assignmentKey || b.id)}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                         >
-                          {processingId === b.id ? (
+                          {processingId === (b.assignmentKey || b.id) ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : (
                             <CheckCheck className="w-3.5 h-3.5" />
@@ -265,8 +266,8 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleApprove(b.id, true)}
-                          disabled={processingId === b.id}
+                          onClick={() => handleApprove(b.assignmentKey || b.id, true)}
+                          disabled={processingId === (b.assignmentKey || b.id)}
                           className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg text-[11px] border border-amber-200 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />

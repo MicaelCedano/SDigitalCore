@@ -99,14 +99,19 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
         batchNumber: b.batchNumber,
         supplierName: b.supplierName,
         status: b.status,
-        totalDevices: b.totalDevices || 0,
-        reviewedDevices: b.reviewedDevices || 0,
+        // En el panel del QC el avance es el de su porción, no el del lote global.
+        totalDevices: 0,
+        reviewedDevices: 0,
         myCount: 0,
         myReviewed: 0,
+        assignmentSubmitted: false,
       };
       entry.myCount += 1;
       const vigente = (dev.lastInspection?.createdAt ?? new Date(0)) >= new Date(b.createdAt);
       if (dev.lastInspection?.status === "COMPLETED" && vigente) entry.myReviewed += 1;
+      entry.totalDevices = entry.myCount;
+      entry.reviewedDevices = entry.myReviewed;
+      entry.assignmentSubmitted = entry.assignmentSubmitted || Boolean(dev.assignmentSubmitted);
       map.set(b.id, entry);
     }
     return [...map.values()].sort((a, b) => (a.status === "IN_REVIEW" ? -1 : 1) - (b.status === "IN_REVIEW" ? -1 : 1));
@@ -257,14 +262,14 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                 <Package className="w-4 h-4 text-[#5750f1]" /> Mis lotes en revisión
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Cuando un lote esté completo, envíalo al administrador para que acepte y acredite el pago.
+                Cuando termines tu porción, envíala al administrador para que acepte y acredite tu pago; no tienes que esperar a los demás.
               </p>
             </div>
           </div>
           <div className="divide-y divide-slate-100">
             {lotes.map((lote: any) => {
               const ready = canSubmitLote(lote);
-              const enviado = lote.status === "SUBMITTED";
+              const enviado = lote.assignmentSubmitted || lote.status === "SUBMITTED";
               return (
                 <div key={lote.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -303,7 +308,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                         />
                       </div>
                       <span className="text-[11px] font-bold text-slate-600">
-                        {lote.reviewedDevices}/{lote.totalDevices} revisados
+                        {lote.reviewedDevices}/{lote.totalDevices} de tu porción revisados
                       </span>
                       <span className="text-[11px] text-slate-400">
                         · tuyos: {lote.myReviewed}/{lote.myCount}
@@ -313,7 +318,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                   <div className="shrink-0">
                     {enviado ? (
                       <span className="px-3 py-2 bg-violet-50 text-violet-700 font-bold text-xs rounded-xl border border-violet-200 inline-flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" /> Esperando aprobación
+                        <Clock className="w-3.5 h-3.5" /> Porción enviada · esperando pago
                       </span>
                     ) : ready ? (
                       <button
