@@ -45,6 +45,7 @@ export async function syncQcWorkTasks(actorId: string) {
   const desired = new Set<string>();
 
   for (const batch of batches as QcBatchForTasks[]) {
+    const collaboratorIds = [...new Set(batch.devices.map((device) => device.assignedToId).filter((id): id is string => Boolean(id)))];
     const globalKey = `${batch.id}:global`;
     desired.add(globalKey);
     await upsertQcTask({
@@ -53,8 +54,9 @@ export async function syncQcWorkTasks(actorId: string) {
       assigneeId: null,
       creatorId,
       title: `Completar revisión QC · ${batch.batchNumber}`,
-      description: `${batch.reviewedDevices}/${batch.totalDevices} equipos revisados. Esta tarea está disponible para el equipo QC.`,
+      description: `${batch.reviewedDevices}/${batch.totalDevices} equipos revisados. ${collaboratorIds.length ? `${collaboratorIds.length} personas ya están colaborando en este lote.` : "La tarea está disponible para el equipo QC."}`,
       assignmentMode: "MULTIPLE",
+      assigneeIds: collaboratorIds,
       progressDone: batch.reviewedDevices,
       progressTotal: batch.totalDevices,
       status: "IN_PROGRESS",
@@ -96,6 +98,7 @@ export async function syncQcWorkTasks(actorId: string) {
         title: `Revisar lote QC asignado · ${batch.batchNumber}`,
         description: `Tienes ${progress.total} equipo${progress.total === 1 ? "" : "s"} asignado${progress.total === 1 ? "" : "s"} en este lote.`,
         assignmentMode: "SINGLE",
+        assigneeIds: [assigneeId],
         progressDone: progress.done,
         progressTotal: progress.total,
         status: progress.done >= progress.total && progress.total > 0 ? "COMPLETED" : "IN_PROGRESS",
@@ -134,11 +137,11 @@ function nextMondayDeadline(now = new Date()) {
 }
 
 async function upsertQcTask(input: {
-  sourceType: string; sourceId: string; assigneeId: string | null; assignmentMode: "SINGLE" | "MULTIPLE"; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
+  sourceType: string; sourceId: string; assigneeId: string | null; assignmentMode: "SINGLE" | "MULTIPLE"; assigneeIds: string[]; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
 }) {
   const existing = await prisma.workTask.findFirst({ where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } });
   if (existing) {
-    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, assignmentMode: input.assignmentMode, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
+    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, assignmentMode: input.assignmentMode, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: { connectOrCreate: input.assigneeIds.map((userId) => ({ where: { taskId_userId: { taskId: existing.id, userId } }, create: { userId, assignedById: input.creatorId } })) } } });
     return;
   }
   await prisma.workTask.create({
@@ -161,7 +164,7 @@ async function upsertQcTask(input: {
       progressTotal: input.progressTotal,
       startedAt: input.status === "IN_PROGRESS" ? new Date() : null,
       completedAt: input.status === "COMPLETED" ? new Date() : null,
-      assignees: input.assigneeId ? { create: { userId: input.assigneeId, assignedById: input.creatorId } } : undefined,
+      assignees: input.assigneeIds.length ? { create: input.assigneeIds.map((userId) => ({ userId, assignedById: input.creatorId })) } : undefined,
       events: { create: { actorId: input.creatorId, type: "CREATED", afterData: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } } },
     },
   });
