@@ -116,7 +116,7 @@ async function upsertQcTask(input: {
 }) {
   const existing = await prisma.workTask.findFirst({ where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } });
   if (existing) {
-    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, status: input.status, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
+    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, status: input.status, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: input.assigneeId ? { connectOrCreate: { where: { taskId_userId: { taskId: existing.id, userId: input.assigneeId } }, create: { userId: input.assigneeId, assignedById: input.creatorId } } } : undefined } });
     return;
   }
   await prisma.workTask.create({
@@ -135,7 +135,7 @@ async function upsertQcTask(input: {
       assigneeId: input.assigneeId,
       progressDone: input.progressDone,
       progressTotal: input.progressTotal,
-      startedAt: null,
+      startedAt: input.status === "IN_PROGRESS" ? new Date() : null,
       completedAt: input.status === "COMPLETED" ? new Date() : null,
       assignees: input.assigneeId ? { create: { userId: input.assigneeId, assignedById: input.creatorId } } : undefined,
       events: { create: { actorId: input.creatorId, type: "CREATED", afterData: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } } },
