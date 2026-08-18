@@ -31,6 +31,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [showSolicitar, setShowSolicitar] = useState(false);
+  const [confirmLote, setConfirmLote] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   if (!data) {
@@ -49,16 +50,15 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   };
 
   const handleSubmitLote = async (lote: any) => {
-    if (
-      !confirm(
-        `¿Enviar el Lote ${lote.batchNumber} para aprobación del administrador? ` +
-          `El pago se acreditará cuando ${lote.supplierName ? "el admin lo acepte" : "lo acepte el administrador"}.`
-      )
-    )
-      return;
+    setConfirmLote(lote);
+  };
+
+  const confirmSubmitLote = async () => {
+    if (!confirmLote) return;
     setRefreshing(true);
-    const res = await submitRevisionBatchAction({ id: lote.id });
+    const res = await submitRevisionBatchAction({ id: confirmLote.id });
     setRefreshing(false);
+    setConfirmLote(null);
     if (res.success) {
       alert(res.message ?? "Lote enviado.");
       refresh();
@@ -391,6 +391,88 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
           </div>
         </div>
       )}
+
+      {confirmLote ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !refreshing) setConfirmLote(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirmar-porcion-title"
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+                  <Send className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-600">Enviar porción</p>
+                  <h2 id="confirmar-porcion-title" className="mt-0.5 text-lg font-black tracking-tight text-slate-900">
+                    ¿Terminaste tu parte?
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmLote(null)}
+                disabled={refreshing}
+                className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white hover:text-slate-700 disabled:opacity-50"
+                aria-label="Cerrar confirmación"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-sm leading-6 text-slate-600">
+                Vas a enviar únicamente los equipos que tienes asignados. Los demás revisores podrán continuar con sus propias porciones.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Lote</p>
+                  <p className="mt-1 truncate font-mono text-sm font-black text-slate-800">{confirmLote.batchNumber}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Tu porción</p>
+                  <p className="mt-1 text-sm font-black text-emerald-800">{confirmLote.myReviewed}/{confirmLote.myCount} equipos</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                <span className="text-xs font-bold text-indigo-800">Pago estimado</span>
+                <span className="text-lg font-black text-indigo-700">
+                  RD$ {(confirmLote.myReviewed * 50).toLocaleString("es-DO")}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmLote(null)}
+                disabled={refreshing}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50"
+              >
+                Todavía no
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmSubmitLote()}
+                disabled={refreshing}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {refreshing ? "Enviando…" : "Enviar mi porción"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Mis IMEIs asignados */}
       <div>
