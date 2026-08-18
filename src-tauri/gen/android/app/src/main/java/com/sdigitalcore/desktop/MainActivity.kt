@@ -20,7 +20,10 @@ class MainActivity : TauriActivity() {
     }
 
     private fun prepareNotificationIntent(intent: Intent?) {
-        val route = intent?.getStringExtra("route") ?: return
+        val route = intent?.getStringExtra("route")
+            ?: intent?.getStringExtra("gcm.n.route")
+            ?: intent?.data?.getQueryParameter("route")
+            ?: return
         if (!route.startsWith("/") || route.startsWith("//")) return
         intent.data = Uri.parse("sdigitalcore://notification")
             .buildUpon()

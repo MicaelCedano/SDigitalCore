@@ -43,7 +43,10 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload) {
           route: payload.route ?? "/dashboard",
         },
       android: {
-        notification: { channelId: "sdigitalcore" },
+        notification: {
+          channelId: "sdigitalcore",
+          clickAction: "com.sdigitalcore.NOTIFICATION_CLICK",
+        },
       },
       });
       response.responses.forEach((result, index) => {
