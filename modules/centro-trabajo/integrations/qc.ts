@@ -8,7 +8,7 @@ type QcBatchForTasks = {
   totalDevices: number;
   reviewedDevices: number;
   createdAt: Date;
-  devices: { assignedToId: string | null; inspections: { status: string }[] }[];
+  devices: { assignedToId: string | null; inspections: { status: string; createdAt: Date }[] }[];
 };
 
 /**
@@ -32,7 +32,7 @@ export async function syncQcWorkTasks(actorId: string) {
             where: { status: "COMPLETED" },
             orderBy: { createdAt: "desc" },
             take: 1,
-            select: { status: true },
+            select: { status: true, createdAt: true },
           },
         },
       },
@@ -61,11 +61,25 @@ export async function syncQcWorkTasks(actorId: string) {
     });
 
     const byAssignee = new Map<string, { done: number; total: number }>();
+    const existingTasks = await prisma.workTask.findMany({
+      where: {
+        sourceType: "qc_revision_batch_assigned",
+        sourceId: batch.id,
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+      },
+      select: { assigneeId: true, createdAt: true },
+    });
+    const taskStartedAt = new Map(
+      existingTasks
+        .filter((task): task is typeof task & { assigneeId: string } => Boolean(task.assigneeId))
+        .map((task) => [task.assigneeId, task.createdAt]),
+    );
     for (const device of batch.devices) {
       if (!device.assignedToId) continue;
       const current = byAssignee.get(device.assignedToId) ?? { done: 0, total: 0 };
       current.total += 1;
-      if (device.inspections.length > 0) current.done += 1;
+      const startedAt = taskStartedAt.get(device.assignedToId);
+      if (device.inspections.some((inspection) => !startedAt || inspection.createdAt >= startedAt)) current.done += 1;
       byAssignee.set(device.assignedToId, current);
     }
     for (const [assigneeId, progress] of byAssignee) {

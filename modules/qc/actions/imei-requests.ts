@@ -285,6 +285,7 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
         select: {
           id: true,
           imei: true,
+          batchId: true,
           assignedToId: true,
           batch: { select: { createdAt: true } },
           inspections: {
@@ -306,6 +307,22 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
           data: { assignedToId: request.requesterId, status: "IN_QC" },
         });
         assigned = res.count;
+
+        // La tarea automática anterior puede representar una asignación
+        // distinta del mismo lote. Se cancela solo la proyección; el
+        // historial de inspecciones y la auditoría permanecen intactos.
+        const batchIds = [...new Set(free.map((device) => device.batchId).filter((id): id is string => Boolean(id)))];
+        if (batchIds.length > 0) {
+          await prisma.workTask.updateMany({
+            where: {
+              sourceType: "qc_revision_batch_assigned",
+              sourceId: { in: batchIds },
+              assigneeId: request.requesterId,
+              status: { notIn: ["COMPLETED", "CANCELLED"] },
+            },
+            data: { status: "CANCELLED", completedAt: null },
+          });
+        }
       }
     }
 
