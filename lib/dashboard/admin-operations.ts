@@ -145,9 +145,10 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         technician: { select: { name: true, username: true } },
       },
     }),
-    // QC: lotes de revisión pendientes, en revisión o enviados a aprobación
+    // QC: solo lotes globales enviados con el flujo anterior. Los lotes en
+    // revisión no son pagos: cada revisor cobra únicamente su porción enviada.
     prisma.qcRevisionBatch.findMany({
-      where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW", "SUBMITTED"] } },
+      where: { status: "SUBMITTED" },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {
