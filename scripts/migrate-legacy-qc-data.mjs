@@ -60,7 +60,8 @@ async function readSource(source) {
       LEFT JOIN users reviewer ON reviewer.id = h.user_id
       WHERE h.estado = 'Revisado'
         AND h.user_id IS NOT NULL
-        AND UPPER(COALESCE(BTRIM(reviewer.role_code), '')) NOT IN ('ADMIN', 'ADMINISTRADOR')
+        AND LOWER(COALESCE(NULLIF(BTRIM(reviewer.username), ''), NULLIF(BTRIM(reviewer.name), ''), ''))
+          NOT IN ('admin', 'administrador')
       ORDER BY h.equipo_id, h.fecha DESC NULLS LAST, h.id DESC
     )
     SELECT

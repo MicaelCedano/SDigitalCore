@@ -8,7 +8,7 @@
 - Crea un `qc_revision_batch` por cada compra de SDigitalSystem (80 lotes), con su proveedor, fecha de compra y conteos; cada equipo queda asociado al lote de su compra.
 - Conserva IMEI, marca, modelo, almacenamiento, color, grado, observación, resultado y fecha.
 - Recupera el último revisor identificado de Control de Calidad, ignorando eventos
-  `Revisado` atribuidos a `ADMIN`/`ADMINISTRADOR`; así una verificación administrativa
+  `Revisado` atribuidos al usuario legacy `admin`/`Administrador`; así una verificación administrativa
   posterior no reemplaza al QC que hizo la revisión.
 - Enlaza `reviewer_id` solo cuando la identidad legacy fue confirmada en Core; siempre conserva `reviewer_name_snapshot`.
 - Conserva como `UNSPECIFIED` los equipos revisados cuya funcionalidad histórica esté vacía, sin inventar un resultado.
