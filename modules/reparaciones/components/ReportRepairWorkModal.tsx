@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, Trash2, X, Wrench, Smartphone, User, Zap } from "lucide-react";
+import { CheckCircle2, Loader2, Plus, Trash2, X, Wrench, Smartphone, User, XCircle, Zap } from "lucide-react";
 
 export interface ReportItemInput {
   imei: string;
@@ -9,10 +9,11 @@ export interface ReportItemInput {
   modelo?: string;
   problema: string;
   cliente: string;
+  resultado: "REPAIRED" | "UNREPAIRED";
   warrantyCaseId?: string;
 }
 
-const emptyItem = (): ReportItemInput => ({ imei: "", marca: "", modelo: "", problema: "", cliente: "" });
+const emptyItem = (): ReportItemInput => ({ imei: "", marca: "", modelo: "", problema: "", cliente: "", resultado: "REPAIRED" });
 
 export function ReportRepairWorkModal({
   prefilled,
@@ -114,7 +115,7 @@ export function ReportRepairWorkModal({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" /> Equipos reparados
+                <Zap className="w-4 h-4 text-amber-500" /> Resultado por equipo
               </h3>
               <button
                 type="button"
@@ -171,6 +172,33 @@ export function ReportRepairWorkModal({
                       className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 disabled:bg-slate-100 disabled:text-slate-500"
                     />
                   </label>
+                </div>
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">¿Se pudo reparar?</p>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => updateItem(index, "resultado", "REPAIRED")}
+                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
+                        item.resultado === "REPAIRED"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-emerald-200"
+                      }`}
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> Sí, reparado
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateItem(index, "resultado", "UNREPAIRED")}
+                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
+                        item.resultado === "UNREPAIRED"
+                          ? "border-rose-300 bg-rose-50 text-rose-700 ring-2 ring-rose-100"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-rose-200"
+                      }`}
+                    >
+                      <XCircle className="h-4 w-4" /> No se pudo reparar
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   {item.warrantyCaseId ? (

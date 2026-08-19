@@ -136,6 +136,7 @@ export function WarrantyFlow({
   const [repaired, setRepaired] = useState(true);
   const [search, setSearch] = useState("");
   const [counterpartyFilter, setCounterpartyFilter] = useState("ALL");
+  const [resultFilter, setResultFilter] = useState<"ALL" | "REPAIRED" | "UNREPAIRED">("ALL");
   const [activeTab, setActiveTab] = useState<"scan" | "list">("scan");
   const [scanInput, setScanInput] = useState("");
   const [scanMessage, setScanMessage] = useState("");
@@ -194,9 +195,14 @@ export function WarrantyFlow({
         if (itemCp !== counterpartyFilter) return false;
       }
 
+      if (operation === "deliver" && resultFilter !== "ALL") {
+        const expectedStatus = resultFilter === "REPAIRED" ? "RECEIVED_FROM_TECHNICIAN" : "RECEIVED";
+        if (item.status !== expectedStatus) return false;
+      }
+
       return true;
     });
-  }, [cases, search, counterpartyFilter, operation]);
+  }, [cases, search, counterpartyFilter, operation, resultFilter]);
 
   const selectedCases = useMemo(
     () =>
@@ -295,6 +301,7 @@ export function WarrantyFlow({
     setReason("");
     setCaseObservations({});
     setCounterparty("");
+    setResultFilter("ALL");
     setSupplierLocked(false);
     setScanInput("");
     setScanMessage("");
@@ -531,21 +538,34 @@ export function WarrantyFlow({
                   className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
                 />
               </div>
-              {availableCounterparties.length > 1 && (
+              {(operation === "deliver" || availableCounterparties.length > 1) && (
                 <div className="flex items-center gap-2">
                   <Filter size={15} className="text-slate-400 shrink-0" />
-                  <select
-                    value={counterpartyFilter}
-                    onChange={(e) => setCounterpartyFilter(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none"
-                  >
-                    <option value="ALL">Todas las contrapartes</option>
-                    {availableCounterparties.map((cp) => (
-                      <option key={cp} value={cp}>
-                        {cp}
-                      </option>
-                    ))}
-                  </select>
+                  {operation === "deliver" && (
+                    <select
+                      value={resultFilter}
+                      onChange={(e) => setResultFilter(e.target.value as typeof resultFilter)}
+                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none"
+                    >
+                      <option value="ALL">Buenos y no reparados</option>
+                      <option value="REPAIRED">Solo buenos (reparados)</option>
+                      <option value="UNREPAIRED">Solo malos (no reparados)</option>
+                    </select>
+                  )}
+                  {availableCounterparties.length > 1 && (
+                    <select
+                      value={counterpartyFilter}
+                      onChange={(e) => setCounterpartyFilter(e.target.value)}
+                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none"
+                    >
+                      <option value="ALL">Todas las contrapartes</option>
+                      {availableCounterparties.map((cp) => (
+                        <option key={cp} value={cp}>
+                          {cp}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
             </div>
@@ -590,6 +610,21 @@ export function WarrantyFlow({
                     <span className="mt-0.5 block font-mono text-xs text-slate-500">
                       IMEI {item.imei}
                     </span>
+                    {operation === "deliver" && (
+                      <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                        item.status === "RECEIVED_FROM_TECHNICIAN"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : item.status === "RECEIVED"
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-cyan-200 bg-cyan-50 text-cyan-700"
+                      }`}>
+                        {item.status === "RECEIVED_FROM_TECHNICIAN"
+                          ? "REPARADO"
+                          : item.status === "RECEIVED"
+                          ? "NO REPARADO"
+                          : "RECIBIDO DE SUPLIDOR"}
+                      </span>
+                    )}
                     {operation === "receiveTech" && item.assignedTechnicianName && (
                       <span className="mt-0.5 block text-[11px] font-medium text-violet-600">
                         Técnico: {item.assignedTechnicianName}

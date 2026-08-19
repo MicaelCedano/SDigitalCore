@@ -254,15 +254,16 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
                             setPrefilled({
                               imei: caseItem.imei,
                               modelo: caseItem.model,
-                              problema: caseItem.problem,
-                              cliente: caseItem.clientName,
-                              warrantyCaseId: caseItem.id,
+                               problema: caseItem.problem,
+                               cliente: caseItem.clientName,
+                               resultado: "REPAIRED",
+                               warrantyCaseId: caseItem.id,
                             });
                             setReportOpen(true);
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#5750f1]/10 text-[#5750f1] rounded-xl text-[11px] font-bold hover:bg-[#5750f1]/20 transition-colors"
                         >
-                          <BadgeCheck className="w-3.5 h-3.5" /> Reportar reparado
+                           <BadgeCheck className="w-3.5 h-3.5" /> Reportar resultado
                         </button>
                       </td>
                     </tr>
