@@ -37,7 +37,7 @@ type RepairDashboardPayload = {
       totalEquipos: number;
       montoTotal: Prisma.Decimal;
       createdAt: Date;
-      items: Array<{ id: string; imei: string; modelo: string | null; cliente: string; problema: string; warrantyCaseId: string | null }>;
+      items: Array<{ id: string; imei: string; modelo: string | null; cliente: string; problema: string; resultado: "REPAIRED" | "UNREPAIRED"; warrantyCaseId: string | null }>;
     }>;
     stats: { enCola: number; trabajosPendientes: number; pendienteEquipos: number; totalPagado: number; saldoWallet: number };
   } | null;
@@ -166,7 +166,7 @@ export async function getRepairDashboardAction(input?: unknown): Promise<Result<
         where: { technicianId: persisted.id },
         orderBy: { createdAt: "desc" },
         take: 100,
-        include: { items: { select: { id: true, imei: true, modelo: true, cliente: true, problema: true, warrantyCaseId: true } } },
+        include: { items: { select: { id: true, imei: true, modelo: true, cliente: true, problema: true, resultado: true, warrantyCaseId: true } } },
       }),
       prisma.wallet.findUnique({ where: { userId: persisted.id }, select: { balance: true } }),
     ]);
@@ -174,7 +174,7 @@ export async function getRepairDashboardAction(input?: unknown): Promise<Result<
     const pendingJobs = myJobs.filter((j) => j.status === "PENDING_PAYMENT");
     const paidJobs = myJobs.filter((j) => j.status === "PAID");
     const totalPagado = paidJobs.reduce((acc, j) => acc + Number(j.montoTotal), 0);
-    const pendienteEquipos = pendingJobs.reduce((acc, j) => acc + j.totalEquipos, 0);
+    const pendienteEquipos = pendingJobs.reduce((acc, j) => acc + j.items.filter((item) => item.resultado === "REPAIRED").length, 0);
 
     return ok({
       isAdmin: false,
@@ -275,7 +275,7 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
           observaciones: observaciones || null,
           totalEquipos: items.length,
           montoPorEquipo,
-          montoTotal: items.length * montoPorEquipo,
+          montoTotal: items.filter((item) => item.resultado === "REPAIRED").length * montoPorEquipo,
         },
       });
 
@@ -287,6 +287,7 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
           modelo: item.modelo || null,
           problema: item.problema,
           cliente: item.cliente,
+          resultado: item.resultado,
           warrantyCaseId: item.warrantyCaseId || null,
         })),
       });
@@ -352,7 +353,8 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
 
     revalidatePath("/reparaciones");
     revalidatePath("/garantias");
-    return ok({ jobId: result.job.id, jobCode: result.jobCode, montoPorEquipo, montoTotal: items.length * montoPorEquipo, documentCodes: result.documentCodes });
+    const reparados = items.filter((item) => item.resultado === "REPAIRED").length;
+    return ok({ jobId: result.job.id, jobCode: result.jobCode, montoPorEquipo, montoTotal: reparados * montoPorEquipo, documentCodes: result.documentCodes });
   } catch (error) {
     return fail(error);
   }
@@ -379,7 +381,7 @@ export async function getPendingRepairJobsAction() {
             wallet: { select: { balance: true } },
           },
         },
-        items: { orderBy: { createdAt: "asc" }, select: { id: true, imei: true, marca: true, modelo: true, cliente: true, problema: true, warrantyCaseId: true } },
+        items: { orderBy: { createdAt: "asc" }, select: { id: true, imei: true, marca: true, modelo: true, cliente: true, problema: true, resultado: true, warrantyCaseId: true } },
       },
     });
     return ok(jobs);
@@ -427,7 +429,9 @@ export async function approveRepairJobAction(input: { jobId: string; customMonto
         }
       }
 
-      const montoTotal = job.items.length * montoPorEquipo;
+      const repairedItems = job.items.filter((item) => item.resultado === "REPAIRED");
+      const unrepairedItems = job.items.length - repairedItems.length;
+      const montoTotal = repairedItems.length * montoPorEquipo;
 
       // Idempotencia: cada job paga una sola vez
       const externalKey = `repair-payment:${job.id}:${job.technicianId}`;
@@ -458,7 +462,7 @@ export async function approveRepairJobAction(input: { jobId: string; customMonto
           accountId: account.id,
           type: "CREDIT",
           amount: montoTotal,
-          description: `Pago por Reparaciones: ${job.jobCode} (${job.items.length} equipo(s) × RD$${montoPorEquipo})`,
+          description: `Pago por Reparaciones: ${job.jobCode} (${repairedItems.length} reparado(s) × RD$${montoPorEquipo}; ${unrepairedItems} no reparado(s) sin pago)`,
           externalKey,
           actorId: actor.id,
         },
@@ -479,11 +483,11 @@ export async function approveRepairJobAction(input: { jobId: string; customMonto
           module: "reparaciones",
           entityType: "RepairJob",
           entityId: job.id,
-          afterData: { jobCode: job.jobCode, equipos: job.items.length, montoPorEquipo, montoTotal, externalKey, date: santoDomingoDateString() },
+          afterData: { jobCode: job.jobCode, equiposReportados: job.items.length, equiposPagados: repairedItems.length, equiposNoPagados: unrepairedItems, montoPorEquipo, montoTotal, externalKey, date: santoDomingoDateString() },
         },
       });
 
-      return { success: true as const, data: { jobCode: job.jobCode, equipos: job.items.length, montoPorEquipo, montoTotal } };
+       return { success: true as const, data: { jobCode: job.jobCode, equipos: repairedItems.length, montoPorEquipo, montoTotal } };
     });
   } catch (error) {
     if (error instanceof Error) return { success: false, error: error.message };

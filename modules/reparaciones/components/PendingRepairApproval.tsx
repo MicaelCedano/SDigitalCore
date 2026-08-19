@@ -122,7 +122,7 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
           <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-300" />
           <h3 className="text-sm font-bold text-slate-800">No hay trabajos pendientes</h3>
           <p className="text-xs max-w-sm mx-auto text-slate-500">
-            Cuando un técnico reporte equipos reparados, aparecerán aquí para aprobar el pago.
+             Cuando un técnico reporte resultados, aparecerán aquí para revisar qué equipos se pagan.
           </p>
         </div>
       ) : (
@@ -133,7 +133,9 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
             const defaultMonto = rate?.activo ? Number(rate.montoPorReparacion) : 50;
             const rawMonto = customMonto[job.id];
             const effectiveMonto = rawMonto !== undefined && rawMonto !== "" ? Number(rawMonto) : defaultMonto;
-            const total = job.items.length * (Number.isNaN(effectiveMonto) ? 0 : effectiveMonto);
+            const repairedCount = job.items.filter((item: any) => item.resultado !== "UNREPAIRED").length;
+            const unrepairedCount = job.items.length - repairedCount;
+            const total = repairedCount * (Number.isNaN(effectiveMonto) ? 0 : effectiveMonto);
 
             return (
               <div key={job.id} className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
@@ -161,7 +163,7 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
                   <div className="space-y-3">
                     <div className="rounded-xl border border-slate-200 bg-slate-50/50 overflow-hidden">
                       <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                        Equipos reportados ({job.items.length})
+                         Equipos reportados ({job.items.length}) · {repairedCount} pagan · {unrepairedCount} no pagan
                       </div>
                       <div className="divide-y divide-slate-100">
                         {job.items.map((item: any) => (
@@ -169,11 +171,14 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
                             <span className="font-mono font-bold text-slate-800">{item.imei}</span>
                             <span className="text-slate-600">{item.modelo || item.marca || "—"}</span>
                             <span className="text-slate-500">{item.cliente}</span>
-                            {item.warrantyCaseId && (
+                             {item.warrantyCaseId && (
                               <span className="rounded-full bg-[#5750f1]/10 px-2 py-0.5 text-[10px] font-bold text-[#5750f1]">
                                 GARANTÍA
                               </span>
-                            )}
+                             )}
+                             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.resultado === "UNREPAIRED" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
+                               {item.resultado === "UNREPAIRED" ? "NO REPARADO · NO PAGA" : "REPARADO · PAGA"}
+                             </span>
                             <span className="w-full text-slate-400 text-[11px] truncate" title={item.problema}>
                               {item.problema}
                             </span>
@@ -237,7 +242,7 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>{job.items.length} equipo(s) × RD$ {effectiveMonto.toLocaleString("es-DO")}</span>
+                         <span>{repairedCount} reparado(s) × RD$ {effectiveMonto.toLocaleString("es-DO")}</span>
                         <Coins className="w-3.5 h-3.5" />
                       </div>
                     </div>
@@ -252,7 +257,7 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
                       ) : (
                         <CheckCircle2 className="w-4 h-4" />
                       )}
-                      {loadingId === job.id ? "Procesando..." : "Aprobar y pagar"}
+                      {loadingId === job.id ? "Procesando..." : repairedCount > 0 ? "Aprobar y pagar reparados" : "Aprobar sin pago"}
                     </button>
                   </div>
                 </div>
