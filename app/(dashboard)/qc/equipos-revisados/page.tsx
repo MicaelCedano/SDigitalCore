@@ -77,7 +77,7 @@ export default async function EquiposRevisadosPage({
       createdAt: true,
       reviewerNameSnapshot: true,
       reviewerId: true,
-      reviewer: { select: { id: true, name: true, username: true } },
+      reviewer: { select: { id: true, name: true, username: true, roleCode: true } },
       device: {
         select: {
           id: true,
@@ -96,6 +96,9 @@ export default async function EquiposRevisadosPage({
 
   const latestByDevice = new Map<string, (typeof allInspections)[number]>();
   for (const inspection of allInspections) {
+    // La verificación física del administrador puede crear una inspección
+    // posterior, pero no debe reemplazar al último revisor de QC en esta vista.
+    if (inspection.reviewer?.roleCode === "ADMIN") continue;
     if (!latestByDevice.has(inspection.deviceId)) latestByDevice.set(inspection.deviceId, inspection);
   }
 
