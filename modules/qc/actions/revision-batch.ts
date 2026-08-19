@@ -1508,6 +1508,8 @@ export async function getQcPaymentsAction(): Promise<
       reviewerName: string;
       reviewerId: string | null;
       reviewedDevices: number;
+      functionalCount: number;
+      nonFunctionalCount: number;
       amount: number;
       paidAt: Date;
       description: string | null;
@@ -1666,21 +1668,51 @@ export async function getQcPaymentsAction(): Promise<
       .filter((id): id is string => Boolean(id));
     const paymentBatches = await prisma.qcRevisionBatch.findMany({
       where: { id: { in: paymentBatchIds } },
-      select: { id: true, batchNumber: true },
+      select: { id: true, batchNumber: true, createdAt: true },
     });
     const batchNumberById = new Map(paymentBatches.map((batch) => [batch.id, batch.batchNumber]));
+    const batchCreatedAtById = new Map(paymentBatches.map((batch) => [batch.id, batch.createdAt]));
+    const paidDevices = await prisma.deviceUnit.findMany({
+      where: { batchId: { in: paymentBatchIds } },
+      select: {
+        batchId: true,
+        inspections: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true, reviewerId: true, status: true, result: true },
+        },
+      },
+    });
+    const paymentCounts = new Map<string, { reviewedDevices: number; functionalCount: number; nonFunctionalCount: number }>();
+    for (const device of paidDevices) {
+      if (!device.batchId) continue;
+      const inspection = device.inspections[0];
+      const batchCreatedAt = batchCreatedAtById.get(device.batchId);
+      if (!inspection || !batchCreatedAt || inspection.createdAt < batchCreatedAt || inspection.status !== "COMPLETED" || !inspection.reviewerId) continue;
+      const key = `${device.batchId}:${inspection.reviewerId}`;
+      const counts = paymentCounts.get(key) ?? { reviewedDevices: 0, functionalCount: 0, nonFunctionalCount: 0 };
+      counts.reviewedDevices += 1;
+      if (inspection.result === "FUNCTIONAL") counts.functionalCount += 1;
+      if (inspection.result === "NON_FUNCTIONAL") counts.nonFunctionalCount += 1;
+      paymentCounts.set(key, counts);
+    }
     const payments = paymentEntries.flatMap((entry) => {
-      const [, batchId] = entry.externalKey.split(":");
+      const [, batchId, reviewerId] = entry.externalKey.split(":");
       const batchNumber = batchId ? batchNumberById.get(batchId) : undefined;
       if (!batchId || !batchNumber) return [];
       const reviewer = entry.wallet.user;
+      const counts = paymentCounts.get(`${batchId}:${reviewerId}`) ?? {
+        reviewedDevices: Math.round(Number(entry.amount) / RATE),
+        functionalCount: 0,
+        nonFunctionalCount: 0,
+      };
       return [{
         id: entry.id,
         batchId,
         batchNumber,
         reviewerName: reviewer.name ?? reviewer.username ?? reviewer.email,
-        reviewerId: entry.actorId,
-        reviewedDevices: Math.round(Number(entry.amount) / RATE),
+        reviewerId: reviewerId ?? null,
+        ...counts,
         amount: Number(entry.amount),
         paidAt: entry.occurredAt,
         description: entry.description,

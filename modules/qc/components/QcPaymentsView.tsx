@@ -216,7 +216,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                   <th className="px-5 py-3.5">Proveedor</th>
                   <th className="px-5 py-3.5 text-center">Equipos</th>
                   <th className="px-5 py-3.5 text-center">Funcionales</th>
-                  <th className="px-5 py-3.5 text-center">Defectuosos</th>
+                  <th className="px-5 py-3.5 text-center">No funcionales</th>
                   <th className="px-5 py-3.5">Enviado por</th>
                   <th className="px-5 py-3.5 text-right">Monto a pagar</th>
                   <th className="px-5 py-3.5 text-right">Acción</th>
@@ -307,7 +307,9 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                 <tr>
                   <th className="px-5 py-3.5">Revisor QC</th>
                   <th className="px-5 py-3.5">Lote (Compra)</th>
-                  <th className="px-5 py-3.5 text-center">Equipos pagados</th>
+                  <th className="px-5 py-3.5 text-center">Funcionales</th>
+                  <th className="px-5 py-3.5 text-center">No funcionales</th>
+                  <th className="px-5 py-3.5 text-center">Total pagado</th>
                   <th className="px-5 py-3.5">Fecha de pago</th>
                   <th className="px-5 py-3.5 text-right">Pago acreditado</th>
                 </tr>
@@ -317,7 +319,20 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                   <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3.5 font-semibold text-slate-800">{payment.reviewerName}</td>
                     <td className="px-5 py-3.5 font-mono font-bold text-slate-800">{payment.batchNumber}</td>
-                    <td className="px-5 py-3.5 text-center font-bold">{payment.reviewedDevices}</td>
+                    <td className="px-5 py-3.5 text-center">
+                      <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                        {payment.functionalCount}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <span className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                        {payment.nonFunctionalCount}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-bold">
+                      {payment.reviewedDevices}
+                      <span className="mt-0.5 block text-[10px] font-normal text-slate-400">{payment.reviewedDevices} × RD$ {RATE}</span>
+                    </td>
                     <td className="px-5 py-3.5">{formatDate(payment.paidAt)}</td>
                     <td className="px-5 py-3.5 text-right font-black text-emerald-700">
                       <span className="inline-flex items-center gap-1">
