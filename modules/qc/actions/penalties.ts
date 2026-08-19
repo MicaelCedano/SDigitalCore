@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import crypto from "crypto";
 import type { Prisma } from "@prisma/client";
+import { getPenaltyVerificationUrl } from "@/lib/qc/penalty-verification";
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
@@ -36,6 +37,43 @@ const externalPenaltySchema = z.object({
 const revertSchema = z.object({ id: z.string().min(1) });
 
 const PENALTY_REVALIDATE = ["/qc/penalidades", "/qc", "/wallet", "/dashboard"];
+
+export async function getPenaltyVoucherAction(id: string): Promise<Result<{
+  id: string;
+  type: string;
+  status: string;
+  monto: number;
+  motivo: string;
+  deviceImei: string | null;
+  deviceModel: string | null;
+  createdAt: Date;
+  technician: { name: string | null; username: string | null };
+  admin: { name: string | null; username: string | null };
+  verifyUrl: string;
+}>> {
+  try {
+    await requirePenaltyAdmin();
+    const penalty = await prisma.penalty.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        monto: true,
+        motivo: true,
+        deviceImei: true,
+        deviceModel: true,
+        createdAt: true,
+        technician: { select: { name: true, username: true } },
+        admin: { select: { name: true, username: true } },
+      },
+    });
+    if (!penalty) return { success: false, error: "Penalidad no encontrada." };
+    return { success: true, data: { ...penalty, monto: Number(penalty.monto), verifyUrl: getPenaltyVerificationUrl(penalty.id) } };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "No se pudo preparar el baucher." };
+  }
+}
 
 async function requirePenaltyAdmin() {
   const actor = await requirePermission("qc.write");

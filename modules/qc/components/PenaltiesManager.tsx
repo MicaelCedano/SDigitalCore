@@ -10,6 +10,7 @@ import {
   Hash,
   History,
   Loader2,
+  QrCode,
   RefreshCw,
   RotateCcw,
   Search,
@@ -17,6 +18,7 @@ import {
   UserX,
   X,
 } from "lucide-react";
+import { PenaltyVoucherModal } from "./PenaltyVoucherModal";
 import {
   getPenaltiesAction,
   getPenaltyDataByImeiAction,
@@ -72,6 +74,7 @@ export function PenaltiesManager({ initialData }: PenaltiesManagerProps) {
   const [processing, setProcessing] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [voucherPenalty, setVoucherPenalty] = useState<any | null>(null);
 
   const showToast = (type: "success" | "error", text: string) => {
     setToast({ type, text });
@@ -533,16 +536,25 @@ export function PenaltiesManager({ initialData }: PenaltiesManagerProps) {
                     )}
                   </td>
                   <td className="py-3 text-right">
-                    {p.status === "ACTIVE" && !p.sourceSystem && (
+                    <div className="flex items-center justify-end gap-1.5">
                       <button
-                        onClick={() => openRevertConfirm(p)}
-                        disabled={processing}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors disabled:opacity-40"
+                        onClick={() => setVoucherPenalty(p)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-100"
+                        title="Generar baucher con QR verificable"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Revertir
+                        <QrCode className="h-3.5 w-3.5" /> Baucher
                       </button>
-                    )}
+                      {p.status === "ACTIVE" && !p.sourceSystem && (
+                        <button
+                          onClick={() => openRevertConfirm(p)}
+                          disabled={processing}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors disabled:opacity-40"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Revertir
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -604,6 +616,8 @@ export function PenaltiesManager({ initialData }: PenaltiesManagerProps) {
           </table>
         </div>
       </div>
+
+      {voucherPenalty ? <PenaltyVoucherModal penalty={voucherPenalty} onClose={() => setVoucherPenalty(null)} /> : null}
 
       {/* Modal de confirmación custom */}
       {confirmTarget && (
