@@ -7,7 +7,9 @@
 - Importa un `DeviceUnit` y la última inspección válida por cada equipo con historial `Revisado`.
 - Crea un `qc_revision_batch` por cada compra de SDigitalSystem (80 lotes), con su proveedor, fecha de compra y conteos; cada equipo queda asociado al lote de su compra.
 - Conserva IMEI, marca, modelo, almacenamiento, color, grado, observación, resultado y fecha.
-- Recupera el último revisor identificado cuando el evento final no tiene `user_id`.
+- Recupera el último revisor identificado de Control de Calidad, ignorando eventos
+  `Revisado` atribuidos a `ADMIN`/`ADMINISTRADOR`; así una verificación administrativa
+  posterior no reemplaza al QC que hizo la revisión.
 - Enlaza `reviewer_id` solo cuando la identidad legacy fue confirmada en Core; siempre conserva `reviewer_name_snapshot`.
 - Conserva como `UNSPECIFIED` los equipos revisados cuya funcionalidad histórica esté vacía, sin inventar un resultado.
 - Usa `source_system + source_record_id` para permitir reejecuciones idempotentes.

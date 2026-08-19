@@ -50,22 +50,17 @@ async function readSource(source) {
   `)).rows;
 
   const purchases = (await source.query(`
-    WITH latest_review AS (
+    WITH latest_qc_review AS (
       SELECT DISTINCT ON (h.equipo_id)
         h.equipo_id,
         h.user_id,
         h.fecha,
         h.id
       FROM equipo_historial h
+      LEFT JOIN users reviewer ON reviewer.id = h.user_id
       WHERE h.estado = 'Revisado'
-      ORDER BY h.equipo_id, h.fecha DESC NULLS LAST, h.id DESC
-    ),
-    latest_identified_reviewer AS (
-      SELECT DISTINCT ON (h.equipo_id)
-        h.equipo_id,
-        h.user_id
-      FROM equipo_historial h
-      WHERE h.estado = 'Revisado' AND h.user_id IS NOT NULL
+        AND h.user_id IS NOT NULL
+        AND UPPER(COALESCE(BTRIM(reviewer.role_code), '')) NOT IN ('ADMIN', 'ADMINISTRADOR')
       ORDER BY h.equipo_id, h.fecha DESC NULLS LAST, h.id DESC
     )
     SELECT
@@ -84,15 +79,14 @@ async function readSource(source) {
       p.purchase_date AS "purchaseDate",
       s.id::text AS "supplierSourceId",
       NULLIF(BTRIM(s.name), '') AS "supplierName",
-      latest_review.fecha AS "reviewedAt",
-      COALESCE(latest_review.user_id, latest_identified_reviewer.user_id)::text AS "reviewerSourceUserId",
+      latest_qc_review.fecha AS "reviewedAt",
+      latest_qc_review.user_id::text AS "reviewerSourceUserId",
       COALESCE(NULLIF(BTRIM(u.name), ''), NULLIF(BTRIM(u.username), ''), 'Revisor histórico no registrado') AS "reviewerName"
     FROM equipo e
-    LEFT JOIN latest_review ON e.id = latest_review.equipo_id
-    LEFT JOIN latest_identified_reviewer ON latest_identified_reviewer.equipo_id = latest_review.equipo_id
+    LEFT JOIN latest_qc_review ON e.id = latest_qc_review.equipo_id
     LEFT JOIN purchase p ON p.id = e.purchase_id
     LEFT JOIN supplier s ON s.id = p.supplier_id
-    LEFT JOIN users u ON u.id = COALESCE(latest_review.user_id, latest_identified_reviewer.user_id)
+    LEFT JOIN users u ON u.id = latest_qc_review.user_id
     WHERE e.modelo IS NOT NULL
       AND BTRIM(e.modelo) <> ''
     ORDER BY e.id
