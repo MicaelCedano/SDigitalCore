@@ -9,6 +9,7 @@ const payloadSchema = z.object({
   username: z.enum(["test", "admin"]).default("test"),
   title: z.string().trim().min(1).max(80),
   body: z.string().trim().min(1).max(240),
+  route: z.enum(["/dashboard", "/almacen/transferencias", "/qc/pagos", "/garantias"]).default("/dashboard"),
 });
 
 export async function POST(request: Request) {
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     const response = await getFirebaseMessaging().sendEachForMulticast({
       tokens: target.pushDevices.map((device) => device.token),
       notification: { title: parsed.data.title, body: parsed.data.body },
-      data: { type: "admin_test", route: "/dashboard" },
+      data: { type: "admin_test", route: parsed.data.route },
       android: { notification: { channelId: "sdigitalcore" } },
     });
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       module: "configuracion",
       entityType: "user",
       entityId: target.id,
-      afterData: { targetUsername: target.username, requested: target.pushDevices.length, success: response.successCount, failure: response.failureCount },
+      afterData: { targetUsername: target.username, route: parsed.data.route, requested: target.pushDevices.length, success: response.successCount, failure: response.failureCount },
     });
 
     const failures = response.responses.flatMap((result, index) => result.success ? [] : [{
