@@ -12,6 +12,7 @@ import {
   savePriceListLogoAction, setActivePriceListAction,
 } from "../actions/price-list";
 import type { PriceListItemInput } from "@/lib/validation/price-list";
+import { downloadCsv } from "@/lib/utils/csv-export";
 
 type Item = PriceListItemInput & { id: string; createdAt?: string | Date; updatedAt?: string | Date };
 type Brand = { id: string; name: string; color: string; orderIndex: number };
@@ -199,6 +200,18 @@ const syncActive = (active: Item[], inventory: Item[]) => {
   return active.map((item) => byId.get(item.id) || item).filter((item) => item.status !== "INACTIVE");
 };
 
+const csvHeaders = [
+  "id", "sku", "modelo", "categoria", "marca", "capacidad",
+  "precio_costo", "precio_mayorista", "precio_detallista", "precio_minimo",
+  "notas", "status", "en_lista_activa", "orden_lista",
+];
+
+const toPriceListCsvRow = (item: Item) => [
+  item.id, item.sku, item.model, item.category, item.brand, item.capacity,
+  item.costPrice, item.wholesalePrice, item.retailPrice, item.minPrice,
+  item.notes, item.status, item.isActive, item.sortOrder,
+];
+
 export function PriceListManager() {
   const [inventory, setInventory] = useState<Item[]>([]);
   const [activeList, setActiveList] = useState<Item[]>([]);
@@ -380,11 +393,28 @@ export function PriceListManager() {
     }
   };
 
+  const exportInventoryCsv = () => {
+    downloadCsv(
+      `inventario-productos-${new Date().toISOString().slice(0, 10)}.csv`,
+      csvHeaders,
+      inventory.map(toPriceListCsvRow),
+    );
+  };
+
+  const exportActiveCsv = () => {
+    downloadCsv(
+      `lista-precios-activa-${new Date().toISOString().slice(0, 10)}.csv`,
+      csvHeaders,
+      activeList.map(toPriceListCsvRow),
+    );
+  };
+
   return <div className="mx-auto max-w-[1500px] space-y-5 pb-10">
     <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
       <div><h1 className="text-2xl font-black tracking-tight text-slate-900">Lista de Precios SDigital</h1><p className="mt-1 text-sm text-slate-500">Inventario, lista activa y publicación de precios en una sola pantalla.</p></div>
       <div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"><Upload className="mr-2 inline h-4 w-4" />Logo<input type="file" accept="image/*" onChange={handleLogo} className="hidden" /></label><button onClick={() => setShowBrandModal(true)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700"><Settings2 className="mr-2 inline h-4 w-4" />Marcas</button><button onClick={exportImage} disabled={exporting || !activeList.length} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{exporting ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : <Download className="mr-2 inline h-4 w-4" />}Exportar PNG</button><button onClick={openCreate} className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700"><Plus className="mr-2 inline h-4 w-4" />Agregar producto</button></div>
     </header>
+    <div className="flex flex-wrap gap-2"><button type="button" onClick={exportInventoryCsv} disabled={loading || !inventory.length} className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:opacity-50"><Download className="mr-1.5 inline h-4 w-4" />CSV inventario</button><button type="button" onClick={exportActiveCsv} disabled={loading || !activeList.length} className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:opacity-50"><Download className="mr-1.5 inline h-4 w-4" />CSV lista activa</button></div>
     {message && <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800">{message}</div>}
     <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       <section className="space-y-5">
