@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Smartphone,
   CircleDollarSign,
+  ChevronDown,
+  History,
 } from "lucide-react";
 import { getRepairDashboardAction, reportRepairWorkAction } from "@/modules/reparaciones/actions/repairs";
 import { ReportRepairWorkModal } from "@/modules/reparaciones/components/ReportRepairWorkModal";
@@ -29,6 +31,7 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
   const [prefilled, setPrefilled] = useState<any | null>(null);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"ok" | "error">("ok");
+  const [showPaidHistory, setShowPaidHistory] = useState(false);
 
   if (!data) {
     return (
@@ -49,6 +52,8 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
   };
 
   const { queue, myJobs, stats } = data;
+  const activeJobs = myJobs.filter((job: any) => job.status !== "PAID");
+  const paidJobs = myJobs.filter((job: any) => job.status === "PAID");
 
   const loadMoreQueue = async () => {
     if (loadingMore || !data.queueHasMore) return;
@@ -294,21 +299,20 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
           <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <CircleDollarSign className="w-4 h-4 text-[#5750f1]" /> Mis Trabajos Reportados
           </h2>
-          <span className="text-[11px] font-bold text-slate-400">{myJobs.length} trabajo(s)</span>
+          <span className="text-[11px] font-bold text-slate-400">{activeJobs.length} pendiente(s)</span>
         </div>
 
-        {myJobs.length === 0 ? (
+        {activeJobs.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-16 text-center text-slate-500 space-y-3">
             <Wrench className="w-12 h-12 mx-auto text-slate-300" />
-            <h3 className="text-sm font-bold text-slate-800">Aún no has reportado trabajos</h3>
+            <h3 className="text-sm font-bold text-slate-800">No tienes trabajos pendientes</h3>
             <p className="text-xs max-w-sm mx-auto text-slate-500">
-              Usa "Reportar trabajo" para reportar equipos reparados (de tu cola o IMEIs sueltos).
-              Al aprobarse, se te paga RD$ por equipo al wallet.
+              Los trabajos ya pagados se guardan en tu historial. Usa "Reportar trabajo" para registrar nuevos equipos.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {myJobs.map((job: any) => (
+            {activeJobs.map((job: any) => (
               <div key={job.id} className="bg-white border border-slate-200 rounded-2xl shadow-2xs p-5 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-xs font-bold text-[#5750f1]">{job.jobCode}</span>
@@ -343,6 +347,60 @@ export function RepairDashboard({ initialData }: RepairDashboardProps) {
                 </p>
               </div>
             ))}
+          </div>
+        )}
+
+        {paidJobs.length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setShowPaidHistory((current) => !current)}
+              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-slate-50"
+              aria-expanded={showPaidHistory}
+            >
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <History className="h-4 w-4 text-emerald-600" /> Historial de trabajos pagados
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  {paidJobs.length}
+                </span>
+              </span>
+              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showPaidHistory ? "rotate-180" : ""}`} />
+            </button>
+            {showPaidHistory && (
+              <div className="border-t border-slate-100 p-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {paidJobs.map((job: any) => (
+                    <div key={job.id} className="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/20 p-5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-[#5750f1]">{job.jobCode}</span>
+                        {jobStatusBadge(job.status)}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <Smartphone className="h-3.5 w-3.5" />
+                        {job.totalEquipos} equipo(s)
+                        <span className="text-slate-300">·</span>
+                        <span className="font-mono">{job.items.map((i: any) => i.imei).join(", ")}</span>
+                      </div>
+                      {job.observaciones && <p className="line-clamp-2 text-[11px] italic text-slate-500">"{job.observaciones}"</p>}
+                      <div className="flex items-center justify-between border-t border-emerald-100 pt-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Pagado</span>
+                        <span className="text-sm font-bold text-emerald-600">RD$ {Number(job.montoTotal).toLocaleString("es-DO")}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        {new Date(job.createdAt).toLocaleDateString("es-DO", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "America/Santo_Domingo",
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
