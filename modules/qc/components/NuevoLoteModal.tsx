@@ -45,8 +45,8 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   const [supplierId, setSupplierId] = useState("");
   const [customSupplier, setCustomSupplier] = useState("");
   const [branch, setBranch] = useState("Principal");
-  const [defaultBrand, setDefaultBrand] = useState("Apple");
-  const [defaultModel, setDefaultModel] = useState("iPhone 13 128GB");
+  const [defaultBrand, setDefaultBrand] = useState("");
+  const [defaultModel, setDefaultModel] = useState("");
   const [notes, setNotes] = useState("");
   const [devicesText, setDevicesText] = useState("");
 
@@ -55,7 +55,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   const [manualDevices, setManualDevices] = useState<
     { model: string; brand: string; imei: string; storageGb: string }[]
   >([
-    { model: "iPhone 13 128GB", brand: "Apple", imei: "", storageGb: "128" },
+    { model: "", brand: "", imei: "", storageGb: "" },
   ]);
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
   const handleAddDeviceRow = () => {
     setManualDevices((prev) => [
       ...prev,
-      { model: defaultModel || "iPhone 13 128GB", brand: defaultBrand || "Apple", imei: "", storageGb: "" },
+      { model: defaultModel, brand: defaultBrand, imei: "", storageGb: "" },
     ]);
   };
 
@@ -340,7 +340,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                 type="text"
                 value={defaultBrand}
                 onChange={(e) => setDefaultBrand(e.target.value)}
-                placeholder="Apple"
+                placeholder="Ej. Samsung"
                 className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-[#5750f1]"
               />
             </div>
@@ -439,6 +439,7 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                       <tr>
+                        <th className="px-3 py-2">Marca</th>
                         <th className="px-3 py-2">Modelo</th>
                         <th className="px-3 py-2">IMEI / Serie</th>
                         <th className="px-3 py-2 w-24">GB</th>
@@ -448,6 +449,19 @@ export function NuevoLoteModal({ onClose, onSuccess }: NuevoLoteModalProps) {
                     <tbody className="divide-y divide-slate-100">
                       {manualDevices.map((row, idx) => (
                         <tr key={idx} className="hover:bg-slate-50">
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={row.brand}
+                              onChange={(e) => {
+                                const next = [...manualDevices];
+                                next[idx].brand = e.target.value;
+                                setManualDevices(next);
+                              }}
+                              placeholder="Ej. Samsung"
+                              className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#5750f1]"
+                            />
+                          </td>
                           <td className="px-3 py-2">
                             <input
                               type="text"

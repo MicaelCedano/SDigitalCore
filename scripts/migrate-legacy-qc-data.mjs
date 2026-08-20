@@ -144,7 +144,8 @@ function buildSnapshot(sourceData, reviewerLinks) {
       device: {
         id: `legacy-sds-device-${sourceRecordId}`,
         imei: item.imei,
-        brand: clean(item.brand) || "Apple",
+        // No inventar una marca cuando el registro legacy no la tenía.
+        brand: clean(item.brand),
         model: item.model.trim(),
         storageGb: item.storageGb,
         color: clean(item.color),

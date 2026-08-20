@@ -67,9 +67,9 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
     // Extraer IMEIs pegados masivamente o ítems individuales
     const bulkImeis = parseBulkImeisText(validated.devicesText);
     const defaultModel = validated.defaultModel?.trim() || "Modelo no especificado";
-    const defaultBrand = validated.defaultBrand?.trim() || "Apple";
+    const defaultBrand = validated.defaultBrand?.trim() || null;
 
-    const devicesToCreate: { imei?: string; serialNumber?: string; brand: string; model: string; storageGb?: number; color?: string }[] = [];
+    const devicesToCreate: { imei?: string; serialNumber?: string; brand: string | null; model: string; storageGb?: number; color?: string }[] = [];
 
     // Agregar IMEIs escaneados masivamente
     for (const rawImei of bulkImeis) {
@@ -88,7 +88,7 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
         devicesToCreate.push({
           imei: dev.imei ? dev.imei.trim() : undefined,
           serialNumber: dev.serialNumber ? dev.serialNumber.trim() : undefined,
-          brand: dev.brand || defaultBrand,
+          brand: dev.brand?.trim() || defaultBrand,
           model: dev.model.trim(),
           storageGb: dev.storageGb ?? undefined,
           color: dev.color ? dev.color.trim() : undefined,
@@ -796,11 +796,11 @@ export async function addDevicesToBatchAction(input: {
     }
 
     const mdl = defaultModel?.trim() || "Modelo no especificado";
-    const brd = defaultBrand?.trim() || "Apple";
+    const brd = defaultBrand?.trim() || null;
 
     // IMEIs pegados masivamente
     const bulkImeis = parseBulkImeisText(devicesText);
-    const devicesToCreate: { imei?: string; serialNumber?: string; brand: string; model: string; storageGb?: number }[] = [];
+    const devicesToCreate: { imei?: string; serialNumber?: string; brand: string | null; model: string; storageGb?: number }[] = [];
     for (const rawImei of bulkImeis) {
       const isCleanImei = /^\d{14,18}$/.test(rawImei);
       devicesToCreate.push({
@@ -815,7 +815,7 @@ export async function addDevicesToBatchAction(input: {
         devicesToCreate.push({
           imei: dev.imei ? dev.imei.trim() : undefined,
           serialNumber: dev.serialNumber ? dev.serialNumber.trim() : undefined,
-          brand: dev.brand || brd,
+          brand: dev.brand?.trim() || brd,
           model: dev.model.trim(),
           storageGb: dev.storageGb ?? undefined,
         });

@@ -102,6 +102,7 @@ export async function readPurchaseExcel(file: File): Promise<ExcelImportResult> 
     let imeiCol = -1;
     let modelCol = -1;
     let colorCol = -1;
+    let brandCol = -1;
 
     // Standardize headers
     const headerRow = worksheet.getRow(1);
@@ -110,6 +111,7 @@ export async function readPurchaseExcel(file: File): Promise<ExcelImportResult> 
         if (val.includes("imei")) imeiCol = colNumber;
         if (val.includes("modelo") || val.includes("model")) modelCol = colNumber;
         if (val.includes("color")) colorCol = colNumber;
+        if (val.includes("marca") || val.includes("brand")) brandCol = colNumber;
     });
 
     if (imeiCol === -1 || modelCol === -1) {
@@ -149,6 +151,7 @@ export async function readPurchaseExcel(file: File): Promise<ExcelImportResult> 
 
         try {
             const parsed = parseIphoneModel(rawModel);
+            const brand = brandCol !== -1 ? row.getCell(brandCol).text?.toString().trim() : "";
 
             // If color was in a separate column and not found in string
             let finalColor = parsed.color;
@@ -162,7 +165,7 @@ export async function readPurchaseExcel(file: File): Promise<ExcelImportResult> 
             rows.push({
                 imei,
                 rawModel,
-                brand: "Apple",
+                brand,
                 modelName: parsed.modelName,
                 storageGb: parsed.storageGb,
                 color: finalColor

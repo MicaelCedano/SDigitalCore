@@ -40,6 +40,7 @@ export async function exportRevisionBatchToExcel(batch: ExportBatch) {
   sheet.columns = [
     { header: "#", key: "index", width: 7 },
     { header: "IMEI / Serie", key: "identifier", width: 23 },
+    { header: "Marca", key: "brand", width: 18 },
     { header: "Modelo", key: "model", width: 30 },
     { header: "Capacidad (GB)", key: "storage", width: 16 },
     { header: "Resultado QC", key: "result", width: 18 },
@@ -48,7 +49,7 @@ export async function exportRevisionBatchToExcel(batch: ExportBatch) {
     { header: "Observaciones", key: "notes", width: 42 },
   ];
 
-  sheet.mergeCells("A1:H1");
+  sheet.mergeCells("A1:I1");
   sheet.getCell("A1").value = "INFORME DE CONTROL DE CALIDAD — SDigitalCore";
   sheet.getCell("A1").font = { bold: true, size: 16, color: { argb: "FF1E293B" } };
   sheet.getCell("A1").alignment = { vertical: "middle" };
@@ -62,7 +63,7 @@ export async function exportRevisionBatchToExcel(batch: ExportBatch) {
   sheet.getRow(4).height = 8;
 
   const headerRow = sheet.getRow(6);
-  headerRow.values = ["#", "IMEI / Serie", "Modelo", "Capacidad (GB)", "Resultado QC", "Grado", "Batería", "Observaciones"];
+  headerRow.values = ["#", "IMEI / Serie", "Marca", "Modelo", "Capacidad (GB)", "Resultado QC", "Grado", "Batería", "Observaciones"];
   headerRow.height = 28;
   headerRow.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -87,7 +88,8 @@ export async function exportRevisionBatchToExcel(batch: ExportBatch) {
       index: index + 1,
       // Los IMEI son identificadores: se escriben como texto para evitar notación científica.
       identifier: String(device.imei || device.serialNumber || "-"),
-      model: `${device.brand || ""} ${device.model}`.trim(),
+      brand: device.brand || "-",
+      model: device.model,
       storage: device.storageGb ?? "-",
       result,
       grade: reviewed ? inspection?.grade || "-" : "-",
@@ -98,18 +100,19 @@ export async function exportRevisionBatchToExcel(batch: ExportBatch) {
       cell.border = thinBorder("FFCBD5E1");
       cell.alignment = {
         vertical: "middle",
-        horizontal: columnNumber === 1 || (columnNumber >= 4 && columnNumber <= 7) ? "center" : "left",
-        wrapText: columnNumber === 8,
+        horizontal: columnNumber === 1 || (columnNumber >= 5 && columnNumber <= 8) ? "center" : "left",
+        wrapText: columnNumber === 9,
       };
     });
     row.getCell(2).numFmt = "@";
-    row.getCell(5).font = {
+    row.getCell(6).font = {
       bold: true,
       color: { argb: result === "FUNCIONAL" ? "FF16A34A" : result === "DEFECTUOSO" ? "FFDC2626" : "FFCA8A04" },
     };
   });
 
   const totalRow = sheet.addRow([
+    "",
     "",
     "",
     "TOTALES:",

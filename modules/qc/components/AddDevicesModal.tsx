@@ -16,9 +16,9 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
   const [entryMode, setEntryMode] = useState<"BULK" | "MANUAL">("BULK");
   const [devicesText, setDevicesText] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
-  const [defaultBrand, setDefaultBrand] = useState("Apple");
+  const [defaultBrand, setDefaultBrand] = useState("");
   const [rows, setRows] = useState<{ model: string; brand: string; imei: string }[]>([
-    { model: "", brand: "Apple", imei: "" },
+    { model: "", brand: "", imei: "" },
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
     if (res.success) {
       setSuccess(res.message ?? "Equipos agregados.");
       setDevicesText("");
-      setRows([{ model: "", brand: "Apple", imei: "" }]);
+      setRows([{ model: "", brand: "", imei: "" }]);
       onChanged();
     } else {
       setError(res.error ?? "Error al agregar equipos.");
@@ -146,7 +146,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
                     type="text"
                     value={defaultBrand}
                     onChange={(e) => setDefaultBrand(e.target.value)}
-                    placeholder="Apple"
+                    placeholder="Ej. Samsung"
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-[#5750f1] focus:outline-none"
                   />
                 </div>
@@ -168,6 +168,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
                 <table className="w-full text-left text-xs">
                   <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
                     <tr>
+                      <th className="px-3 py-2">Marca</th>
                       <th className="px-3 py-2">Modelo</th>
                       <th className="px-3 py-2">IMEI / Serie</th>
                       <th className="px-3 py-2 w-20 text-right"></th>
@@ -176,6 +177,19 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
                   <tbody className="divide-y divide-slate-100">
                     {rows.map((row, idx) => (
                       <tr key={idx}>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={row.brand}
+                            onChange={(e) => {
+                              const next = [...rows];
+                              next[idx].brand = e.target.value;
+                              setRows(next);
+                            }}
+                            placeholder="Ej. Samsung"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs focus:border-[#5750f1] focus:outline-none"
+                          />
+                        </td>
                         <td className="px-3 py-2">
                           <input
                             type="text"
@@ -221,7 +235,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
               </div>
               <button
                 type="button"
-                onClick={() => setRows((prev) => [...prev, { model: "", brand: "Apple", imei: "" }])}
+                onClick={() => setRows((prev) => [...prev, { model: "", brand: "", imei: "" }])}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
               >
                 <Plus className="h-3.5 w-3.5" /> Añadir Fila

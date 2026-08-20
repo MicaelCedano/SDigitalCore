@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const revisionBatchDeviceSchema = z.object({
-  brand: z.string().optional().nullable().default("Apple"),
+  brand: z.string().optional().nullable(),
   model: z.string().min(1, "El modelo es requerido"),
   storageGb: z.preprocess(
     (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
@@ -20,7 +20,7 @@ export const createRevisionBatchSchema = z.object({
   notes: z.string().optional().nullable(),
   devicesText: z.string().optional().nullable(), // para pegar IMEIs masivamente
   defaultModel: z.string().optional().nullable(), // modelo por defecto si se pegan IMEIs simples
-  defaultBrand: z.string().optional().nullable().default("Apple"),
+  defaultBrand: z.string().optional().nullable(),
   devices: z.array(revisionBatchDeviceSchema).optional().default([]),
 });
 
