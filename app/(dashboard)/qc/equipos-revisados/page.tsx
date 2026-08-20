@@ -62,22 +62,21 @@ export default async function EquiposRevisadosPage({
   // Hay varias inspecciones históricas por equipo cuando se corrige o se
   // reingresa. El listado principal representa equipos, por lo que primero
   // conservamos solo la inspección más reciente de cada DeviceUnit.
-  const allInspections = await prisma.qcInspection.findMany({
+  // Primero cargamos solo el índice necesario para deduplicar, filtrar y
+  // calcular estadísticas. Las notas pueden ser grandes y solo hacen falta
+  // para los 20 equipos que se muestran en la página actual.
+  const inspectionIndexRows = await prisma.qcInspection.findMany({
     where,
     orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     select: {
       id: true,
       deviceId: true,
       result: true,
-      grade: true,
-      batteryHealth: true,
-      functionalityNotes: true,
-      physicalNotes: true,
       reviewedAt: true,
       createdAt: true,
       reviewerNameSnapshot: true,
       reviewerId: true,
-      reviewer: { select: { id: true, name: true, username: true, roleCode: true } },
+      reviewer: { select: { roleCode: true } },
       device: {
         select: {
           id: true,
@@ -94,8 +93,8 @@ export default async function EquiposRevisadosPage({
     },
   });
 
-  const latestByDevice = new Map<string, (typeof allInspections)[number]>();
-  for (const inspection of allInspections) {
+  const latestByDevice = new Map<string, (typeof inspectionIndexRows)[number]>();
+  for (const inspection of inspectionIndexRows) {
     // La verificación física del administrador puede crear una inspección
     // posterior, pero no debe reemplazar al último revisor de QC en esta vista.
     const snapshotRole = inspection.reviewerNameSnapshot.trim().toLocaleLowerCase("es");
@@ -108,7 +107,44 @@ export default async function EquiposRevisadosPage({
   const latestInspections = Array.from(latestByDevice.values());
   const filteredInspections = result ? latestInspections.filter((inspection) => inspection.result === result) : latestInspections;
   const total = filteredInspections.length;
-  const inspections = filteredInspections.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCandidates = filteredInspections.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageIds = pageCandidates.map((inspection) => inspection.id);
+  const detailRows = pageIds.length
+    ? await prisma.qcInspection.findMany({
+        where: { id: { in: pageIds } },
+        select: {
+          id: true,
+          result: true,
+          grade: true,
+          batteryHealth: true,
+          functionalityNotes: true,
+          physicalNotes: true,
+          reviewedAt: true,
+          createdAt: true,
+          reviewerNameSnapshot: true,
+          reviewerId: true,
+          reviewer: { select: { id: true, name: true, username: true } },
+          device: {
+            select: {
+              id: true,
+              imei: true,
+              serialNumber: true,
+              brand: true,
+              model: true,
+              storageGb: true,
+              color: true,
+              status: true,
+              batch: { select: { batchNumber: true, supplierName: true, status: true } },
+            },
+          },
+        },
+      })
+    : [];
+  const detailsById = new Map(detailRows.map((inspection) => [inspection.id, inspection]));
+  const inspections = pageIds.flatMap((id) => {
+    const inspection = detailsById.get(id);
+    return inspection ? [inspection] : [];
+  });
   const resultStats = new Map<string | null, number>();
   for (const inspection of latestInspections) {
     resultStats.set(inspection.result, (resultStats.get(inspection.result) ?? 0) + 1);
