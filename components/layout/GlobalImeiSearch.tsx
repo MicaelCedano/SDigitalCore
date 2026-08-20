@@ -227,7 +227,7 @@ export function GlobalImeiSearch() {
           <div className="flex items-center justify-between border-b border-[#f0f1f3] px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-[#101828]">Rastreo global de IMEI</p>
-              <p className="mt-0.5 text-xs text-[#667085]">Garantías, almacén, QC, reparaciones, desbloqueos y documentos.</p>
+              <p className="mt-0.5 text-xs text-[#667085]">Garantías, almacén, equipos viejos, QC, reparaciones, desbloqueos y documentos.</p>
             </div>
             {digits.length >= 4 && !loading ? <span className="rounded-full bg-[#eef2ff] px-2 py-1 text-xs font-semibold text-[#4338ca]">{results.length} resultado{results.length === 1 ? "" : "s"}</span> : null}
           </div>

@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   const canSearchRepairs = isAdmin || modules.has("reparaciones");
   const canSearchUnlocks = isAdmin || modules.has("desbloqueos");
 
-  const [warranties, receiptItems, countItems, invoiceItems, qcInspections, repairItems, unlockRecords] = await Promise.all([
+  const [warranties, receiptItems, countItems, invoiceItems, qcInspections, deviceUnits, repairItems, unlockRecords] = await Promise.all([
     canSearchWarranties
       ? prisma.warrantyCase.findMany({
           where: { imei: { contains: query } },
@@ -137,6 +137,24 @@ export async function GET(request: Request) {
           take,
         })
       : Promise.resolve([]),
+    canSearchQc
+      ? prisma.deviceUnit.findMany({
+          where: { imei: { contains: query, mode: "insensitive" } },
+          select: {
+            id: true,
+            imei: true,
+            model: true,
+            brand: true,
+            status: true,
+            sourceSystem: true,
+            updatedAt: true,
+            batch: { select: { batchNumber: true, supplierName: true } },
+          },
+          orderBy: { updatedAt: "desc" },
+          skip,
+          take,
+        })
+      : Promise.resolve([]),
     canSearchRepairs
       ? prisma.repairJobItem.findMany({
           where: { imei: { contains: query, mode: "insensitive" } },
@@ -179,8 +197,10 @@ export async function GET(request: Request) {
     if (!latestQcByDevice.has(inspection.device.id)) latestQcByDevice.set(inspection.device.id, inspection);
   }
   const latestQcInspections = Array.from(latestQcByDevice.values());
+  const qcDeviceIds = new Set(latestQcInspections.map((inspection) => inspection.device.id));
+  const deviceOnlyResults = deviceUnits.filter((device) => !qcDeviceIds.has(device.id));
 
-  const hasMore = [warranties, receiptItems, countItems, invoiceItems, qcInspections, repairItems, unlockRecords]
+  const hasMore = [warranties, receiptItems, countItems, invoiceItems, qcInspections, deviceUnits, repairItems, unlockRecords]
     .some((items) => items.length > pageSize);
   const pageItems = <T,>(items: T[]) => items.slice(0, pageSize);
 
@@ -245,6 +265,19 @@ export async function GET(request: Request) {
       status: item.result ?? "COMPLETED",
       date: (item.reviewedAt ?? item.createdAt).toISOString(),
       href: `/qc/equipos-revisados?q=${encodeURIComponent(item.device.imei ?? query)}`,
+    })),
+    ...pageItems(deviceOnlyResults).map((item) => ({
+      id: `device-${item.id}`,
+      dedupeKey: `device-${item.id}`,
+      source: "qc" as const,
+      sourceLabel: item.sourceSystem === "SDIGITALSYSTEM" ? "Equipo legacy" : "Equipo registrado",
+      documentNumber: item.batch?.batchNumber ?? "Equipo registrado",
+      imei: item.imei ?? query,
+      title: `${item.brand ? `${item.brand} ` : ""}${item.model}`,
+      detail: `${item.batch?.supplierName ?? "Sin suplidor"} · Estado: ${item.status}`,
+      status: item.status,
+      date: item.updatedAt.toISOString(),
+      href: `/qc/equipos-revisados?q=${encodeURIComponent(item.imei ?? query)}`,
     })),
     ...pageItems(repairItems).map((item) => ({
       id: `repair-${item.id}`,
