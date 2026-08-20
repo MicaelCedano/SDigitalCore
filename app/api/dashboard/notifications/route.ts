@@ -12,12 +12,67 @@ export async function GET() {
     return NextResponse.json({ notifications: [], notificationCount: 0 });
   }
 
-  const [overview, pendingQcImeiRequests] = await Promise.all([
-    getAdminOperationsOverview(user.id),
+  const [
+    pendingWarehouseRequests,
+    pendingAccessRequests,
+    latestReceipt,
+    recentWarrantyEvents,
+    pendingQcImeiRequests,
+    warehouseCount,
+    accessCount,
+    qcCount,
+  ] = await Promise.all([
+    prisma.warehouseRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        requestCode: true,
+        requestedBy: true,
+        type: true,
+        branch: true,
+        createdAt: true,
+      },
+    }),
+    prisma.accessRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        createdAt: true,
+      },
+    }),
+    prisma.goodsReceipt.findFirst({
+      where: { status: { not: "CANCELLED" } },
+      orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        receiptNumber: true,
+        supplierName: true,
+        receivedAt: true,
+        items: { select: { quantity: true } },
+      },
+    }),
+    prisma.warrantyEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: {
+        id: true,
+        type: true,
+        actorNameSnapshot: true,
+        createdAt: true,
+        case: { select: { caseCode: true, model: true } },
+      },
+    }),
     prisma.qcImeiRequest.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 5,
       select: {
         id: true,
         createdAt: true,
@@ -25,9 +80,26 @@ export async function GET() {
         imeis: true,
       },
     }),
+    prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
+    prisma.accessRequest.count({ where: { status: "PENDING" } }),
+    prisma.qcImeiRequest.count({ where: { status: "PENDING" } }),
   ]);
+
+  const overviewForNotifications = {
+    pendingWarehouseRequests,
+    pendingAccessRequests,
+    latestReceipt: latestReceipt
+      ? {
+          ...latestReceipt,
+          itemCount: latestReceipt.items.length,
+          unitCount: latestReceipt.items.reduce((total, item) => total + item.quantity, 0),
+        }
+      : null,
+    recentWarrantyEvents,
+  };
+
   const notifications = [
-    ...(overview ? toAdminNotifications(overview) : []),
+    ...toAdminNotifications(overviewForNotifications as never),
     ...pendingQcImeiRequests.map((request) => {
       const requester = request.requester.name || request.requester.username || request.requester.email;
       const imeiCount = Array.isArray(request.imeis) ? request.imeis.length : 0;
@@ -41,9 +113,8 @@ export async function GET() {
       };
     }),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const notificationCount = overview
-    ? overview.pendingWarehouseRequestCount + overview.pendingAccessRequestCount + pendingQcImeiRequests.length
-    : 0;
+
+  const notificationCount = warehouseCount + accessCount + qcCount;
 
   return NextResponse.json({ notifications, notificationCount });
 }

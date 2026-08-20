@@ -114,6 +114,7 @@ export async function getInvoicesAction(query?: string, type?: string) {
         items: true,
       },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return { success: true, data: invoices };

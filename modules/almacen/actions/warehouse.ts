@@ -113,6 +113,7 @@ export async function getWarehouseProductsAction(query?: string) {
     const products = await prisma.warehouseProduct.findMany({
       where,
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
 
     return { success: true, data: products };
@@ -137,6 +138,7 @@ export async function getWarehouseProductsAction(query?: string) {
       const products = await prisma.warehouseProduct.findMany({
         where: legacyWhere,
         orderBy: { createdAt: "desc" },
+        take: 200,
         select: legacyWarehouseProductSelect,
       });
 
@@ -372,6 +374,7 @@ export async function getWarehouseMovementsAction(query?: string) {
         product: true,
       },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return { success: true, data: movements };
@@ -460,6 +463,7 @@ export async function getWarehouseRequestsAction(query?: string, status?: string
       where,
       include: { items: { include: { product: { select: { id: true, code: true, name: true, brand: true, capacity: true, color: true, unitsPerBox: true } } } } },
       orderBy: { createdAt: "desc" },
+      take: 100,
     });
 
     return { success: true, data: requests };

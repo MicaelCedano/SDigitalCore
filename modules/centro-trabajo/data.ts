@@ -103,6 +103,7 @@ export async function getWorkCenterData() {
       where: historyTasksWhere,
       include: taskInclude,
       orderBy: { completedAt: "desc" },
+      take: 50,
     });
 
     const [activeUsers, completedToday] = await Promise.all([

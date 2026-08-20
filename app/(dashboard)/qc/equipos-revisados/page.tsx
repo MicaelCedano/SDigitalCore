@@ -68,6 +68,7 @@ export default async function EquiposRevisadosPage({
   const inspectionIndexRows = await prisma.qcInspection.findMany({
     where,
     orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    take: 300,
     select: {
       id: true,
       deviceId: true,

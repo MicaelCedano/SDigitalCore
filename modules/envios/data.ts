@@ -66,10 +66,11 @@ export async function listShipmentHistory() {
   const shipments = await prisma.shipment.findMany({
     where: { status: { in: ["DELIVERED", "CANCELLED"] } },
     orderBy: { deliveredAt: "desc" },
+    take: 50,
     include: {
       driver: { select: { id: true, name: true, username: true } },
-      locations: { orderBy: { recordedAt: "asc" }, take: 500 },
-      stops: { orderBy: { createdAt: "asc" }, take: 100 },
+      locations: { orderBy: { recordedAt: "asc" }, take: 100 },
+      stops: { orderBy: { createdAt: "asc" }, take: 50 },
     },
   });
   return shipments.map(serializeShipment);

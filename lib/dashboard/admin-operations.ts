@@ -209,7 +209,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   const assignmentAudits = await prisma.auditLog.findMany({
     where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
     orderBy: { createdAt: "desc" },
-    take: 300,
+    take: 60,
     select: { entityId: true, action: true, createdAt: true, afterData: true },
   });
   const latestAssignments = new Map<string, { batchId: string; reviewerId: string; reviewerName: string; totalDevices: number; reviewedDevices: number; submittedAt: Date }>();

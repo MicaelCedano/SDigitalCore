@@ -272,6 +272,7 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
     const batches = await prisma.qcRevisionBatch.findMany({
       where,
       orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }],
+      take: 100,
       include: {
         _count: {
           select: { devices: true },
@@ -1362,31 +1363,17 @@ export async function getQcDashboardAction() {
         select: { balance: true },
       }),
       // Es la misma regla usada al solicitar IMEIs: equipos libres, en un
-      // lote vigente y sin una inspección completada en ese lote.
-      prisma.deviceUnit.findMany({
-        // AVAILABLE ya fue revisado y solo está listo para venta; no debe
-        // aparecer como equipo pendiente para el QC.
+      // lote vigente y pendientes de control de calidad.
+      prisma.deviceUnit.count({
         where: {
           status: "PENDING_QC",
           assignedToId: null,
           batch: { status: { not: "CANCELLED" } },
         },
-        select: {
-          batch: { select: { createdAt: true } },
-          inspections: {
-            where: { status: "COMPLETED" },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { createdAt: true },
-          },
-        },
       }),
     ]);
 
-    const availableForReview = availableDevices.filter((device) => {
-      const batchStart = device.batch?.createdAt ?? new Date(0);
-      return (device.inspections[0]?.createdAt ?? new Date(0)) < batchStart;
-    }).length;
+    const availableForReview = availableDevices;
 
     const assignmentAudits = await prisma.auditLog.findMany({
       where: {
@@ -1394,7 +1381,7 @@ export async function getQcDashboardAction() {
         entityId: { in: [...new Set(devices.map((device) => device.batchId).filter((id): id is string => Boolean(id)))] },
       },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 40,
       select: { entityId: true, action: true, afterData: true },
     });
     const submittedBatchIds = new Set<string>();
