@@ -2,7 +2,7 @@ import { requirePermission } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import { WarrantyFlow } from "@/modules/garantias/components/WarrantyFlow";
 import type { WarrantyStatus } from "@prisma/client";
-const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], receiveTech: ["IN_REPAIR"], sendSupplier: ["RECEIVED","IN_REPAIR","RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], deliver: ["RECEIVED","RECEIVED_FROM_TECHNICIAN","RECEIVED_FROM_SUPPLIER"], credit: ["RECEIVED","IN_REPAIR","RECEIVED_FROM_TECHNICIAN","SENT_TO_SUPPLIER","RECEIVED_FROM_SUPPLIER"] };
+const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], receiveTech: ["TECHNICIAN_REPORTED_REPAIRED", "TECHNICIAN_REPORTED_UNREPAIRED"], sendSupplier: ["RECEIVED","RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], deliver: ["RECEIVED","RECEIVED_FROM_TECHNICIAN","RECEIVED_FROM_SUPPLIER"], credit: ["RECEIVED","IN_REPAIR","RECEIVED_FROM_TECHNICIAN","SENT_TO_SUPPLIER","RECEIVED_FROM_SUPPLIER"] };
 type Operation = "assign" | "receiveTech" | "sendSupplier" | "receiveSupplier" | "deliver" | "credit";
 export async function renderWarrantyFlow(operation: Operation) {
   await requirePermission("warranties.transition");

@@ -3,6 +3,8 @@ import type { WarrantyStatus } from "@prisma/client";
 export const WARRANTY_STATUS_LABELS: Record<WarrantyStatus, string> = {
   RECEIVED: "Recibido",
   IN_REPAIR: "En reparación",
+  TECHNICIAN_REPORTED_REPAIRED: "Técnico reportó reparado · pendiente de confirmación",
+  TECHNICIAN_REPORTED_UNREPAIRED: "Técnico reportó sin reparar · pendiente de confirmación",
   RECEIVED_FROM_TECHNICIAN: "Recibido del técnico",
   SENT_TO_SUPPLIER: "Enviado al suplidor",
   RECEIVED_FROM_SUPPLIER: "Recibido del suplidor",
@@ -13,6 +15,8 @@ export const WARRANTY_STATUS_LABELS: Record<WarrantyStatus, string> = {
 export const WARRANTY_STATUS_TONES: Record<WarrantyStatus, string> = {
   RECEIVED: "border-blue-200 bg-blue-50 text-blue-700",
   IN_REPAIR: "border-amber-200 bg-amber-50 text-amber-700",
+  TECHNICIAN_REPORTED_REPAIRED: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  TECHNICIAN_REPORTED_UNREPAIRED: "border-orange-200 bg-orange-50 text-orange-700",
   RECEIVED_FROM_TECHNICIAN: "border-violet-200 bg-violet-50 text-violet-700",
   SENT_TO_SUPPLIER: "border-orange-200 bg-orange-50 text-orange-700",
   RECEIVED_FROM_SUPPLIER: "border-cyan-200 bg-cyan-50 text-cyan-700",
@@ -22,7 +26,9 @@ export const WARRANTY_STATUS_TONES: Record<WarrantyStatus, string> = {
 
 const transitions: Record<WarrantyStatus, WarrantyStatus[]> = {
   RECEIVED: ["IN_REPAIR", "SENT_TO_SUPPLIER", "DELIVERED", "CREDIT_NOTE"],
-  IN_REPAIR: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED", "SENT_TO_SUPPLIER", "CREDIT_NOTE"],
+  IN_REPAIR: ["SENT_TO_SUPPLIER", "CREDIT_NOTE"],
+  TECHNICIAN_REPORTED_REPAIRED: ["RECEIVED_FROM_TECHNICIAN"],
+  TECHNICIAN_REPORTED_UNREPAIRED: ["RECEIVED"],
   RECEIVED_FROM_TECHNICIAN: ["SENT_TO_SUPPLIER", "DELIVERED", "CREDIT_NOTE"],
   SENT_TO_SUPPLIER: ["RECEIVED_FROM_SUPPLIER", "CREDIT_NOTE"],
   RECEIVED_FROM_SUPPLIER: ["IN_REPAIR", "DELIVERED", "CREDIT_NOTE"],
@@ -43,6 +49,8 @@ export const WARRANTY_EVENT_LABELS: Record<string, string> = {
   DETAILS_UPDATED: "Datos corregidos",
   STATUS_CHANGED: "Estado actualizado",
   ASSIGNED_TO_TECHNICIAN: "Entregado a técnico",
+  TECHNICIAN_REPORTED_REPAIRED: "Técnico reportó reparado (pendiente de confirmación)",
+  TECHNICIAN_REPORTED_UNREPAIRED: "Técnico reportó sin reparar (pendiente de confirmación)",
   RECEIVED_REPAIRED: "Recibido reparado del técnico",
   RECEIVED_UNREPAIRED: "Recibido sin reparar del técnico",
   SENT_TO_SUPPLIER: "Enviado al suplidor",

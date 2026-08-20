@@ -388,9 +388,9 @@ const flowRules: Record<FlowOperation, {
   needsReason: boolean;
 }> = {
   assign: { toStatus: "IN_REPAIR", allowed: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], documentType: "TECHNICIAN_ASSIGNMENT", eventType: "ASSIGNED_TO_TECHNICIAN", needsCounterparty: true, needsReason: false },
-  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: false },
-  "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: false },
-  "send-supplier": { toStatus: "SENT_TO_SUPPLIER", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"], documentType: "SUPPLIER_SHIPMENT", eventType: "SENT_TO_SUPPLIER", needsCounterparty: true, needsReason: false },
+  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["TECHNICIAN_REPORTED_REPAIRED"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: false },
+  "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["TECHNICIAN_REPORTED_UNREPAIRED"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: false },
+  "send-supplier": { toStatus: "SENT_TO_SUPPLIER", allowed: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN"], documentType: "SUPPLIER_SHIPMENT", eventType: "SENT_TO_SUPPLIER", needsCounterparty: true, needsReason: false },
   "receive-supplier": { toStatus: "RECEIVED_FROM_SUPPLIER", allowed: ["SENT_TO_SUPPLIER"], documentType: "SUPPLIER_RECEIPT", eventType: "RECEIVED_FROM_SUPPLIER", needsCounterparty: true, needsReason: true },
   deliver: { toStatus: "DELIVERED", allowed: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], documentType: "CUSTOMER_DELIVERY", eventType: "DELIVERED_TO_CUSTOMER", needsCounterparty: true, needsReason: true },
   credit: { toStatus: "CREDIT_NOTE", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"], documentType: "CREDIT_NOTE", eventType: "CREDIT_NOTE_MARKED", needsCounterparty: false, needsReason: true },
@@ -406,11 +406,6 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
     let counterpartyName = normalizeName(data.counterpartyName);
     const reason = data.reason?.trim();
     const caseObservations = data.caseObservations ?? {};
-
-    if (operation === "receive-unrepaired") {
-      const missingObservation = data.caseCodes.find((caseCode) => !caseObservations[caseCode]?.trim());
-      if (missingObservation) return { success: false, error: `La observación del caso ${missingObservation} es obligatoria.` };
-    }
 
     // "Enviar a Reparaciones": si viene technicianId real, resolver el usuario y
     // usar su nombre como contraparte (assignedTechnicianName snapshot) + enlazar ID.
@@ -449,6 +444,9 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       const cases = await tx.warrantyCase.findMany({ where: { caseCode: { in: data.caseCodes }, archivedAt: null } });
       if (cases.length !== data.caseCodes.length) throw new WarrantyActionError("Uno o más casos no existen o están archivados.");
       if (cases.some((item) => !rule.allowed.includes(item.status))) throw new WarrantyActionError("Uno o más casos cambiaron de estado y ya no son elegibles.");
+      if ((operation === "receive-repaired" || operation === "receive-unrepaired") && cases.some((item) => item.assignedTechnicianId === actor.id)) {
+        throw new WarrantyActionError("El técnico que reportó el resultado no puede confirmar su propia recepción. Debe confirmarla otra persona.");
+      }
       if (operation === "deliver" && cases.some((item) => comparableName(item.clientName) !== comparableName(counterpartyName))) {
         throw new WarrantyActionError("Para entregar, todos los casos deben pertenecer al cliente indicado.");
       }
@@ -474,7 +472,7 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
           },
         });
         if (update.count !== 1) throw new WarrantyActionError(`El caso ${item.caseCode} fue actualizado por otra persona. Recarga e inténtalo nuevamente.`);
-        const itemReason = operation === "receive-unrepaired" ? caseObservations[item.caseCode]?.trim() : reason;
+        const itemReason = operation === "receive-unrepaired" ? caseObservations[item.caseCode]?.trim() || reason : reason;
         await createEvent(tx, item.id, actor, rule.eventType, { fromStatus: item.status, toStatus: rule.toStatus, counterpartyName: counterpartyName || item.clientName, reason: itemReason });
       }
       const document = await createDocument(tx, actor.id, rule.documentType, counterpartyName || cases[0].clientName, cases.map((item) => item.id), reason);
@@ -512,7 +510,16 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
 }
 
 export async function assignCasesToTechnician(input: unknown) { return flow(input, "assign"); }
-export async function receiveCasesFromTechnician(input: unknown, repaired: boolean) { return flow(input, repaired ? "receive-repaired" : "receive-unrepaired"); }
+export async function receiveCasesFromTechnician(input: unknown) {
+  const caseCodes = (input as { caseCodes?: unknown })?.caseCodes;
+  if (!Array.isArray(caseCodes) || caseCodes.length === 0) return { success: false as const, error: "Selecciona al menos un equipo." };
+  const cases = await prisma.warrantyCase.findMany({ where: { caseCode: { in: caseCodes.filter((value): value is string => typeof value === "string") }, archivedAt: null }, select: { caseCode: true, status: true } });
+  if (cases.length !== caseCodes.length) return { success: false as const, error: "Uno o más equipos ya no están pendientes de confirmación." };
+  const repaired = cases.every((item) => item.status === "TECHNICIAN_REPORTED_REPAIRED");
+  const unrepaired = cases.every((item) => item.status === "TECHNICIAN_REPORTED_UNREPAIRED");
+  if (!repaired && !unrepaired) return { success: false as const, error: "Selecciona equipos del mismo resultado: reparados o sin reparar." };
+  return flow(input, repaired ? "receive-repaired" : "receive-unrepaired");
+}
 export async function sendCasesToSupplier(input: unknown) { return flow(input, "send-supplier"); }
 export async function receiveCasesFromSupplier(input: unknown) { return flow(input, "receive-supplier"); }
 export async function deliverCasesToCustomer(input: unknown) { return flow(input, "deliver"); }

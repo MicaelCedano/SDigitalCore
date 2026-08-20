@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import { santoDomingoDateString } from "@/modules/garantias/lib/document-number";
-import { createDocument, createEvent } from "@/modules/garantias/actions/warranty";
+import { createEvent } from "@/modules/garantias/actions/warranty";
 import { assignCasesToTechnician } from "@/modules/garantias/actions/warranty";
 import { revalidatePath } from "next/cache";
 
@@ -301,11 +301,11 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
           const linked = linkedCases.find((c) => c.id === item.warrantyCaseId);
           if (!linked) continue;
           const repaired = item.resultado === "REPAIRED";
-          const toStatus = repaired ? "RECEIVED_FROM_TECHNICIAN" : "RECEIVED";
-          const eventType = repaired ? "RECEIVED_REPAIRED" : "RECEIVED_UNREPAIRED";
+          const toStatus = repaired ? "TECHNICIAN_REPORTED_REPAIRED" : "TECHNICIAN_REPORTED_UNREPAIRED";
+          const eventType = repaired ? "TECHNICIAN_REPORTED_REPAIRED" : "TECHNICIAN_REPORTED_UNREPAIRED";
           const updatedCase = await tx.warrantyCase.updateMany({
             where: { id: linked.id, status: "IN_REPAIR" },
-            data: { status: toStatus, assignedTechnicianId: null, assignedTechnicianName: null, updatedById: actor.id },
+            data: { status: toStatus, updatedById: actor.id },
           });
           if (updatedCase.count !== 1) throw new Error(`El caso ${linked.caseCode} cambió mientras se reportaba. Recarga e inténtalo nuevamente.`);
           await createEvent(tx, linked.id, actor, eventType, {
@@ -314,16 +314,6 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
             counterpartyName: actorName,
             reason: repaired ? observaciones || "Trabajo reparado por el técnico." : observaciones || "El técnico reportó que no se pudo reparar.",
           });
-        }
-        const repairedCaseIds = items.filter((item) => item.warrantyCaseId && item.resultado === "REPAIRED").map((item) => linkedCases.find((c) => c.id === item.warrantyCaseId)?.id).filter((id): id is string => Boolean(id));
-        const unrepairedCaseIds = items.filter((item) => item.warrantyCaseId && item.resultado === "UNREPAIRED").map((item) => linkedCases.find((c) => c.id === item.warrantyCaseId)?.id).filter((id): id is string => Boolean(id));
-        if (repairedCaseIds.length > 0) {
-          const doc = await createDocument(tx, actor.id, "TECHNICIAN_RECEIPT_REPAIRED", actorName, repairedCaseIds, observaciones || "Trabajo reparado por el técnico.");
-          documentCodes.push(doc.documentCode);
-        }
-        if (unrepairedCaseIds.length > 0) {
-          const doc = await createDocument(tx, actor.id, "TECHNICIAN_RECEIPT_UNREPAIRED", actorName, unrepairedCaseIds, observaciones || "Equipos que no se pudieron reparar.");
-          documentCodes.push(doc.documentCode);
         }
         await tx.auditLog.create({
           data: {

@@ -71,10 +71,10 @@ const config: Record<WarrantyFlowOperation, [string, string, string, string]> = 
     "Generar entrega a técnico",
   ],
   receiveTech: [
-    "Recibir equipos del técnico",
+    "Confirmar recepción del técnico",
     "Técnico que entrega",
     "Confirma qué equipos regresan del taller y en qué condición.",
-    "Registrar recepción",
+    "Confirmar recepción",
   ],
   sendSupplier: [
     "Enviar a suplidor / marca",
@@ -133,7 +133,6 @@ export function WarrantyFlow({
   const [counterparty, setCounterparty] = useState(defaultCounterparty);
   const [reason, setReason] = useState("");
   const [caseObservations, setCaseObservations] = useState<Record<string, string>>({});
-  const [repaired, setRepaired] = useState(true);
   const [search, setSearch] = useState("");
   const [counterpartyFilter, setCounterpartyFilter] = useState("ALL");
   const [resultFilter, setResultFilter] = useState<"ALL" | "REPAIRED" | "UNREPAIRED">("ALL");
@@ -257,10 +256,6 @@ export function WarrantyFlow({
     if (selected.length === 0) return setMessage("Selecciona al menos un equipo.");
     if (operation !== "credit" && !counterparty.trim())
       return setMessage(`Indica el ${label.toLowerCase()}.`);
-    if (operation === "receiveTech" && !repaired) {
-      const missing = selected.some((caseCode) => !caseObservations[caseCode]?.trim());
-      if (missing) return setMessage("Escribe una observación para cada equipo no reparado.");
-    }
     setMessage("");
     setConfirmOpen(true);
   }
@@ -279,14 +274,13 @@ export function WarrantyFlow({
       caseCodes: selected,
       counterpartyName: counterparty,
       reason,
-      caseObservations:
-        operation === "receiveTech" && !repaired ? caseObservations : undefined,
+      caseObservations: operation === "receiveTech" ? caseObservations : undefined,
     };
     const result =
       operation === "assign"
         ? await assignCasesToTechnician(input)
         : operation === "receiveTech"
-        ? await receiveCasesFromTechnician(input, repaired)
+        ? await receiveCasesFromTechnician(input)
         : operation === "sendSupplier"
         ? await sendCasesToSupplier(input)
         : operation === "receiveSupplier"
@@ -445,17 +439,6 @@ export function WarrantyFlow({
                 </div>
               )}
             </label>
-            {operation === "receiveTech" && (
-              <label className="flex items-center gap-3 self-end pb-3 text-sm font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={repaired}
-                  onChange={(event) => setRepaired(event.target.checked)}
-                  className="h-4 w-4 rounded accent-[#5750f1]"
-                />
-                Equipo reparado satisfactoriamente
-              </label>
-            )}
           </div>
         )}
 
@@ -627,7 +610,7 @@ export function WarrantyFlow({
                     )}
                     {operation === "receiveTech" && item.assignedTechnicianName && (
                       <span className="mt-0.5 block text-[11px] font-medium text-violet-600">
-                        Técnico: {item.assignedTechnicianName}
+                        Técnico: {item.assignedTechnicianName} · {item.status === "TECHNICIAN_REPORTED_REPAIRED" ? "reportó reparado" : "reportó sin reparar"}
                       </span>
                     )}
                     {operation === "receiveSupplier" && item.currentSupplierName && (
@@ -734,39 +717,6 @@ export function WarrantyFlow({
               />
             </label>
             <p className="mt-1 text-right text-[11px] text-slate-400">{reason.length}/1000</p>
-          </div>
-        )}
-
-        {/* Observaciones obligatorias para equipos no reparados */}
-        {operation === "receiveTech" && !repaired && selectedCases.length > 0 && (
-          <div className="border-t border-amber-200 bg-amber-50/50 p-5 sm:p-6">
-            <p className="text-sm font-bold text-slate-700">
-              Observación individual de cada equipo no reparado
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Es obligatoria para cada equipo marcado como no reparado.
-            </p>
-            <div className="mt-3 space-y-3">
-              {selectedCases.map((item) => (
-                <label key={item.caseCode} className="block text-sm font-semibold text-slate-700">
-                  <span>
-                    {item.caseCode} · IMEI {item.imei}
-                  </span>
-                  <textarea
-                    value={caseObservations[item.caseCode] ?? ""}
-                    onChange={(event) =>
-                      setCaseObservations((current) => ({
-                        ...current,
-                        [item.caseCode]: event.target.value,
-                      }))
-                    }
-                    maxLength={1000}
-                    placeholder="Indica la falla o por qué no fue reparado..."
-                    className="mt-1.5 min-h-20 w-full rounded-xl border border-amber-200 bg-white p-3 text-sm font-normal outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
-                  />
-                </label>
-              ))}
-            </div>
           </div>
         )}
 
