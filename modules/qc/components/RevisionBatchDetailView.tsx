@@ -7,8 +7,6 @@ import {
   updateRevisionBatchStatusAction,
   getRevisionBatchDetailAction,
   deleteRevisionBatchAction,
-  submitRevisionBatchAction,
-  approveRevisionBatchAction,
 } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { AssignDeviceModal } from "./AssignDeviceModal";
@@ -30,7 +28,6 @@ import {
   AlertTriangle,
   RefreshCw,
   FileSpreadsheet,
-  CheckCheck,
   ClipboardCheck,
   UserCheck,
   Fingerprint,
@@ -98,32 +95,6 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
       status: batch.status,
       devices: batch.devices || [],
     });
-  };
-
-  const handleSubmitBatch = async () => {
-    if (!confirm(`¿Enviar el Lote ${batch.batchNumber} para aprobación del administrador? El pago se acreditará cuando lo acepte.`)) return;
-    setLoadingStatus(true);
-    const res = await submitRevisionBatchAction({ id: batch.id });
-    setLoadingStatus(false);
-    if (res.success) {
-      alert(res.message ?? "Lote enviado.");
-      setBatch((prev: any) => ({ ...prev, status: "SUBMITTED" }));
-    } else {
-      alert(res.error || "No se pudo enviar el lote.");
-    }
-  };
-
-  const handleRejectBatch = async () => {
-    if (!confirm(`¿Devolver el Lote ${batch.batchNumber} a revisión? Volverá a EN REVISIÓN.`)) return;
-    setLoadingStatus(true);
-    const res = await approveRevisionBatchAction({ id: batch.id, reject: true });
-    setLoadingStatus(false);
-    if (res.success) {
-      alert(res.message ?? "Lote procesado.");
-      setBatch((prev: any) => ({ ...prev, status: res.data?.status ?? "IN_REVIEW" }));
-    } else {
-      alert(res.error || "No se pudo procesar el lote.");
-    }
   };
 
   // Filtrar equipos del lote
@@ -214,20 +185,10 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
           </div>
         </div>
 
-        {/* Acciones: admin gestiona la compra (verificar/recuperar/eliminar);
-            el control de calidad revisa, envía el lote y gestiona estados */}
+        {/* Acciones administrativas y herramientas de control físico del lote. */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
           {isAdmin ? (
             <>
-              {batch.status === "SUBMITTED" && (
-                <button
-                  onClick={handleRejectBatch}
-                  disabled={loadingStatus}
-                  className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-xl border border-amber-200 flex items-center gap-2"
-                >
-                  Devolver a Revisión
-                </button>
-              )}
               <button
                 onClick={() => setShowVerifier(true)}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2"
@@ -260,16 +221,6 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
             </>
           ) : (
             <>
-              {(batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") && batch.reviewedDevices >= batch.totalDevices && (
-                <button
-                  onClick={handleSubmitBatch}
-                  disabled={loadingStatus}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
-                >
-                  <CheckCheck className="w-4 h-4" /> Enviar Lote
-                </button>
-              )}
-
               {batch.status === "PENDING_REVIEW" && (
                 <button
                   onClick={() => handleStatusChange("IN_REVIEW")}
@@ -278,12 +229,6 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
                 >
                   <Clock className="w-4 h-4" /> Iniciar Revisión
                 </button>
-              )}
-
-              {batch.status === "SUBMITTED" && (
-                <span className="px-4 py-2.5 bg-violet-50 text-violet-700 font-bold text-xs rounded-xl border border-violet-200 flex items-center gap-2">
-                  <Clock className="w-4 h-4" /> Esperando aprobación del admin
-                </span>
               )}
 
               {batch.status !== "CANCELLED" && batch.status !== "SUBMITTED" && batch.status !== "COMPLETED" && (

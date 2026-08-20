@@ -290,7 +290,7 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
           (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
           batch.totalDevices > 0 &&
           batch.reviewedDevices >= batch.totalDevices
-            ? "SUBMITTED"
+            ? "COMPLETED"
             : batch.status,
       })),
     };
@@ -359,7 +359,7 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
       (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
       totalDevices > 0 &&
       reviewedDevices >= totalDevices
-        ? "SUBMITTED"
+        ? "COMPLETED"
         : batch.status;
 
     return {
@@ -573,10 +573,9 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
 }
 
 /**
- * El ADMIN acepta un lote SUBMITTED (completo, buenos y malos ya revisados).
- * Al aceptar: lote → COMPLETED y se acredita el pago a los revisores
- * (RD$50 por equipo, idempotente por externalKey). También permite devolver
- * a IN_REVIEW si faltó algo (reject → el QC sigue trabajando).
+ * Conservado para compatibilidad histórica con pagos por porción.
+ * El pago actual se procesa únicamente por reviewerId desde la bandeja
+ * de pagos individuales; nunca se debe pagar el lote completo.
  */
 export async function approveRevisionBatchAction(input: { id: string; reviewerId?: string | null; reject?: boolean }): Promise<Result<{ id: string; batchNumber: string; status: string; paidReviewers: number }>> {
   try {
@@ -662,68 +661,7 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
       return { success: true, data: { id: batch.id, batchNumber: batch.batchNumber, status: "ASSIGNMENT_APPROVED", paidReviewers }, message: "Porción aprobada y pagada sin esperar al resto del lote." };
     }
 
-    const isCompleteButStale =
-      (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
-      batch.totalDevices > 0 &&
-      batch.reviewedDevices >= batch.totalDevices;
-    if (batch.status !== "SUBMITTED" && !isCompleteButStale) {
-      return { success: false, error: `Solo se puede aceptar un lote ENVIADO (estado actual: ${batch.status}).` };
-    }
-
-    const assignedReviewerRows = await prisma.deviceUnit.findMany({
-      where: { batchId: batch.id, assignedToId: { not: null } },
-      select: { assignedToId: true },
-    });
-    const assignedReviewerIds = [...new Set(assignedReviewerRows.map((device) => device.assignedToId).filter((id): id is string => Boolean(id)))];
-    let paidReviewers = 0;
-    const updated = await prisma.$transaction(async (tx) => {
-      const u = await tx.qcRevisionBatch.update({
-        where: { id: batch.id },
-        data: {
-          status: parsed.data.reject ? "IN_REVIEW" : "COMPLETED",
-          completedAt: parsed.data.reject ? null : new Date(),
-        },
-      });
-      if (!parsed.data.reject) {
-        paidReviewers = await payReviewersForBatch(batch.id, tx);
-        // Lote entregado y pagado: liberar la asignación de los equipos
-        // (el panel del QC se limpia; un reingreso futuro queda sin asignar).
-        await tx.deviceUnit.updateMany({
-          where: { batchId: batch.id, assignedToId: { not: null } },
-          data: { assignedToId: null },
-        });
-      }
-      return u;
-    });
-
-    await logAudit({
-      userId: persisted.id,
-      action: parsed.data.reject ? "qc_batch.reject" : "qc_batch.approve",
-      module: "qc",
-      entityType: "qc_revision_batch",
-      entityId: batch.id,
-      beforeData: { status: batch.status },
-      afterData: { status: updated.status, paidReviewers },
-    });
-    await sendPushToUsers(assignedReviewerIds, {
-      title: parsed.data.reject ? `Lote ${batch.batchNumber} devuelto` : `Lote ${batch.batchNumber} aprobado`,
-      body: parsed.data.reject ? "El administrador devolvió el lote para continuar la revisión." : "El lote fue aprobado y el pago fue acreditado.",
-      route: `/qc/lotes/${batch.id}`,
-      type: parsed.data.reject ? "qc_batch.rejected" : "qc_batch.approved",
-    });
-
-    revalidatePath("/qc/lotes");
-    revalidatePath(`/qc/lotes/${batch.id}`);
-    revalidatePath("/qc/equipos-revisados");
-    revalidatePath("/dashboard");
-
-    return {
-      success: true,
-      data: { id: updated.id, batchNumber: updated.batchNumber, status: updated.status, paidReviewers },
-      message: parsed.data.reject
-        ? `Lote ${updated.batchNumber} devuelto a revisión.`
-        : `Lote ${updated.batchNumber} ACEPTADO. Pago acreditado a ${paidReviewers} revisor(es).`,
-    };
+    return { success: false, error: "El pago global por lote fue deshabilitado. Paga cada porción desde Pagos de Control de Calidad." };
   } catch (error: any) {
     console.error("Error al aprobar lote:", error);
     return { success: false, error: error.message || "Error al aprobar el lote" };
@@ -1041,8 +979,7 @@ export async function getRevisionBatchFormDataAction() {
  * Registra la revisión QC de un equipo dentro de un Lote de Revisión.
  * Crea una inspección COMPLETED, actualiza el estado operativo del equipo
  * y recalcula los contadores del lote. Si con esta revisión quedan todos
- * los equipos revisados, el lote pasa automáticamente a SUBMITTED para
- * que el administrador pueda aprobarlo y acreditar el pago.
+ * los equipos revisados, el lote pasa automáticamente a COMPLETED.
  */
 export async function reviewDeviceAction(input: ReviewDeviceInput) {
   try {
@@ -1129,14 +1066,14 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       }
 
       const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
-      // El último equipo revisado deja el lote listo para aprobación. El pago
-      // sigue protegido: solo ocurre cuando el admin acepta el lote.
+      // El lote se completa al terminar la revisión. El pago se procesa aparte
+      // por cada porción enviada por el revisor.
       const nextStatus =
         batch.status === "COMPLETED"
           ? "COMPLETED"
-          : batch.status === "SUBMITTED"
-            ? "SUBMITTED"
-            : allReviewed
+          : allReviewed
+            ? "COMPLETED"
+            : batch.status === "SUBMITTED"
               ? "SUBMITTED"
               : batch.status;
 
@@ -1173,12 +1110,12 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       },
     });
 
-    if (updatedBatch.status === "SUBMITTED" && batch.status !== "SUBMITTED") {
+    if (updatedBatch.status === "COMPLETED" && batch.status !== "COMPLETED") {
       await sendPushToRole("ADMIN", {
-        title: `Lote ${batch.batchNumber} listo para aprobación`,
-        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Ya puede aprobarse y pagarse.`,
+        title: `Lote ${batch.batchNumber} completado`,
+        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Los pagos se gestionan por porción.`,
         route: `/qc/lotes/${batch.id}`,
-        type: "qc_batch.submitted",
+        type: "qc_batch.completed",
       });
     }
 
@@ -1193,10 +1130,10 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
     }
     revalidatePath("/centro-trabajo");
 
-    const submitted = updatedBatch.status === "SUBMITTED";
+    const completed = updatedBatch.status === "COMPLETED";
     return {
       success: true,
-      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). Lote ${batch.batchNumber}${submitted ? " enviado a aprobación." : ""}`,
+      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). Lote ${batch.batchNumber}${completed ? " completado." : ""}`,
       data: updatedBatch,
     };
   } catch (error: any) {
@@ -1279,13 +1216,13 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
       }
       const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
       // La corrección administrativa también puede completar la revisión.
-      // El pago sigue dependiendo de la aprobación explícita del admin.
+      // El pago se procesa aparte por cada porción del revisor.
       const nextStatus =
         batch.status === "COMPLETED"
           ? "COMPLETED"
-          : batch.status === "SUBMITTED"
-            ? "SUBMITTED"
-            : allReviewed
+          : allReviewed
+            ? "COMPLETED"
+            : batch.status === "SUBMITTED"
               ? "SUBMITTED"
               : batch.status;
 
@@ -1300,8 +1237,7 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
         },
       });
 
-      // Sin pago aquí: el pago a revisores ocurre SOLO cuando el admin
-      // acepta el lote (approveRevisionBatchAction).
+      // Sin pago aquí: el pago se acredita por porción desde Pagos QC.
 
       return updated;
     });
@@ -1315,12 +1251,12 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
       afterData: { batchId: batch.id, batchNumber: batch.batchNumber, deviceId: device.id },
     });
 
-    if (updatedBatch.status === "SUBMITTED" && batch.status !== "SUBMITTED") {
+    if (updatedBatch.status === "COMPLETED" && batch.status !== "COMPLETED") {
       await sendPushToRole("ADMIN", {
-        title: `Lote ${batch.batchNumber} listo para aprobación`,
-        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Ya puede aprobarse y pagarse.`,
+        title: `Lote ${batch.batchNumber} completado`,
+        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Los pagos se gestionan por porción.`,
         route: `/qc/lotes/${batch.id}`,
-        type: "qc_batch.submitted",
+        type: "qc_batch.completed",
       });
     }
 
@@ -1642,15 +1578,9 @@ export async function getQcPaymentsAction(): Promise<
     }
 
     const RATE = QC_REVIEW_RATE;
-    const mapPending: Array<any> = pending.map((b) => {
-      const s = submitterByBatch.get(b.id);
-      return {
-        ...b,
-        submittedBy: s?.name ?? null,
-        submittedAt: s?.submittedAt ?? b.updatedAt,
-        estimatedAmount: b.reviewedDevices * RATE,
-      };
-    });
+    // El pago global del lote quedó deshabilitado. La bandeja solo muestra
+    // envíos individuales por reviewerId.
+    const mapPending: Array<any> = [];
     const assignmentAudits = await prisma.auditLog.findMany({
       where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
       orderBy: { createdAt: "desc" },
