@@ -113,15 +113,14 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
     }
   };
 
-  const handleApproveBatch = async (reject: boolean) => {
-    const actionLabel = reject ? "devolver a revisión" : "aceptar y acreditar el pago";
-    if (!confirm(`¿${reject ? "Devolver" : "Aceptar"} el Lote ${batch.batchNumber}? ${reject ? "Volverá a EN REVISIÓN." : "Se acreditará el pago a los revisores (RD$50/equipo)."}`)) return;
+  const handleRejectBatch = async () => {
+    if (!confirm(`¿Devolver el Lote ${batch.batchNumber} a revisión? Volverá a EN REVISIÓN.`)) return;
     setLoadingStatus(true);
-    const res = await approveRevisionBatchAction({ id: batch.id, reject });
+    const res = await approveRevisionBatchAction({ id: batch.id, reject: true });
     setLoadingStatus(false);
     if (res.success) {
       alert(res.message ?? "Lote procesado.");
-      setBatch((prev: any) => ({ ...prev, status: res.data?.status ?? (reject ? "IN_REVIEW" : "COMPLETED") }));
+      setBatch((prev: any) => ({ ...prev, status: res.data?.status ?? "IN_REVIEW" }));
     } else {
       alert(res.error || "No se pudo procesar el lote.");
     }
@@ -215,28 +214,19 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
           </div>
         </div>
 
-        {/* Acciones: admin gestiona la compra (verificar/recuperar/eliminar/aceptar);
+        {/* Acciones: admin gestiona la compra (verificar/recuperar/eliminar);
             el control de calidad revisa, envía el lote y gestiona estados */}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
           {isAdmin ? (
             <>
               {batch.status === "SUBMITTED" && (
-                <>
-                  <button
-                    onClick={() => handleApproveBatch(false)}
-                    disabled={loadingStatus}
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2"
-                  >
-                    <CheckCheck className="w-4 h-4" /> Aceptar Lote (pagar)
-                  </button>
-                  <button
-                    onClick={() => handleApproveBatch(true)}
-                    disabled={loadingStatus}
-                    className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-xl border border-amber-200 flex items-center gap-2"
-                  >
-                    Devolver a Revisión
-                  </button>
-                </>
+                <button
+                  onClick={handleRejectBatch}
+                  disabled={loadingStatus}
+                  className="px-3 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs rounded-xl border border-amber-200 flex items-center gap-2"
+                >
+                  Devolver a Revisión
+                </button>
               )}
               <button
                 onClick={() => setShowVerifier(true)}
