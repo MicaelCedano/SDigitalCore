@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck, CheckCircle2, XCircle, Clock, RefreshCw } from "lucide-react";
+import { Loader2, ShieldCheck, CheckCircle2, XCircle, Clock, RefreshCw, AlertTriangle, X } from "lucide-react";
 import { getPendingWithdrawalsAction, redeemWithdrawalAction, cancelWithdrawalAction } from "@/modules/wallet/actions/withdrawals";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 
@@ -25,6 +25,7 @@ export function WithdrawalValidator() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [cancelTarget, setCancelTarget] = useState<PendingWithdrawal | null>(null);
 
   const money = (value: number) =>
     new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(value);
@@ -62,7 +63,13 @@ export function WithdrawalValidator() {
   }
 
   async function handleCancel(item: PendingWithdrawal) {
-    if (!window.confirm(`¿Anular el retiro ${item.baucherCode} de ${money(item.amount)}? Se devolverá el saldo al técnico.`)) return;
+    setCancelTarget(item);
+  }
+
+  async function confirmCancel() {
+    if (!cancelTarget) return;
+    const item = cancelTarget;
+    setCancelTarget(null);
     setBusy(true);
     setError("");
     setNotice("");
@@ -153,6 +160,68 @@ export function WithdrawalValidator() {
           </div>
         )}
       </div>
+
+      <WithdrawalCancelModal
+        item={cancelTarget}
+        loading={busy}
+        money={money}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => void confirmCancel()}
+      />
     </section>
+  );
+}
+
+function WithdrawalCancelModal({
+  item,
+  loading,
+  money,
+  onCancel,
+  onConfirm,
+}: {
+  item: PendingWithdrawal | null;
+  loading: boolean;
+  money: (value: number) => string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!item) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !loading) onCancel(); }}>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="cancel-withdrawal-title" aria-describedby="cancel-withdrawal-description">
+        <div className="flex items-start justify-between border-b border-slate-100 px-6 pb-4 pt-6">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <AlertTriangle className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="cancel-withdrawal-title" className="text-lg font-black text-slate-900">¿Anular retiro?</h2>
+              <p id="cancel-withdrawal-description" className="mt-1 text-sm leading-relaxed text-slate-500">Esta acción devolverá el saldo al técnico y el baucher dejará de estar disponible para pago.</p>
+            </div>
+          </div>
+          <button type="button" onClick={onCancel} disabled={loading} className="-mr-2 -mt-2 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50" aria-label="Cerrar">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-2 px-6 py-5">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Baucher</span>
+            <span className="font-mono text-sm font-black text-slate-800">{item.baucherCode}</span>
+          </div>
+          <div className="flex items-center justify-between px-1">
+            <span className="text-sm text-slate-500">Monto a devolver</span>
+            <span className="text-base font-black text-slate-900">{money(item.amount)}</span>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+          <button type="button" onClick={onCancel} disabled={loading} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-white disabled:opacity-50">Cancelar</button>
+          <button type="button" onClick={onConfirm} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-black text-white shadow-md shadow-rose-600/20 hover:bg-rose-700 disabled:opacity-50">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+            {loading ? "Anulando…" : "Anular retiro"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
