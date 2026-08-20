@@ -4,7 +4,7 @@ import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 
 const searchSchema = z.object({
-  q: z.string().trim().regex(/^\d{4,15}$/, "Escribe entre 4 y 15 dígitos."),
+  q: z.string().trim().regex(/^\d{6,15}$/, "Escribe entre 6 y 15 dígitos."),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   pageSize: z.coerce.number().int().min(5).max(20).default(8),
 });
@@ -25,7 +25,7 @@ type GlobalImeiResult = {
 
 function findMatchingImei(value: string | null, query: string) {
   if (!value) return query;
-  const tokens = value.match(/\d{4,20}/g) ?? [];
+  const tokens = value.match(/\d{6,20}/g) ?? [];
   return tokens.find((token) => token.includes(query)) ?? query;
 }
 

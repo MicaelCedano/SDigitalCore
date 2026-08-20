@@ -54,7 +54,7 @@ export async function listShipments() {
     take: 100,
     include: {
       driver: { select: { id: true, name: true, username: true } },
-      locations: { orderBy: { recordedAt: "asc" }, take: 1000 },
+      locations: { orderBy: { recordedAt: "asc" }, take: 500 },
       stops: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -68,8 +68,8 @@ export async function listShipmentHistory() {
     orderBy: { deliveredAt: "desc" },
     include: {
       driver: { select: { id: true, name: true, username: true } },
-      locations: { orderBy: { recordedAt: "asc" } },
-      stops: { orderBy: { createdAt: "asc" } },
+      locations: { orderBy: { recordedAt: "asc" }, take: 500 },
+      stops: { orderBy: { createdAt: "asc" }, take: 100 },
     },
   });
   return shipments.map(serializeShipment);

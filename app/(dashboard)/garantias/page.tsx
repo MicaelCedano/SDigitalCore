@@ -5,6 +5,7 @@ import { WarrantyDashboard } from "@/modules/garantias/components/WarrantyDashbo
 import { can } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import type { WarrantyStatus } from "@prisma/client";
+import type { WarrantyFlowCase } from "@/modules/garantias/components/WarrantyFlow";
 
 export const metadata: Metadata = { title: "Gestión de Garantías" };
 
@@ -15,7 +16,21 @@ export default async function GarantiasPage() {
   if (!stats.success) throw new Error(stats.error);
 
   const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], receiveTech: ["IN_REPAIR"], sendSupplier: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], deliver: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], credit: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"] };
-  const quickCases = canTransition ? Object.fromEntries(await Promise.all(Object.entries(eligible).map(async ([operation, statuses]) => [operation, await prisma.warrantyCase.findMany({ where: { archivedAt: null, status: { in: statuses } }, orderBy: { entryDate: "asc" }, select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true, assignedTechnicianName: true, currentSupplierName: true } })]))) : {};
+  const quickCases: Record<string, WarrantyFlowCase[]> = canTransition
+    ? Object.fromEntries(Object.keys(eligible).map((operation) => [operation, []]))
+    : {};
+  if (canTransition) {
+    const eligibleStatuses = [...new Set(Object.values(eligible).flat())];
+    const quickRows = await prisma.warrantyCase.findMany({
+      where: { archivedAt: null, status: { in: eligibleStatuses } },
+      orderBy: { entryDate: "asc" },
+      take: 500,
+      select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true, assignedTechnicianName: true, currentSupplierName: true },
+    });
+    for (const [operation, statuses] of Object.entries(eligible)) {
+      quickCases[operation] = quickRows.filter((row) => statuses.includes(row.status));
+    }
+  }
 
   return (
     <WarrantyDashboard

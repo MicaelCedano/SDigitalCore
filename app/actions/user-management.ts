@@ -133,13 +133,32 @@ export async function getUserManagementDataAction() {
   try {
     await requireUserAdmin();
     const [users, requests] = await Promise.all([
-      prisma.user.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.accessRequest.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: { id: true, name: true, username: true, email: true, phone: true, image: true, roleCode: true, status: true, allowedModules: true, createdAt: true },
+      }),
+      prisma.accessRequest.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: { id: true, name: true, username: true, email: true, phone: true, status: true, assignedRole: true, customModules: true, createdAt: true },
+      }),
     ]);
-    let identities: Awaited<ReturnType<typeof prisma.legacyUserIdentity.findMany>> = [];
+    type LegacyIdentityMatch = {
+      id: string;
+      usernameSnapshot: string;
+      nameSnapshot: string | null;
+      emailSnapshot: string | null;
+      roleSnapshot: string | null;
+      sourceWalletBalance: { toFixed: (digits: number) => string };
+      sourceTransactionCount: number;
+    };
+    let identities: LegacyIdentityMatch[] = [];
     try {
       identities = await prisma.legacyUserIdentity.findMany({
         where: { matchStatus: { in: ["UNMATCHED", "SUGGESTED", "CONFLICT"] }, coreUserId: null },
+        take: 200,
+        select: { id: true, usernameSnapshot: true, nameSnapshot: true, emailSnapshot: true, roleSnapshot: true, sourceWalletBalance: true, sourceTransactionCount: true },
       });
     } catch (error) {
       if (!(error instanceof Error && /legacy_user_identity|does not exist|P2021/i.test(error.message))) throw error;

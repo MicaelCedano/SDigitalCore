@@ -73,7 +73,7 @@ export function GlobalImeiSearch() {
     const nextQuery = value.replace(/\D/g, "").slice(0, 15);
     const nextDigits = nextQuery.replace(/\D/g, "");
     setQuery(nextQuery);
-    if (nextDigits.length < 4) {
+    if (nextDigits.length < 6) {
       setResults([]);
       setPage(1);
       setHasMore(false);
@@ -143,7 +143,7 @@ export function GlobalImeiSearch() {
   }, []);
 
   useEffect(() => {
-    if (digits.length < 4) {
+    if (digits.length < 6) {
       return;
     }
 

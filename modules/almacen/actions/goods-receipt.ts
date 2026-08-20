@@ -258,6 +258,7 @@ export async function getGoodsReceiptsAction(query?: string, status?: string) {
       orderBy: {
         createdAt: "desc",
       },
+      take: 100,
     });
 
     return { success: true, data: receipts };
