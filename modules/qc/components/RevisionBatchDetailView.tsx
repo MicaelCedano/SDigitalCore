@@ -326,6 +326,7 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
               <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
                 <tr>
                   <th className="px-4 py-3.5">IMEI / Serie</th>
+                  <th className="px-4 py-3.5">Marca</th>
                   <th className="px-4 py-3.5">Modelo</th>
                   <th className="px-4 py-3.5">Color / Capacidad</th>
                   <th className="px-4 py-3.5 text-center">Estado Operativo</th>
@@ -344,8 +345,11 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
                       <td className="px-4 py-4 font-mono font-bold text-slate-800">
                         {dev.imei || dev.serialNumber || "Sin Identificador"}
                       </td>
+                      <td className="px-4 py-4 font-semibold text-slate-600">
+                        {dev.brand || "—"}
+                      </td>
                       <td className="px-4 py-4 font-semibold text-slate-800">
-                        {dev.brand} {dev.model}
+                        {dev.model}
                       </td>
                       <td className="px-4 py-4 text-slate-600">
                         {dev.color || "—"} {dev.storageGb ? `/ ${dev.storageGb}GB` : ""}

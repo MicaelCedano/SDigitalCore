@@ -205,11 +205,12 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="min-w-[980px] w-full text-left text-sm">
+        <table className="min-w-[1080px] w-full text-left text-sm">
           <thead className="bg-[#f9fafb] text-[11px] font-semibold uppercase tracking-[0.06em] text-[#667085]">
             <tr>
-              <th className="px-6 py-3">Equipo</th>
-              <th className="px-4 py-3">Identificador</th>
+              <th className="px-6 py-3">IMEI / Serie</th>
+              <th className="px-4 py-3">Marca</th>
+              <th className="px-4 py-3">Modelo</th>
               <th className="px-4 py-3">Resultado</th>
               <th className="px-4 py-3">Calidad</th>
               <th className="px-4 py-3">Revisado por</th>
@@ -224,18 +225,17 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
                 title="Ver detalle de la revisión"
                 className="cursor-pointer hover:bg-[#fcfcfd]"
               >
-                <td className="px-6 py-4">
-                  <p className="font-semibold text-[#101828]">
-                    {[inspection.device.brand, inspection.device.model].filter(Boolean).join(" ")}
-                  </p>
+                <td className="px-6 py-4 font-mono text-xs font-semibold text-[#344054]">
+                  {inspection.device.imei ?? inspection.device.serialNumber ?? "—"}
+                </td>
+                <td className="px-4 py-4 font-semibold text-[#475467]">{inspection.device.brand ?? "—"}</td>
+                <td className="px-4 py-4">
+                  <p className="font-semibold text-[#101828]">{inspection.device.model}</p>
                   <p className="mt-0.5 text-xs text-[#667085]">
                     {[inspection.device.storageGb ? `${inspection.device.storageGb} GB` : null, inspection.device.color]
                       .filter(Boolean)
                       .join(" · ") || "Sin detalles adicionales"}
                   </p>
-                </td>
-                <td className="px-4 py-4 font-mono text-xs font-semibold text-[#344054]">
-                  {inspection.device.imei ?? inspection.device.serialNumber ?? "—"}
                 </td>
                 <td className="px-4 py-4">
                   <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${resultTone(inspection.result)}`}>
