@@ -1,10 +1,11 @@
 import { ArrowDownLeft, ArrowUpRight, Landmark, PiggyBank, WalletCards, ShieldCheck, Sparkles, Clock, History } from "lucide-react";
-import { getCurrentWallet } from "@/modules/wallet/data";
+import { getAdminTeamWalletBalances, getCurrentWallet } from "@/modules/wallet/data";
 import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { WithdrawalPanel } from "@/modules/wallet/components/WithdrawalPanel";
 import { WalletAccountsSection } from "@/modules/wallet/components/WalletAccountsSection";
 import { WithdrawalValidator } from "@/modules/wallet/components/WithdrawalValidator";
 import { BaucherEntryButton } from "@/modules/wallet/components/BaucherEntryButton";
+import { AdminTeamWalletBalances } from "@/modules/wallet/components/AdminTeamWalletBalances";
 
 function money(value: string | number) {
   return new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP" }).format(Number(value));
@@ -15,9 +16,9 @@ function date(value: string | Date) {
 }
 
 export default async function WalletPage() {
-  const data = await getCurrentWallet();
-  const persisted = await getPersistedCurrentUser();
+  const [data, persisted] = await Promise.all([getCurrentWallet(), getPersistedCurrentUser()]);
   const isAdmin = persisted?.roleCode === "ADMIN";
+  const adminTeamWallets = isAdmin ? await getAdminTeamWalletBalances() : null;
 
   if (!data.schemaReady) {
     return (
@@ -73,6 +74,8 @@ export default async function WalletPage() {
           </div>
         </div>
       </section>
+
+      {adminTeamWallets ? <AdminTeamWalletBalances rows={adminTeamWallets.rows} totals={adminTeamWallets.totals} /> : null}
 
       {/* Cuentas y Ahorros */}
       <WalletAccountsSection

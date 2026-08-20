@@ -204,3 +204,50 @@ export async function getCurrentWallet() {
     throw error;
   }
 }
+
+export async function getAdminTeamWalletBalances() {
+  await requirePermission("wallet.read");
+  const persisted = await getPersistedCurrentUser();
+  if (!persisted || persisted.status !== "ACTIVE" || persisted.roleCode !== "ADMIN") {
+    throw new Error("Esta vista requiere el rol ADMIN.");
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      roleCode: { in: ["QC", "TECNICO"] },
+      status: { in: ["ACTIVE", "INACTIVE"] },
+    },
+    orderBy: [{ roleCode: "asc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+      roleCode: true,
+      status: true,
+      wallet: { select: { balance: true, status: true, currency: true } },
+    },
+  });
+
+  const rows = users.map((user) => ({
+    id: user.id,
+    name: user.name ?? user.username ?? user.email,
+    username: user.username,
+    role: user.roleCode as "QC" | "TECNICO",
+    userStatus: user.status,
+    walletStatus: user.wallet?.status ?? null,
+    currency: user.wallet?.currency ?? "DOP",
+    balance: Number(user.wallet?.balance ?? 0),
+  }));
+  const qc = rows.filter((row) => row.role === "QC");
+  const technicians = rows.filter((row) => row.role === "TECNICO");
+
+  return {
+    rows,
+    totals: {
+      qc: qc.reduce((total, row) => total + row.balance, 0),
+      technicians: technicians.reduce((total, row) => total + row.balance, 0),
+      all: rows.reduce((total, row) => total + row.balance, 0),
+    },
+  };
+}
