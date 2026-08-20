@@ -59,7 +59,7 @@ export async function syncQcWorkTasks(actorId: string) {
       assigneeIds: collaboratorIds,
       progressDone: batch.reviewedDevices,
       progressTotal: batch.totalDevices,
-      status: "IN_PROGRESS",
+      status: batch.reviewedDevices >= batch.totalDevices && batch.totalDevices > 0 ? "COMPLETED" : "IN_PROGRESS",
       dueAt: qcDeadline,
       sourceCode: batch.batchNumber,
       sourceUrl: `/qc/lotes/${batch.id}`,

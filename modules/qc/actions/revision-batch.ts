@@ -1149,6 +1149,12 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
     revalidatePath(`/qc/lotes/${batch.id}`);
     revalidatePath("/qc/equipos-revisados");
     revalidatePath("/dashboard");
+    try {
+      await syncQcWorkTasks(actor.id);
+    } catch (syncError) {
+      console.error("[qc] No se pudo actualizar la tarea del Centro de trabajo tras revisar un equipo:", syncError);
+    }
+    revalidatePath("/centro-trabajo");
 
     const completed = updatedBatch.reviewedDevices >= updatedBatch.totalDevices;
     return {
@@ -1274,6 +1280,12 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
     revalidatePath(`/qc/lotes/${batch.id}`);
     revalidatePath("/qc/equipos-revisados");
     revalidatePath("/dashboard");
+    try {
+      await syncQcWorkTasks(actor.id);
+    } catch (syncError) {
+      console.error("[qc] No se pudo actualizar la tarea del Centro de trabajo tras corregir un equipo:", syncError);
+    }
+    revalidatePath("/centro-trabajo");
 
     return {
       success: true,
