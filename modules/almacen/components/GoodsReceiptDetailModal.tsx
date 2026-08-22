@@ -378,9 +378,10 @@ export function GoodsReceiptDetailModal({
                           <div>
                             <p className="text-xs font-bold text-slate-800">{color.color}</p>
                             <p className="text-[11px] font-medium text-slate-500">
+                              {color.quantity} {color.quantity === 1 ? "unidad" : "unidades"}
                               {color.imeis.length > 0
-                                ? `${color.imeis.length} ${color.imeis.length === 1 ? "IMEI / serie" : "IMEIs / series"}`
-                                : `${color.quantity} ${color.quantity === 1 ? "unidad" : "unidades"} · sin IMEI / serie`}
+                                ? ` · ${color.imeis.length} ${color.imeis.length === 1 ? "IMEI / serie" : "IMEIs / series"}`
+                                : " · sin IMEI / serie"}
                             </p>
                           </div>
                           {color.imeis.length > 0 && (
