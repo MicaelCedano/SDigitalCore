@@ -194,6 +194,10 @@ export function GoodsReceiptDetailModal({
   });
 
   const totalQty = models.reduce((sum, model) => sum + model.quantity, 0);
+  const generalObservationText = [
+    receipt.notes,
+    ...(receipt.items || []).map((item) => item.description?.trim() || ""),
+  ].filter(Boolean).join("\n");
   const receiptSummary = [
     `Recibiendo de ${receipt.supplierName}`,
     ...models.map((model) => `${model.description} - ${model.quantity}`),
@@ -231,13 +235,13 @@ export function GoodsReceiptDetailModal({
       branch: receipt.branch,
       receivedBy: receipt.receivedBy,
       status: receipt.status,
-      notes: receipt.notes,
+      notes: generalObservationText || null,
       receivedAt: receipt.receivedAt || receipt.createdAt || new Date(),
       items: (receipt.items || []).map((item) => ({
         code: item.code,
-        description: item.description?.trim() || "Modelo no especificado",
-        quantity: item.quantity || 1,
-        unitPrice: item.unitPrice,
+        description: getItemIdentity(item).label,
+        quantity: getItemQuantity(item),
+        unitPrice: null,
         condition: item.condition,
         imeiOrSerial: getItemImeis(item).join("\n") || item.imeiOrSerial,
         notes: item.notes,

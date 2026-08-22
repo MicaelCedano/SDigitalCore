@@ -137,14 +137,12 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
     { key: "col3", width: 34 },  // Descripción / Producto
     { key: "col4", width: 10 },  // Cant.
     { key: "col5", width: 14 },  // Condición
-    { key: "col6", width: 18 },  // Precio Unit.
-    { key: "col7", width: 18 },  // Subtotal
-    { key: "col8", width: 32 },  // IMEIs / Series
-    { key: "col9", width: 25 },  // Notas
+    { key: "col6", width: 32 },  // IMEIs / Series
+    { key: "col7", width: 30 },  // Observaciones
   ];
 
   // 1. Título principal
-  sheet.mergeCells("A1:I1");
+  sheet.mergeCells("A1:G1");
   const titleCell = sheet.getCell("A1");
   titleCell.value = "RECIBO DE MERCANCÍA — SDIGITAL CORE";
   titleCell.font = { name: "Segoe UI", size: 14, bold: true, color: { argb: "FF0F172A" } };
@@ -213,13 +211,11 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
   const headers = [
     "#",
     "SKU / Código",
-    "Descripción / Producto",
+    "Modelo / Producto",
     "Cant.",
     "Condición",
-    "Precio Unit. (RD$)",
-    "Subtotal (RD$)",
     "IMEIs / Series",
-    "Notas del Ítem",
+    "Observaciones",
   ];
 
   const headerRow = sheet.getRow(tableHeaderRowIdx);
@@ -231,7 +227,7 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
     cell.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
     cell.alignment = {
-      horizontal: colIdx === 0 || colIdx === 3 || colIdx === 4 ? "center" : colIdx === 5 || colIdx === 6 ? "right" : "left",
+      horizontal: colIdx === 0 || colIdx === 3 || colIdx === 4 ? "center" : "left",
       vertical: "middle",
     };
     cell.border = THIN_BORDER;
@@ -240,14 +236,10 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
   // 4. Filas de Ítems
   let currentRowIdx = tableHeaderRowIdx + 1;
   let totalItemsCount = 0;
-  let totalAmount = 0;
 
   data.items.forEach((item, index) => {
     const qty = item.quantity || 1;
-    const price = item.unitPrice || 0;
-    const subtotal = qty * price;
     totalItemsCount += qty;
-    totalAmount += subtotal;
 
     const itemImeis = parseImeiList(item.imeiOrSerial);
     if (itemImeis.length === 0 && item.colorVariants) {
@@ -292,32 +284,20 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
     c5.value = item.condition || "Nuevo";
     c5.alignment = { horizontal: "center", vertical: "top" };
 
-    // Precio Unit
-    const c6 = row.getCell(6);
-    c6.value = price;
-    c6.numFmt = '"RD$ "#,##0.00';
-    c6.alignment = { horizontal: "right", vertical: "top" };
-
-    // Subtotal
-    const c7 = row.getCell(7);
-    c7.value = subtotal;
-    c7.numFmt = '"RD$ "#,##0.00';
-    c7.alignment = { horizontal: "right", vertical: "top" };
-
     // IMEIs
-    const c8 = row.getCell(8);
-    c8.value = itemImeis.length > 0 ? itemImeis.join("\n") : "-";
-    c8.font = { name: "Consolas", size: 9.5 };
-    c8.numFmt = "@";
-    c8.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+    const c6 = row.getCell(6);
+    c6.value = itemImeis.length > 0 ? itemImeis.join("\n") : "-";
+    c6.font = { name: "Consolas", size: 9.5 };
+    c6.numFmt = "@";
+    c6.alignment = { horizontal: "left", vertical: "top", wrapText: true };
 
-    // Notas
-    const c9 = row.getCell(9);
-    c9.value = item.notes || "-";
-    c9.alignment = { horizontal: "left", vertical: "top" };
+    // Observaciones
+    const c7 = row.getCell(7);
+    c7.value = item.notes || "-";
+    c7.alignment = { horizontal: "left", vertical: "top", wrapText: true };
 
     // Aplicar estilos a todas las celdas de la fila
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 7; i++) {
       const cell = row.getCell(i);
       cell.fill = bgFill;
       cell.border = THIN_BORDER;
@@ -341,25 +321,18 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
   totQty.font = { name: "Segoe UI", size: 11, bold: true, color: { argb: "FF2563EB" } };
   totQty.alignment = { horizontal: "center", vertical: "middle" };
 
-  sheet.mergeCells(`E${currentRowIdx}:F${currentRowIdx}`);
-  const totPriceLabel = sheet.getCell(`E${currentRowIdx}`);
-  totPriceLabel.value = "MONTO TOTAL:";
-  totPriceLabel.font = { name: "Segoe UI", size: 10, bold: true };
-  totPriceLabel.alignment = { horizontal: "right", vertical: "middle" };
+  const totImeiLabel = totalsRow.getCell(5);
+  totImeiLabel.value = "IMEIs registrados:";
+  totImeiLabel.font = { name: "Segoe UI", size: 10, bold: true };
+  totImeiLabel.alignment = { horizontal: "right", vertical: "middle" };
 
-  const totAmt = totalsRow.getCell(7);
-  totAmt.value = totalAmount;
-  totAmt.numFmt = '"RD$ "#,##0.00';
-  totAmt.font = { name: "Segoe UI", size: 11, bold: true, color: { argb: "FF16A34A" } };
-  totAmt.alignment = { horizontal: "right", vertical: "middle" };
-
-  const totImeis = totalsRow.getCell(8);
+  const totImeis = totalsRow.getCell(6);
   totImeis.value = `${detailedImeis.length} IMEIs registrados`;
   totImeis.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "FF0F172A" } };
   totImeis.alignment = { horizontal: "center", vertical: "middle" };
 
   const totalsBg: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
-  for (let i = 1; i <= 9; i++) {
+  for (let i = 1; i <= 7; i++) {
     const cell = totalsRow.getCell(i);
     cell.fill = totalsBg;
     cell.border = THIN_BORDER;

@@ -346,12 +346,17 @@ export function GoodsReceiptForm({
     setLoading(true);
 
     try {
+      const generalNotes = [
+        notes.trim(),
+        ...items.map((item) => String(item.description || "").trim()),
+      ].filter(Boolean).join("\n");
+
       const payload: GoodsReceiptInput = {
         id: initialData?.id,
         supplierName,
         branch,
         receivedBy: receivedBy.trim() || undefined,
-        notes: notes.trim() || undefined,
+        notes: generalNotes || undefined,
         status,
         items: items.map((i) => {
           // Consolidar IMEIs de todas las variantes de color para imeiOrSerial general
@@ -370,7 +375,9 @@ export function GoodsReceiptForm({
             brand: i.brand ? String(i.brand).trim() : null,
             model: String(i.model).trim(),
             capacity: i.capacity ? String(i.capacity).trim() : null,
-            description: i.description ? String(i.description).trim() : null,
+            // La descripción del ítem es una observación del envío. La
+            // identidad operativa queda en marca/modelo/capacidad y variantes.
+            description: null,
             quantity: Math.max(1, totalQty || Number(i.quantity) || 1),
             unitPrice: null,
             condition: i.condition || "Nuevo",
@@ -756,12 +763,12 @@ export function GoodsReceiptForm({
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Descripción / compatibilidad</label>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1">Observación del envío (opcional)</label>
                         <input
                           type="text"
                           value={item.description || ""}
                           onChange={(e) => handleItemChange(itemIdx, "description", e.target.value)}
-                          placeholder="Observaciones opcionales"
+                          placeholder="Ej. algunos equipos llegaron sin caja"
                           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
                         />
                       </div>
