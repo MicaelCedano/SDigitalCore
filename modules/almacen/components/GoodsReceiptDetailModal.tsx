@@ -79,6 +79,10 @@ function parseImeis(value?: string | null) {
     .filter(Boolean);
 }
 
+function formatImeisForKaptas(imeis: string[]) {
+  return [...new Set(imeis.map((imei) => imei.trim()).filter(Boolean))].join("\r\n");
+}
+
 function getItemImeis(item: ReceiptItem) {
   const variantImeis = (item.colorVariants || []).flatMap((variant) =>
     parseImeis(variant.imeis),
@@ -389,7 +393,7 @@ export function GoodsReceiptDetailModal({
                               type="button"
                               onClick={() =>
                                 void copyText(
-                                  color.imeis.join("\n"),
+                                  formatImeisForKaptas(color.imeis),
                                   `color-${model.key}-${color.key}`,
                                 )
                               }
