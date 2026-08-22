@@ -238,7 +238,10 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
 
     // 2. Anti-doble-pago: IMEI ya reportado (pendiente de pago) o ya pagado
     const existing = await prisma.repairJobItem.findMany({
-      where: { imei: { in: cleanImeis }, job: { status: { in: [RepairJobStatus.PENDING_PAYMENT, RepairJobStatus.PAID] } } },
+      where: {
+        job: { status: { in: [RepairJobStatus.PENDING_PAYMENT, RepairJobStatus.PAID] } },
+        OR: cleanImeis.map((imei) => ({ imei: { equals: imei, mode: "insensitive" as const } })),
+      },
       select: { imei: true, job: { select: { jobCode: true, status: true } } },
     });
     if (existing.length > 0) {
@@ -282,7 +285,9 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
       await tx.repairJobItem.createMany({
         data: items.map((item) => ({
           jobId: job.id,
-          imei: item.imei,
+          // Guardar el identificador normalizado evita que un mismo IMEI/SN
+          // se cuele después por diferencias de espacios o mayúsculas.
+          imei: item.imei.trim().toUpperCase(),
           marca: item.marca || null,
           modelo: item.modelo || null,
           problema: item.problema,
