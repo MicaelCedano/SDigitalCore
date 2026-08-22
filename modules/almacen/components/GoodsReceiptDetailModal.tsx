@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 
 type ReceiptColorVariant = {
+  brand?: string | null;
+  model?: string | null;
+  capacity?: string | null;
   color?: string | null;
   quantity?: number | null;
   imeis?: string | null;
@@ -84,6 +87,27 @@ function getItemImeis(item: ReceiptItem) {
   return variantImeis.length > 0 ? variantImeis : parseImeis(item.imeiOrSerial);
 }
 
+function getItemIdentity(item: ReceiptItem) {
+  const variant = item.colorVariants?.find((candidate) => candidate.model || candidate.brand);
+  const brand = variant?.brand?.trim() || "";
+  const model = variant?.model?.trim() || item.description?.trim() || "";
+  const capacity = variant?.capacity?.trim() || "";
+  const label = [brand, model, capacity].filter(Boolean).join(" ") || "Modelo no especificado";
+
+  return {
+    label,
+    key: label.toLocaleLowerCase("es-DO"),
+  };
+}
+
+function getItemQuantity(item: ReceiptItem) {
+  const variants = item.colorVariants || [];
+  if (variants.length > 0) {
+    return variants.reduce((sum, variant) => sum + (Number(variant.quantity) || 1), 0);
+  }
+  return item.quantity || getItemImeis(item).length || 1;
+}
+
 function getItemColorImeis(item: ReceiptItem): ColorImeiSummary[] {
   const groupedVariants = new Map<string, ColorImeiSummary>();
 
@@ -114,13 +138,13 @@ function summarizeModels(items: ReceiptItem[]): ModelSummary[] {
   const grouped = new Map<string, ModelSummary>();
 
   for (const item of items) {
-    const description = item.description?.trim() || "Modelo no especificado";
-    const key = description.toLocaleLowerCase("es-DO");
-    const current = grouped.get(key);
+    const identity = getItemIdentity(item);
+    const quantity = getItemQuantity(item);
+    const current = grouped.get(identity.key);
     const colorGroups = getItemColorImeis(item);
 
     if (current) {
-      current.quantity += item.quantity || 1;
+      current.quantity += quantity;
       for (const colorGroup of colorGroups) {
         const existingColor = current.colors.find((color) => color.key === colorGroup.key);
         if (existingColor) {
@@ -132,10 +156,10 @@ function summarizeModels(items: ReceiptItem[]): ModelSummary[] {
       continue;
     }
 
-    grouped.set(key, {
-      key,
-      description,
-      quantity: item.quantity || 1,
+    grouped.set(identity.key, {
+      key: identity.key,
+      description: identity.label,
+      quantity,
       colors: colorGroups,
     });
   }
