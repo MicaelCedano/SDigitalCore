@@ -58,7 +58,11 @@ export function PendingRepairApproval({ initialJobs, initialRates }: { initialJo
       return;
     }
     setMessageTone("ok");
-    setMessage(`Trabajo ${res.data.jobCode} aprobado: RD$ ${res.data.montoTotal.toLocaleString("es-DO")} acreditados al wallet del técnico.`);
+    setMessage(
+      res.data.montoTotal > 0
+        ? `Trabajo ${res.data.jobCode} aprobado: RD$ ${res.data.montoTotal.toLocaleString("es-DO")} acreditados al wallet del técnico.`
+        : `Trabajo ${res.data.jobCode} aprobado sin pago. Los equipos no reparados se quitaron de pendientes.`,
+    );
     await refresh();
   }
 

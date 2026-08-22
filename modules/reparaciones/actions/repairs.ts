@@ -423,6 +423,37 @@ export async function approveRepairJobAction(input: { jobId: string; customMonto
       const unrepairedItems = job.items.length - repairedItems.length;
       const montoTotal = repairedItems.length * montoPorEquipo;
 
+      // Un trabajo compuesto únicamente por equipos no reparados también debe
+      // cerrarse al aprobarlo, pero no debe crear un movimiento de wallet por
+      // RD$0. Mientras permanezca PENDING_PAYMENT vuelve a aparecer como deuda.
+      if (repairedItems.length === 0) {
+        await tx.repairJob.update({
+          where: { id: job.id },
+          data: { status: "PAID", approvedById: actor.id, approvedAt: new Date(), montoPorEquipo, montoTotal: 0 },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            userId: actor.id,
+            action: "repair.approve_no_pay",
+            module: "reparaciones",
+            entityType: "RepairJob",
+            entityId: job.id,
+            afterData: {
+              jobCode: job.jobCode,
+              equiposReportados: job.items.length,
+              equiposPagados: 0,
+              equiposNoPagados: unrepairedItems,
+              montoPorEquipo,
+              montoTotal: 0,
+              date: santoDomingoDateString(),
+            },
+          },
+        });
+
+        return { success: true as const, data: { jobCode: job.jobCode, equipos: 0, montoPorEquipo, montoTotal: 0 } };
+      }
+
       // Idempotencia: cada job paga una sola vez
       const externalKey = `repair-payment:${job.id}:${job.technicianId}`;
       const existingPayment = await tx.walletLedgerEntry.findUnique({ where: { externalKey } });
