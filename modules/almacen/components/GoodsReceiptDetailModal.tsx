@@ -74,7 +74,7 @@ function parseImeis(value?: string | null) {
   if (!value) return [];
 
   return value
-    .split(/[\n,;]+/)
+    .split(/[\s,;|]+/)
     .map((imei) => imei.trim())
     .filter(Boolean);
 }

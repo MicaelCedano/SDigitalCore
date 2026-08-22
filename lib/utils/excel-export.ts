@@ -45,7 +45,7 @@ export interface DetailedImeiRow {
 export function parseImeiList(input?: string | null): string[] {
   if (!input) return [];
   return input
-    .split(/[\r\n,;|]+/)
+    .split(/[\s,;|]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
