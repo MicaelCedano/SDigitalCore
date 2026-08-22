@@ -705,26 +705,42 @@ export async function deleteRevisionBatchAction(input: { id: string }): Promise<
     let equiposEliminados = 0;
     let equiposDesvinculados = 0;
 
-    await prisma.$transaction(async (tx) => {
-      for (const dev of batch.devices) {
-        const hasPrevHistory = dev.inspections.some((i) => i.createdAt < batchStart);
-        if (hasPrevHistory) {
-          // Reingreso con historial: desvincular sin borrar
-          await tx.deviceUnit.update({
-            where: { id: dev.id },
+    const deviceIdsToUnlink: string[] = [];
+    const deviceIdsToDelete: string[] = [];
+
+    for (const dev of batch.devices) {
+      const hasPrevHistory = dev.inspections.some((i) => i.createdAt < batchStart);
+      if (hasPrevHistory) deviceIdsToUnlink.push(dev.id);
+      else deviceIdsToDelete.push(dev.id);
+    }
+
+    // Las operaciones masivas evitan una consulta por equipo dentro de la
+    // transacción. Esto es importante para compras grandes (p. ej. 300 equipos),
+    // porque Prisma cancela la transacción interactiva después de 5 segundos.
+    await prisma.$transaction(
+      async (tx) => {
+        if (deviceIdsToUnlink.length > 0) {
+          const unlinked = await tx.deviceUnit.updateMany({
+            where: { id: { in: deviceIdsToUnlink }, batchId: batch.id },
             data: { batchId: null, status: "QUARANTINED" },
           });
-          equiposDesvinculados++;
-        } else {
-          // Equipo de esta compra: borrar inspecciones (Restrict) y fotos (Cascade) primero
-          await tx.qcInspection.deleteMany({ where: { deviceId: dev.id } });
-          await tx.deviceUnit.delete({ where: { id: dev.id } });
-          equiposEliminados++;
+          equiposDesvinculados = unlinked.count;
         }
-      }
 
-      await tx.qcRevisionBatch.delete({ where: { id: batch.id } });
-    });
+        if (deviceIdsToDelete.length > 0) {
+          // QcInspection usa onDelete: Restrict; borrarlas primero permite
+          // que DeviceUnit sea eliminado y las fotos se limpien por Cascade.
+          await tx.qcInspection.deleteMany({ where: { deviceId: { in: deviceIdsToDelete } } });
+          const deleted = await tx.deviceUnit.deleteMany({
+            where: { id: { in: deviceIdsToDelete }, batchId: batch.id },
+          });
+          equiposEliminados = deleted.count;
+        }
+
+        await tx.qcRevisionBatch.delete({ where: { id: batch.id } });
+      },
+      { timeout: 30_000 },
+    );
 
     await logAudit({
       userId: actor.id,
