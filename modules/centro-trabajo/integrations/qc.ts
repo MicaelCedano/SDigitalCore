@@ -140,14 +140,14 @@ async function upsertQcTask(input: {
   sourceType: string; sourceId: string; assigneeId: string | null; assignmentMode: "SINGLE" | "MULTIPLE"; assigneeIds: string[]; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
 }) {
   const taskKey = `${input.sourceType}:${input.sourceId}:${input.assigneeId ?? "global"}`;
-  await prisma.$transaction(async (tx) => {
+  const newlyAssignedIds = await prisma.$transaction(async (tx) => {
     // getWorkCenterData puede ejecutarse en paralelo en varias peticiones. El
     // lock hace atómica la pareja "buscar o crear", incluso sin migración.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${taskKey}))`;
     const matches = await tx.workTask.findMany({
       where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      select: { id: true, dueAt: true, startedAt: true, completedAt: true },
+      select: { id: true, dueAt: true, startedAt: true, completedAt: true, assignees: { select: { userId: true } } },
     });
     const existing = matches[0];
     if (existing) {
@@ -156,7 +156,9 @@ async function upsertQcTask(input: {
       if (duplicateIds.length) {
         await tx.workTask.updateMany({ where: { id: { in: duplicateIds }, status: { notIn: ["COMPLETED", "CANCELLED"] } }, data: { status: "CANCELLED", completedAt: null } });
       }
-      return;
+      return input.assigneeId
+        ? input.assigneeIds.filter((userId) => !existing.assignees.some((assignment) => assignment.userId === userId))
+        : [];
     }
     await tx.workTask.create({
       data: {
@@ -182,9 +184,10 @@ async function upsertQcTask(input: {
         events: { create: { actorId: input.creatorId, type: "CREATED", afterData: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } } },
       },
     });
+    return input.assigneeId ? input.assigneeIds : [];
   });
-  if (input.assigneeId) {
-    await sendPushToUsers([input.assigneeId], {
+  if (newlyAssignedIds.length) {
+    await sendPushToUsers(newlyAssignedIds, {
       title: "Lote QC asignado",
       body: `${input.title}. Tienes ${input.progressTotal - input.progressDone} equipo(s) pendiente(s).`,
       route: input.sourceUrl,
