@@ -143,7 +143,7 @@ async function upsertQcTask(input: {
   await prisma.$transaction(async (tx) => {
     // getWorkCenterData puede ejecutarse en paralelo en varias peticiones. El
     // lock hace atómica la pareja "buscar o crear", incluso sin migración.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${taskKey}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${taskKey}))`;
     const matches = await tx.workTask.findMany({
       where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
