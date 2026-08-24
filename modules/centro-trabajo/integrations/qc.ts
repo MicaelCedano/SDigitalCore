@@ -139,34 +139,49 @@ function nextMondayDeadline(now = new Date()) {
 async function upsertQcTask(input: {
   sourceType: string; sourceId: string; assigneeId: string | null; assignmentMode: "SINGLE" | "MULTIPLE"; assigneeIds: string[]; creatorId: string; title: string; description: string; progressDone: number; progressTotal: number; status: "IN_PROGRESS" | "COMPLETED"; dueAt: Date; sourceCode: string; sourceUrl: string;
 }) {
-  const existing = await prisma.workTask.findFirst({ where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } });
-  if (existing) {
-    await prisma.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, assignmentMode: input.assignmentMode, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: { connectOrCreate: input.assigneeIds.map((userId) => ({ where: { taskId_userId: { taskId: existing.id, userId } }, create: { userId, assignedById: input.creatorId } })) } } });
-    return;
-  }
-  await prisma.workTask.create({
-    data: {
-      title: input.title,
-      description: input.description,
-      kind: "AUTOMATIC",
-      assignmentMode: input.assignmentMode,
-      status: input.status,
-      priority: input.progressDone < input.progressTotal ? "HIGH" : "NORMAL",
-      sourceModule: "qc",
-      sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      sourceCode: input.sourceCode,
-      sourceUrl: input.sourceUrl,
-      creatorId: input.creatorId,
-      assigneeId: input.assigneeId,
-      dueAt: input.dueAt,
-      progressDone: input.progressDone,
-      progressTotal: input.progressTotal,
-      startedAt: input.status === "IN_PROGRESS" ? new Date() : null,
-      completedAt: input.status === "COMPLETED" ? new Date() : null,
-      assignees: input.assigneeIds.length ? { create: input.assigneeIds.map((userId) => ({ userId, assignedById: input.creatorId })) } : undefined,
-      events: { create: { actorId: input.creatorId, type: "CREATED", afterData: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } } },
-    },
+  const taskKey = `${input.sourceType}:${input.sourceId}:${input.assigneeId ?? "global"}`;
+  await prisma.$transaction(async (tx) => {
+    // getWorkCenterData puede ejecutarse en paralelo en varias peticiones. El
+    // lock hace atómica la pareja "buscar o crear", incluso sin migración.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${taskKey}))`;
+    const matches = await tx.workTask.findMany({
+      where: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true, dueAt: true, startedAt: true, completedAt: true },
+    });
+    const existing = matches[0];
+    if (existing) {
+      await tx.workTask.update({ where: { id: existing.id }, data: { title: input.title, description: input.description, assignmentMode: input.assignmentMode, status: input.status, dueAt: existing.dueAt ?? input.dueAt, startedAt: input.status === "IN_PROGRESS" ? existing.startedAt ?? new Date() : existing.startedAt, completedAt: input.status === "COMPLETED" ? existing.completedAt ?? new Date() : null, progressDone: input.progressDone, progressTotal: input.progressTotal, sourceCode: input.sourceCode, sourceUrl: input.sourceUrl, assignees: { connectOrCreate: input.assigneeIds.map((userId) => ({ where: { taskId_userId: { taskId: existing.id, userId } }, create: { userId, assignedById: input.creatorId } })) } } });
+      const duplicateIds = matches.slice(1).map((task) => task.id);
+      if (duplicateIds.length) {
+        await tx.workTask.updateMany({ where: { id: { in: duplicateIds }, status: { notIn: ["COMPLETED", "CANCELLED"] } }, data: { status: "CANCELLED", completedAt: null } });
+      }
+      return;
+    }
+    await tx.workTask.create({
+      data: {
+        title: input.title,
+        description: input.description,
+        kind: "AUTOMATIC",
+        assignmentMode: input.assignmentMode,
+        status: input.status,
+        priority: input.progressDone < input.progressTotal ? "HIGH" : "NORMAL",
+        sourceModule: "qc",
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+        sourceCode: input.sourceCode,
+        sourceUrl: input.sourceUrl,
+        creatorId: input.creatorId,
+        assigneeId: input.assigneeId,
+        dueAt: input.dueAt,
+        progressDone: input.progressDone,
+        progressTotal: input.progressTotal,
+        startedAt: input.status === "IN_PROGRESS" ? new Date() : null,
+        completedAt: input.status === "COMPLETED" ? new Date() : null,
+        assignees: input.assigneeIds.length ? { create: input.assigneeIds.map((userId) => ({ userId, assignedById: input.creatorId })) } : undefined,
+        events: { create: { actorId: input.creatorId, type: "CREATED", afterData: { sourceType: input.sourceType, sourceId: input.sourceId, assigneeId: input.assigneeId } } },
+      },
+    });
   });
   if (input.assigneeId) {
     await sendPushToUsers([input.assigneeId], {
