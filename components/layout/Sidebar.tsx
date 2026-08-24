@@ -80,6 +80,7 @@ const navItems: NavItem[] = [
     { label: "Recepción de técnico", href: "/garantias/tecnicos/recepcion" },
     { label: "Envío a suplidor", href: "/garantias/suplidores/envio" },
     { label: "Recepción de suplidor", href: "/garantias/suplidores/recepcion" },
+    { label: "Listos para entregar", href: "/garantias/listos-para-entregar" },
     { label: "Despacho al cliente", href: "/garantias/despacho" },
     { label: "Nota de crédito", href: "/garantias/nota-credito" },
     { label: "Documentos", href: "/garantias/historial/documentos" },

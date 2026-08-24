@@ -8,6 +8,7 @@ import {
   flowSchema,
   restoreWarrantySchema,
   updateWarrantySchema,
+  imeiSchema,
 } from "@/lib/validation/warranty";
 import { civilDate, nextWarrantyNumber, santoDomingoDateString } from "@/modules/garantias/lib/document-number";
 import { Prisma, WarrantyDocumentType, WarrantyEventType, WarrantyStatus } from "@prisma/client";
@@ -526,6 +527,35 @@ export async function receiveCasesFromTechnician(input: unknown) {
 export async function sendCasesToSupplier(input: unknown) { return flow(input, "send-supplier"); }
 export async function receiveCasesFromSupplier(input: unknown) { return flow(input, "receive-supplier"); }
 export async function markWarrantyReadyForCustomer(input: unknown) { return flow(input, "mark-ready"); }
+export async function markWarrantyReadyByImei(input: unknown) {
+  try {
+    const rawImei = (input as { imei?: unknown })?.imei;
+    const parsed = imeiSchema.safeParse(rawImei);
+    if (!parsed.success) return { success: false as const, error: "Escribe un IMEI válido de 15 dígitos." };
+
+    const current = await prisma.warrantyCase.findFirst({
+      where: { imei: parsed.data, archivedAt: null, status: { in: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"] } },
+      orderBy: { updatedAt: "desc" },
+      select: { caseCode: true, clientName: true, model: true, status: true },
+    });
+    if (current) {
+      const result = await markWarrantyReadyForCustomer({ caseCodes: [current.caseCode] });
+      if (!result.success) return result;
+      return { success: true as const, data: { ...result.data, caseCode: current.caseCode, clientName: current.clientName, model: current.model } };
+    }
+
+    const existing = await prisma.warrantyCase.findFirst({
+      where: { imei: parsed.data, archivedAt: null },
+      orderBy: { updatedAt: "desc" },
+      select: { status: true },
+    });
+    if (!existing) return { success: false as const, error: "No se encontró una garantía activa con ese IMEI." };
+    if (existing.status === "READY_FOR_CUSTOMER") return { success: false as const, error: "Este equipo ya está listo para entregar al cliente." };
+    return { success: false as const, error: "Este equipo no está confirmado como reparado. No se puede pasar a listo para entregar." };
+  } catch (error) {
+    return fail(error);
+  }
+}
 export async function deliverCasesToCustomer(input: unknown) { return flow(input, "deliver"); }
 export async function markWarrantyCreditNote(input: unknown) { return flow(input, "credit"); }
 
