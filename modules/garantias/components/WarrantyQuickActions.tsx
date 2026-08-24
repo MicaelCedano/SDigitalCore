@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FileCheck2, Plus, Truck, UserRoundCheck, Wrench, X } from "lucide-react";
+import { CheckCircle2, FileCheck2, PackageCheck, Plus, Truck, UserRoundCheck, Wrench, X } from "lucide-react";
 import { WarrantyFlow, type WarrantyFlowCase, type WarrantyFlowOperation } from "@/modules/garantias/components/WarrantyFlow";
 import { WarrantyIntakeForm } from "@/modules/garantias/components/WarrantyIntakeForm";
 
@@ -10,6 +10,7 @@ const actions: Array<{ operation: WarrantyFlowOperation; label: string; descript
   { operation: "receiveTech", label: "Recibir del técnico", description: "Registra equipos reparados o no reparados.", icon: Wrench, tone: "blue" },
   { operation: "sendSupplier", label: "Enviar a suplidor", description: "Despacha equipos a marca o proveedor.", icon: Truck, tone: "orange" },
   { operation: "receiveSupplier", label: "Recibir de suplidor", description: "Registra el retorno del proveedor.", icon: FileCheck2, tone: "amber" },
+  { operation: "markReady", label: "Listos para entregar", description: "Marca únicamente equipos reparados como listos para el cliente.", icon: PackageCheck, tone: "emerald" },
   { operation: "deliver", label: "Despachar al cliente", description: "Entrega los equipos listos al cliente.", icon: CheckCircle2, tone: "emerald" },
   { operation: "credit", label: "Crear nota de crédito", description: "Cierra un caso abierto con su motivo.", icon: FileCheck2, tone: "red" },
 ];

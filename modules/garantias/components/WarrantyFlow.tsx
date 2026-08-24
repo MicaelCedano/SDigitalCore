@@ -22,6 +22,7 @@ import {
   markWarrantyCreditNote,
   receiveCasesFromSupplier,
   receiveCasesFromTechnician,
+  markWarrantyReadyForCustomer,
   sendCasesToSupplier,
 } from "@/modules/garantias/actions/warranty";
 import { WarrantyDocumentPreviewModal } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
@@ -42,6 +43,7 @@ export type WarrantyFlowOperation =
   | "receiveTech"
   | "sendSupplier"
   | "receiveSupplier"
+  | "markReady"
   | "deliver"
   | "credit";
 
@@ -87,6 +89,12 @@ const config: Record<WarrantyFlowOperation, [string, string, string, string]> = 
     "Suplidor o marca",
     "Registra el retorno de los equipos enviados.",
     "Registrar recepción",
+  ],
+  markReady: [
+    "Marcar listos para entregar al cliente",
+    "",
+    "Solo muestra equipos reparados recibidos del técnico o del suplidor.",
+    "Marcar como listos",
   ],
   deliver: [
     "Despachar garantía al cliente",
@@ -254,7 +262,7 @@ export function WarrantyFlow({
 
   function validateBeforeConfirm() {
     if (selected.length === 0) return setMessage("Selecciona al menos un equipo.");
-    if (operation !== "credit" && !counterparty.trim())
+    if (operation !== "credit" && operation !== "markReady" && !counterparty.trim())
       return setMessage(`Indica el ${label.toLowerCase()}.`);
     setMessage("");
     setConfirmOpen(true);
@@ -285,6 +293,8 @@ export function WarrantyFlow({
         ? await sendCasesToSupplier(input)
         : operation === "receiveSupplier"
         ? await receiveCasesFromSupplier(input)
+        : operation === "markReady"
+        ? await markWarrantyReadyForCustomer(input)
         : operation === "deliver"
         ? await deliverCasesToCustomer(input)
         : await markWarrantyCreditNote(input);
@@ -329,7 +339,7 @@ export function WarrantyFlow({
   function addScannedCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanImei = scanInput.trim();
-    if (operation !== "deliver" && operation !== "credit" && !counterparty.trim()) {
+    if (operation !== "deliver" && operation !== "credit" && operation !== "markReady" && !counterparty.trim()) {
       setScanMessage(`Indica primero el ${label.toLowerCase()}.`);
       return;
     }
@@ -401,7 +411,7 @@ export function WarrantyFlow({
         )}
 
         {/* Sección de contraparte */}
-        {operation !== "credit" && (
+        {operation !== "credit" && operation !== "markReady" && (
           <div className="grid gap-4 border-b border-slate-200 p-5 sm:grid-cols-2 sm:p-6">
             <label className="text-sm font-semibold text-slate-700">
               {label}
@@ -775,7 +785,7 @@ export function WarrantyFlow({
               <p>
                 <strong>{selected.length}</strong> equipo(s) seleccionado(s)
               </p>
-              {operation !== "credit" && (
+              {operation !== "credit" && operation !== "markReady" && (
                 <p>
                   {label}: <strong>{counterparty}</strong>
                 </p>

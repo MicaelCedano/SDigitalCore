@@ -17,7 +17,7 @@ import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 type ArchiveFilter = "active" | "archived" | "all";
-type FlowOperation = "assign" | "receive-repaired" | "receive-unrepaired" | "send-supplier" | "receive-supplier" | "deliver" | "credit";
+type FlowOperation = "assign" | "receive-repaired" | "receive-unrepaired" | "send-supplier" | "receive-supplier" | "mark-ready" | "deliver" | "credit";
 
 export type WarrantyCaseListItem = {
   id: string;
@@ -382,7 +382,7 @@ export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<
 const flowRules: Record<FlowOperation, {
   toStatus: WarrantyStatus;
   allowed: WarrantyStatus[];
-  documentType: WarrantyDocumentType;
+  documentType: WarrantyDocumentType | null;
   eventType: WarrantyEventType;
   needsCounterparty: boolean;
   needsReason: boolean;
@@ -392,11 +392,12 @@ const flowRules: Record<FlowOperation, {
   "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["TECHNICIAN_REPORTED_UNREPAIRED"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: false },
   "send-supplier": { toStatus: "SENT_TO_SUPPLIER", allowed: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN"], documentType: "SUPPLIER_SHIPMENT", eventType: "SENT_TO_SUPPLIER", needsCounterparty: true, needsReason: false },
   "receive-supplier": { toStatus: "RECEIVED_FROM_SUPPLIER", allowed: ["SENT_TO_SUPPLIER"], documentType: "SUPPLIER_RECEIPT", eventType: "RECEIVED_FROM_SUPPLIER", needsCounterparty: true, needsReason: true },
-  deliver: { toStatus: "DELIVERED", allowed: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], documentType: "CUSTOMER_DELIVERY", eventType: "DELIVERED_TO_CUSTOMER", needsCounterparty: true, needsReason: true },
-  credit: { toStatus: "CREDIT_NOTE", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER"], documentType: "CREDIT_NOTE", eventType: "CREDIT_NOTE_MARKED", needsCounterparty: false, needsReason: true },
+  "mark-ready": { toStatus: "READY_FOR_CUSTOMER", allowed: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], documentType: null, eventType: "READY_FOR_CUSTOMER", needsCounterparty: false, needsReason: false },
+  deliver: { toStatus: "DELIVERED", allowed: ["READY_FOR_CUSTOMER"], documentType: "CUSTOMER_DELIVERY", eventType: "DELIVERED_TO_CUSTOMER", needsCounterparty: true, needsReason: true },
+  credit: { toStatus: "CREDIT_NOTE", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER", "READY_FOR_CUSTOMER"], documentType: "CREDIT_NOTE", eventType: "CREDIT_NOTE_MARKED", needsCounterparty: false, needsReason: true },
 };
 
-async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode: string; status: WarrantyStatus }>> {
+async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode?: string; status: WarrantyStatus }>> {
   try {
     const actor = await requirePermission("warranties.transition");
     const parsed = flowSchema.safeParse(input);
@@ -475,18 +476,20 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
         const itemReason = operation === "receive-unrepaired" ? caseObservations[item.caseCode]?.trim() || reason : reason;
         await createEvent(tx, item.id, actor, rule.eventType, { fromStatus: item.status, toStatus: rule.toStatus, counterpartyName: counterpartyName || item.clientName, reason: itemReason });
       }
-      const document = await createDocument(tx, actor.id, rule.documentType, counterpartyName || cases[0].clientName, cases.map((item) => item.id), reason);
+      const document = rule.documentType
+        ? await createDocument(tx, actor.id, rule.documentType, counterpartyName || cases[0].clientName, cases.map((item) => item.id), reason)
+        : null;
       await tx.auditLog.create({
         data: {
           userId: actor.id,
           action: `warranty.${operation}`,
           module: "garantias",
-          entityType: "WarrantyDocument",
-          entityId: document.id,
-          afterData: auditData({ caseCodes: data.caseCodes, toStatus: rule.toStatus, counterpartyName, reason, documentCode: document.documentCode }),
+          entityType: document ? "WarrantyDocument" : "WarrantyCase",
+          entityId: document?.id ?? cases[0].id,
+          afterData: auditData({ caseCodes: data.caseCodes, toStatus: rule.toStatus, counterpartyName, reason, documentCode: document?.documentCode ?? null }),
         },
       });
-      return { documentCode: document.documentCode, status: rule.toStatus };
+      return { documentCode: document?.documentCode, status: rule.toStatus };
     });
     await sendPushToRole("ADMIN", {
       title: `Garantía ${data.caseCodes[0]} actualizada`,
@@ -522,6 +525,7 @@ export async function receiveCasesFromTechnician(input: unknown) {
 }
 export async function sendCasesToSupplier(input: unknown) { return flow(input, "send-supplier"); }
 export async function receiveCasesFromSupplier(input: unknown) { return flow(input, "receive-supplier"); }
+export async function markWarrantyReadyForCustomer(input: unknown) { return flow(input, "mark-ready"); }
 export async function deliverCasesToCustomer(input: unknown) { return flow(input, "deliver"); }
 export async function markWarrantyCreditNote(input: unknown) { return flow(input, "credit"); }
 

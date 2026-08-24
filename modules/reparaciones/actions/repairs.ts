@@ -80,7 +80,8 @@ export async function sendCasesToRepairsAction(input: { caseCodes: string[]; tec
     if (!parsed.success) return { success: false, error: "Datos inválidos." };
     const result = await assignCasesToTechnician({ caseCodes: parsed.data.caseCodes, technicianId: parsed.data.technicianId });
     if (!result.success) return result;
-    return ok(result.data);
+    if (!result.data.documentCode) return { success: false, error: "No se generó el documento de entrega a reparaciones." };
+    return ok({ documentCode: result.data.documentCode, status: result.data.status });
   } catch (error) {
     return fail(error);
   }

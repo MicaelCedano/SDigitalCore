@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Copy,
   FileCheck2,
+  PackageCheck,
   ShieldCheck,
   Smartphone,
   Truck,
@@ -229,23 +230,34 @@ export function WarrantyCaseDetailDrawer({
                     <Wrench size={15} /> Recibir del técnico
                   </button>
                 )}
-                {item.status === "RECEIVED_FROM_TECHNICIAN" && (
+                {(item.status === "RECEIVED_FROM_TECHNICIAN" || item.status === "RECEIVED_FROM_SUPPLIER") && (
                   <>
                     <button
                       type="button"
-                      onClick={() => triggerFlow("deliver")}
+                      onClick={() => triggerFlow("markReady")}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
                     >
-                      <CheckCircle2 size={15} /> Despachar al cliente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => triggerFlow("sendSupplier")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-orange-700 transition"
-                    >
-                      <Truck size={15} /> Enviar a suplidor
+                      <PackageCheck size={15} /> Listo para entregar
                     </button>
                   </>
+                )}
+                {item.status === "RECEIVED_FROM_TECHNICIAN" && (
+                  <button
+                    type="button"
+                    onClick={() => triggerFlow("sendSupplier")}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-orange-700 transition"
+                  >
+                    <Truck size={15} /> Enviar a suplidor
+                  </button>
+                )}
+                {item.status === "READY_FOR_CUSTOMER" && (
+                  <button
+                    type="button"
+                    onClick={() => triggerFlow("deliver")}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+                  >
+                    <CheckCircle2 size={15} /> Despachar al cliente
+                  </button>
                 )}
                 {item.status === "SENT_TO_SUPPLIER" && (
                   <button
