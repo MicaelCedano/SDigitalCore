@@ -11,6 +11,7 @@ import {
   imeiSchema,
 } from "@/lib/validation/warranty";
 import { civilDate, nextWarrantyNumber, santoDomingoDateString } from "@/modules/garantias/lib/document-number";
+import { getWarrantyStatusLabel } from "@/modules/garantias/lib/status-machine";
 import { Prisma, WarrantyDocumentType, WarrantyEventType, WarrantyStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ensureCustomerForWarranty } from "@/modules/configuracion/actions/business-partner";
@@ -494,7 +495,7 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
     });
     await sendPushToRole("ADMIN", {
       title: `Garantía ${data.caseCodes[0]} actualizada`,
-      body: `${data.caseCodes.length} caso(s): ${rule.toStatus.toLowerCase().replaceAll("_", " ")}.`,
+      body: `${data.caseCodes.length} caso(s): ${getWarrantyStatusLabel(rule.toStatus).toLocaleLowerCase("es")}.`,
       route: `/garantias/${data.caseCodes[0]}`,
       type: `warranty.${operation}`,
     });
