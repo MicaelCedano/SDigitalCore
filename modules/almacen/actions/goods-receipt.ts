@@ -47,6 +47,10 @@ function normalizedColorKey(value: string | null | undefined) {
   return aliases[key] || key;
 }
 
+function colorParts(value: string | null | undefined) {
+  return normalizeReceiptText(value).split("/").map((part) => part.trim()).filter(Boolean);
+}
+
 const warehouseProductIdentitySchema = z.object({
   brand: z.string().trim().min(1),
   name: z.string().trim().min(1),
@@ -335,15 +339,23 @@ export async function getWarehouseProductSuggestionAction(input: unknown) {
       where: {
         status: "ACTIVE",
         brand: { equals: identity.brand, mode: "insensitive" },
-        name: { equals: identity.name, mode: "insensitive" },
+        name: { contains: identity.name, mode: "insensitive" },
       },
       orderBy: { updatedAt: "desc" },
       take: 20,
     });
-    const matches = candidates.filter((product) =>
-      normalizedKey(product.capacity) === normalizedKey(identity.capacity) &&
-      normalizedColorKey(product.color) === normalizedColorKey(identity.color),
-    );
+    const requestedColorParts = colorParts(identity.color);
+    const requestedColorName = requestedColorParts[0] || "";
+    const requestedColorCode = normalizedKey(requestedColorParts.slice(1).join(" ")).replace(/\s+/g, "");
+    const requestedName = normalizedKey(identity.name);
+    const matches = candidates.filter((product) => {
+      const productName = normalizedKey(product.name);
+      const productIdentityText = normalizedKey(`${product.name} ${product.color}`).replace(/\s+/g, "");
+      const sameModel = productName === requestedName || productName.startsWith(`${requestedName} `);
+      const sameColorName = normalizedColorKey(product.color) === normalizedColorKey(requestedColorName || identity.color);
+      const sameColorCode = Boolean(requestedColorCode) && productIdentityText.includes(requestedColorCode);
+      return normalizedKey(product.capacity) === normalizedKey(identity.capacity) && sameModel && (sameColorName || sameColorCode);
+    });
     if (matches.length !== 1) return { success: true, data: null, matchCount: matches.length };
     const product = matches[0];
     return {
