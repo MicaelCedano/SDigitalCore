@@ -254,6 +254,11 @@ export async function getGoodsReceiptsAction(query?: string, status?: string) {
       where,
       include: {
         items: true,
+        warehouseImports: {
+          orderBy: { importedAt: "desc" },
+          take: 1,
+          include: { lines: true },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -278,6 +283,11 @@ export async function getGoodsReceiptByIdAction(id: string) {
       where: { id },
       include: {
         items: true,
+        warehouseImports: {
+          orderBy: { importedAt: "desc" },
+          take: 1,
+          include: { lines: true },
+        },
       },
     });
 
@@ -357,7 +367,21 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
       });
       if (claimed.count !== 1) throw new Error(`El recibo ${receipt.receiptNumber} ya fue enviado al almacén y no puede enviarse otra vez.`);
 
+      const importNumber = await nextOperationalNumber(tx, "WAREHOUSE_RECEIPT_IMPORT", "ENT");
       const products = [];
+      const importLines: Array<{
+        productId: string;
+        itemId: string;
+        code: string;
+        name: string;
+        brand: string | null;
+        capacity: string | null;
+        color: string | null;
+        unitsPerBox: number;
+        boxesCount: number;
+        looseUnits: number;
+        totalUnits: number;
+      }> = [];
       for (const line of validated.lines) {
         const code = line.code.toUpperCase();
         const existing = await tx.warehouseProduct.findUnique({ where: { code } });
@@ -367,18 +391,28 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
         const product = existing
           ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
           : await tx.warehouseProduct.create({ data: { code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
-        await tx.warehouseMovement.create({ data: { productId: product.id, type: "ENTRY", boxesCount: boxes, totalUnits: line.quantity, reason: `Importación recibo ${receipt.receiptNumber}`, createdBy: actor.id } });
+        await tx.warehouseMovement.create({ data: { productId: product.id, type: "ENTRY", boxesCount: boxes, totalUnits: line.quantity, reason: `Entrada ${importNumber} · recibo ${receipt.receiptNumber}`, createdBy: actor.id } });
         await tx.goodsReceiptItem.update({ where: { id: line.itemId }, data: { code } });
+        importLines.push({ productId: product.id, itemId: line.itemId, code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, unitsPerBox, boxesCount: boxes, looseUnits, totalUnits: line.quantity });
         products.push(product);
       }
-      return products;
+      const voucher = await tx.warehouseReceiptImport.create({
+        data: {
+          importNumber,
+          receiptId: receipt.id,
+          importedBy: actor.id,
+          lines: { create: importLines },
+        },
+        include: { lines: true },
+      });
+      return { products, voucher };
     });
 
-    await logAudit({ userId: actor.id, action: "goods_receipt.import_to_warehouse", module: "almacen", entityType: "goods_receipt", entityId: receipt.id, afterData: { receiptNumber: receipt.receiptNumber, productIds: created.map((product) => product.id), lineCount: created.length } });
+    await logAudit({ userId: actor.id, action: "goods_receipt.import_to_warehouse", module: "almacen", entityType: "goods_receipt", entityId: receipt.id, afterData: { receiptNumber: receipt.receiptNumber, importNumber: created.voucher.importNumber, productIds: created.products.map((product) => product.id), lineCount: created.products.length } });
     revalidatePath("/almacen");
     revalidatePath("/almacen/recibos");
     revalidatePath("/dashboard");
-    return { success: true, data: created, message: `${created.length} producto(s) enviado(s) al almacén. Los códigos quedaron guardados en el recibo.` };
+    return { success: true, data: created.products, importNumber: created.voucher.importNumber, message: `${created.products.length} producto(s) enviado(s) al almacén. Comprobante ${created.voucher.importNumber} generado.` };
   } catch (error: any) {
     console.error("Error al importar recibo al almacén:", error);
     return { success: false, error: error.message || "No se pudo importar el recibo al almacén." };
@@ -395,6 +429,7 @@ export async function deleteGoodsReceiptAction(id: string) {
     const existing = await prisma.goodsReceipt.findUnique({ where: { id } });
     if (!existing) return { success: false, error: "Recibo no encontrado" };
     if (existing.status === "CANCELLED") return { success: false, error: "El recibo ya está anulado" };
+    if (existing.warehouseImportedAt) return { success: false, error: "Primero cancela la entrada al almacén desde el comprobante; así el stock queda correcto." };
     const cancelled = await prisma.goodsReceipt.update({ where: { id }, data: { status: "CANCELLED" } });
     await logAudit({ userId: actor.id, action: "goods_receipt.cancel", module: "almacen", entityType: "goods_receipt", entityId: cancelled.id, beforeData: { receiptNumber: existing.receiptNumber, status: existing.status }, afterData: { status: cancelled.status } });
 
@@ -404,6 +439,57 @@ export async function deleteGoodsReceiptAction(id: string) {
     return { success: true, message: "Recibo anulado; su historial fue conservado" };
   } catch (error: any) {
     return { success: false, error: "Error al anular el recibo" };
+  }
+}
+
+export async function cancelGoodsReceiptWarehouseImportAction(importId: string) {
+  try {
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
+    if (persisted?.roleCode !== "ADMIN") return { success: false, error: "Solo un administrador puede cancelar una entrada al almacén." };
+
+    const imported = await prisma.warehouseReceiptImport.findUnique({
+      where: { id: importId },
+      include: { receipt: true, lines: true },
+    });
+    if (!imported) return { success: false, error: "Comprobante de almacén no encontrado." };
+    if (imported.status !== "ACTIVE") return { success: false, error: "Este comprobante ya fue cancelado." };
+
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.warehouseReceiptImport.updateMany({
+        where: { id: imported.id, status: "ACTIVE" },
+        data: { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: actor.id },
+      });
+      if (claimed.count !== 1) throw new Error("Este comprobante ya fue cancelado por otra operación.");
+      for (const line of imported.lines) {
+        const changed = await tx.warehouseProduct.updateMany({
+          where: {
+            id: line.productId,
+            status: "ACTIVE",
+            boxes: { gte: line.boxesCount },
+            looseUnits: { gte: line.looseUnits },
+            totalUnits: { gte: line.totalUnits },
+          },
+          data: {
+            boxes: { decrement: line.boxesCount },
+            looseUnits: { decrement: line.looseUnits },
+            totalUnits: { decrement: line.totalUnits },
+          },
+        });
+        if (changed.count !== 1) throw new Error(`No se puede cancelar ${imported.importNumber}: el stock de ${line.code} ya fue utilizado o cambió.`);
+        await tx.warehouseMovement.create({ data: { productId: line.productId, type: "EXIT", boxesCount: line.boxesCount, totalUnits: line.totalUnits, reason: `Cancelación ${imported.importNumber} · recibo ${imported.receipt.receiptNumber}`, createdBy: actor.id } });
+      }
+      await tx.goodsReceipt.update({ where: { id: imported.receiptId }, data: { warehouseImportedAt: null, warehouseImportedBy: null } });
+    });
+
+    await logAudit({ userId: actor.id, action: "goods_receipt.warehouse_import_cancel", module: "almacen", entityType: "warehouse_receipt_import", entityId: imported.id, beforeData: { importNumber: imported.importNumber, receiptNumber: imported.receipt.receiptNumber, status: imported.status }, afterData: { status: "CANCELLED", stockReversed: true } });
+    revalidatePath("/almacen");
+    revalidatePath("/almacen/recibos");
+    revalidatePath("/dashboard");
+    return { success: true, message: `Entrada ${imported.importNumber} cancelada y stock revertido.` };
+  } catch (error: any) {
+    return { success: false, error: error.message || "No se pudo cancelar la entrada al almacén." };
   }
 }
 

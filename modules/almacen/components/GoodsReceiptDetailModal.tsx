@@ -5,6 +5,7 @@ import { exportSingleReceiptToExcel } from "@/lib/utils/excel-export";
 import {
   Check,
   Copy,
+  Ban,
   FileSpreadsheet,
   Layers,
   MapPin,
@@ -47,6 +48,16 @@ type GoodsReceiptDetail = {
   createdAt?: string | Date | null;
   items?: ReceiptItem[] | null;
   warehouseImportedAt?: string | Date | null;
+  warehouseImports?: WarehouseReceiptImport[] | null;
+};
+
+type WarehouseReceiptImport = {
+  id: string;
+  importNumber: string;
+  importedAt: string | Date;
+  status: "ACTIVE" | "CANCELLED";
+  cancelledAt?: string | Date | null;
+  lines: Array<{ code: string; name: string; brand?: string | null; capacity?: string | null; color?: string | null; boxesCount: number; looseUnits: number; totalUnits: number }>;
 };
 
 type ModelSummary = {
@@ -68,6 +79,7 @@ interface GoodsReceiptDetailModalProps {
   onClose: () => void;
   onEdit?: (receipt: GoodsReceiptDetail) => void;
   onImportToWarehouse?: (receipt: GoodsReceiptDetail) => void;
+  onCancelWarehouseImport?: (importId: string) => Promise<void>;
 }
 
 function parseImeis(value?: string | null) {
@@ -176,8 +188,10 @@ export function GoodsReceiptDetailModal({
   onClose,
   onEdit,
   onImportToWarehouse,
+  onCancelWarehouseImport,
 }: GoodsReceiptDetailModalProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [cancelImportOpen, setCancelImportOpen] = useState(false);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const models = useMemo(
@@ -194,6 +208,10 @@ export function GoodsReceiptDetailModal({
   });
 
   const totalQty = models.reduce((sum, model) => sum + model.quantity, 0);
+  const latestWarehouseImport = receipt.warehouseImports?.[0] ?? null;
+  const importDate = latestWarehouseImport
+    ? new Date(latestWarehouseImport.importedAt).toLocaleString("es-DO", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Santo_Domingo" })
+    : null;
   const generalObservationText = [
     receipt.notes,
     ...(receipt.items || []).map((item) => item.description?.trim() || ""),
@@ -429,6 +447,22 @@ export function GoodsReceiptDetailModal({
               <p>{receipt.notes}</p>
             </div>
           )}
+
+          {latestWarehouseImport && (
+            <section className={`rounded-2xl border p-4 sm:p-5 ${latestWarehouseImport.status === "ACTIVE" ? "border-indigo-200 bg-indigo-50/60" : "border-slate-200 bg-slate-50"}`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-600">Comprobante de entrada a almacén</p>
+                  <h3 className="mt-1 text-base font-black text-slate-900">{latestWarehouseImport.importNumber}</h3>
+                  <p className="mt-1 text-xs text-slate-600">Registrado el {importDate} · {latestWarehouseImport.status === "ACTIVE" ? "Entrada activa" : "Entrada cancelada"}</p>
+                </div>
+                {latestWarehouseImport.status === "ACTIVE" && onCancelWarehouseImport ? <button type="button" onClick={() => setCancelImportOpen(true)} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-50"><Ban className="h-4 w-4" /> Cancelar entrada</button> : null}
+              </div>
+              <div className="mt-4 overflow-x-auto rounded-xl border border-indigo-100 bg-white">
+                <table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Código Kaptas</th><th className="px-3 py-2">Producto</th><th className="px-3 py-2 text-right">Cajas</th><th className="px-3 py-2 text-right">Sueltas</th><th className="px-3 py-2 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-100">{latestWarehouseImport.lines.map((line) => <tr key={`${latestWarehouseImport.id}-${line.code}`}><td className="px-3 py-2 font-mono font-bold text-indigo-700">{line.code}</td><td className="px-3 py-2 font-semibold text-slate-700">{[line.brand, line.name, line.capacity, line.color].filter(Boolean).join(" ")}</td><td className="px-3 py-2 text-right text-slate-600">{line.boxesCount}</td><td className="px-3 py-2 text-right text-slate-600">{line.looseUnits}</td><td className="px-3 py-2 text-right font-bold text-slate-900">{line.totalUnits}</td></tr>)}</tbody></table>
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -466,6 +500,7 @@ export function GoodsReceiptDetailModal({
           </div>
         </div>
       </section>
+      {cancelImportOpen && latestWarehouseImport && onCancelWarehouseImport ? <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation"><div role="dialog" aria-modal="true" aria-labelledby="cancel-warehouse-import-title" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h3 id="cancel-warehouse-import-title" className="text-lg font-black text-slate-900">¿Cancelar esta entrada?</h3><p className="mt-2 text-sm leading-6 text-slate-600">Se revertirán exactamente las cajas y unidades del comprobante <strong>{latestWarehouseImport.importNumber}</strong>. Si parte de ese stock ya fue utilizado, el sistema no permitirá la cancelación.</p><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => setCancelImportOpen(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Volver</button><button type="button" onClick={() => { setCancelImportOpen(false); void onCancelWarehouseImport(latestWarehouseImport.id); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700"><Ban className="h-4 w-4" /> Confirmar cancelación</button></div></div></div> : null}
     </>
   );
 }

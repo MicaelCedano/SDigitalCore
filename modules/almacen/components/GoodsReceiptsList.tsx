@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   getGoodsReceiptsAction,
   deleteGoodsReceiptAction,
+  cancelGoodsReceiptWarehouseImportAction,
 } from "../actions/goods-receipt";
 import { GoodsReceiptForm } from "./GoodsReceiptForm";
 import { GoodsReceiptDetailModal } from "./GoodsReceiptDetailModal";
@@ -61,6 +62,16 @@ export function GoodsReceiptsList() {
       await deleteGoodsReceiptAction(id);
       fetchReceipts();
     }
+  };
+
+  const handleCancelWarehouseImport = async (importId: string) => {
+    const result = await cancelGoodsReceiptWarehouseImportAction(importId);
+    if (!result.success) {
+      window.alert(result.error || "No se pudo cancelar la entrada al almacén.");
+      return;
+    }
+    setSelectedReceiptForDetail(null);
+    await fetchReceipts();
   };
 
   const handleExportAllExcel = () => {
@@ -396,6 +407,7 @@ export function GoodsReceiptsList() {
             setShowFormModal(true);
           }}
           onImportToWarehouse={(r) => setSelectedReceiptForImport(r)}
+          onCancelWarehouseImport={handleCancelWarehouseImport}
         />
       )}
 

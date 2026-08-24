@@ -1225,6 +1225,7 @@ model GoodsReceipt {
   updatedAt           DateTime           @updatedAt @map("updated_at")
 
   items GoodsReceiptItem[]
+  warehouseImports WarehouseReceiptImport[]
 
   @@map("goods_receipt")
 }
@@ -1361,8 +1362,57 @@ model WarehouseProduct {
 
   movements    WarehouseMovement[]
   requestItems WarehouseRequestItem[]
+  receiptImportLines WarehouseReceiptImportLine[]
 
   @@map("warehouse_product")
+}
+
+enum WarehouseReceiptImportStatus {
+  ACTIVE
+  CANCELLED
+
+  @@map("warehouse_receipt_import_status")
+}
+
+model WarehouseReceiptImport {
+  id           String                       @id @default(cuid())
+  importNumber String                       @unique @map("import_number")
+  receiptId    String                       @map("receipt_id")
+  importedBy   String                       @map("imported_by")
+  importedAt   DateTime                     @default(now()) @map("imported_at")
+  status       WarehouseReceiptImportStatus @default(ACTIVE)
+  cancelledAt  DateTime?                    @map("cancelled_at")
+  cancelledBy  String?                      @map("cancelled_by")
+
+  receipt GoodsReceipt              @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  lines   WarehouseReceiptImportLine[]
+
+  @@index([receiptId, status])
+  @@index([status, importedAt])
+  @@map("warehouse_receipt_import")
+}
+
+model WarehouseReceiptImportLine {
+  id          String   @id @default(cuid())
+  importId    String   @map("import_id")
+  productId   String   @map("product_id")
+  itemId      String   @map("item_id")
+  code        String
+  name        String
+  brand       String?
+  capacity    String?
+  color       String?
+  unitsPerBox Int      @map("units_per_box")
+  boxesCount  Int      @map("boxes_count")
+  looseUnits  Int      @map("loose_units")
+  totalUnits  Int      @map("total_units")
+
+  import  WarehouseReceiptImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  product WarehouseProduct       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([importId])
+  @@index([productId])
+  @@map("warehouse_receipt_import_line")
 }
 
 enum WarehouseMovementType {
