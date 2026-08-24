@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { importGoodsReceiptToWarehouseAction } from "../actions/goods-receipt";
+import { useEffect, useMemo, useState } from "react";
+import { getWarehouseProductSuggestionAction, importGoodsReceiptToWarehouseAction } from "../actions/goods-receipt";
 import type { GoodsReceiptWarehouseImportInput } from "@/lib/validation/goods-receipt";
-import { AlertCircle, ArrowRight, CheckCircle2, LockKeyhole, PackagePlus, Send, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, LockKeyhole, PackagePlus, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 
 type ImportReceipt = {
   id: string;
@@ -11,6 +11,7 @@ type ImportReceipt = {
   items?: Array<{ id?: string; code?: string | null; description?: string | null; model?: string | null; brand?: string | null; capacity?: string | null; quantity?: number | null; colorVariants?: Array<{ color?: string | null; quantity?: number | null; model?: string | null; brand?: string | null; capacity?: string | null }> | null }>;
 };
 type ImportLine = GoodsReceiptWarehouseImportInput["lines"][number];
+type ProductSuggestion = { code: string; unitsPerBox: number; boxes: number; looseUnits: number; totalUnits: number };
 
 function splitProductDescription(description: string | null | undefined) {
   const source = description?.trim() || "Modelo sin nombre";
@@ -35,7 +36,30 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<Record<number, ProductSuggestion>>({});
+  const [lookupDone, setLookupDone] = useState(false);
   const totalUnits = useMemo(() => lines.reduce((sum, line) => sum + line.quantity, 0), [lines]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSuggestions() {
+      const results = await Promise.all(lines.map((line) => getWarehouseProductSuggestionAction({ brand: line.brand, name: line.name, capacity: line.capacity, color: line.color })));
+      if (cancelled) return;
+      const found: Record<number, ProductSuggestion> = {};
+      results.forEach((result, index) => {
+        if (result.success && result.matchCount === 1 && result.data) found[index] = result.data;
+      });
+      setSuggestions(found);
+      setLines((current) => current.map((line, index) => {
+        const suggestion = found[index];
+        if (!suggestion) return line;
+        return { ...line, code: line.code || suggestion.code, unitsPerBox: suggestion.unitsPerBox };
+      }));
+      setLookupDone(true);
+    }
+    void loadSuggestions();
+    return () => { cancelled = true; };
+  }, [receipt.id]);
 
   const updateLine = (index: number, field: "code" | "unitsPerBox", value: string) => {
     setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: field === "unitsPerBox" ? Math.max(1, Number(value) || 1) : value } : line));
@@ -69,9 +93,9 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
         </div>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="overflow-y-auto p-4 sm:p-6">
-            <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-3 text-xs text-indigo-900">Completa el código Kaptas y las unidades que trae una caja. La cantidad recibida está bloqueada y se distribuirá automáticamente entre cajas y unidades sueltas.</div>
+            <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-3 text-xs text-indigo-900">El sistema busca productos existentes por marca, modelo, capacidad y color. Si encuentra uno, completa automáticamente el Kaptas y las unidades por caja; la cantidad recibida permanece bloqueada y se sumará al stock existente.</div>
             {error && <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
-            <div className="space-y-3">{lines.map((line, index) => { const boxes = Math.floor(line.quantity / line.unitsPerBox); const looseUnits = line.quantity % line.unitsPerBox; return <div key={`${line.itemId}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs"><div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-500">Producto identificado</p><p className="mt-1 text-sm font-bold text-slate-800">{line.brand || "Marca pendiente"} {line.name} {line.capacity && <span className="font-semibold text-slate-500">{line.capacity}</span>}</p></div>{line.color ? <span className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{line.color}</span> : null}</div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-semibold text-slate-700">Marca<input required value={line.brand} onChange={(event) => updateIdentity(index, "brand", event.target.value)} placeholder="Ej. Oukitel" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Modelo<input required value={line.name} onChange={(event) => updateIdentity(index, "name", event.target.value)} placeholder="Ej. WP210" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">RAM y almacenamiento<input value={line.capacity} onChange={(event) => updateIdentity(index, "capacity", event.target.value)} placeholder="Ej. 12+512GB" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Color <span className="font-normal text-slate-400">(opcional)</span><input value={line.color ?? ""} onChange={(event) => updateIdentity(index, "color", event.target.value)} placeholder="Déjalo vacío si no aplica" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700 sm:col-span-2 lg:col-span-1">Código Kaptas<input required value={line.code} onChange={(event) => updateLine(index, "code", event.target.value)} placeholder="Ej. SAM-A16-AZ" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Unidades por caja<input required type="number" min={1} value={line.unitsPerBox} onChange={(event) => updateLine(index, "unitsPerBox", event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><div className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="block text-[10px] font-semibold uppercase text-slate-500">Recibido</span><strong className="text-slate-800">{line.quantity} uds</strong><span className="block text-[10px] text-slate-500">{boxes} cajas · {looseUnits} sueltas</span></div></div></div>; })}</div>
+            <div className="space-y-3">{lines.map((line, index) => { const boxes = Math.floor(line.quantity / line.unitsPerBox); const looseUnits = line.quantity % line.unitsPerBox; const suggestion = suggestions[index]; return <div key={`${line.itemId}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs"><div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-500">Producto identificado</p><p className="mt-1 text-sm font-bold text-slate-800">{line.brand || "Marca pendiente"} {line.name} {line.capacity && <span className="font-semibold text-slate-500">{line.capacity}</span>}</p></div>{line.color ? <span className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{line.color}</span> : null}</div>{suggestion ? <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span><strong>Ya existe en almacén.</strong> Código <strong>{suggestion.code}</strong> · {suggestion.totalUnits.toLocaleString("es-DO")} uds actuales. Esta importación se sumará a ese producto.</span></div> : lookupDone ? <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">No hay una coincidencia exacta; completa el código Kaptas para crear o vincular el producto.</div> : null}<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="text-xs font-semibold text-slate-700">Marca<input required value={line.brand} onChange={(event) => updateIdentity(index, "brand", event.target.value)} placeholder="Ej. Oukitel" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Modelo<input required value={line.name} onChange={(event) => updateIdentity(index, "name", event.target.value)} placeholder="Ej. WP210" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">RAM y almacenamiento<input value={line.capacity} onChange={(event) => updateIdentity(index, "capacity", event.target.value)} placeholder="Ej. 12+512GB" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Color <span className="font-normal text-slate-400">(opcional)</span><input value={line.color ?? ""} onChange={(event) => updateIdentity(index, "color", event.target.value)} placeholder="Déjalo vacío si no aplica" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700 sm:col-span-2 lg:col-span-1">Código Kaptas<input required value={line.code} onChange={(event) => updateLine(index, "code", event.target.value)} placeholder="Ej. SAM-A16-AZ" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Unidades por caja<input required type="number" min={1} value={line.unitsPerBox} onChange={(event) => updateLine(index, "unitsPerBox", event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><div className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="block text-[10px] font-semibold uppercase text-slate-500">Recibido</span><strong className="text-slate-800">{line.quantity} uds</strong><span className="block text-[10px] text-slate-500">{boxes} cajas · {looseUnits} sueltas</span></div></div></div>; })}</div>
           </div>
           <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end sm:px-6"><button type="button" onClick={onClose} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Cancelar</button><button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#5750f1] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 disabled:opacity-50">{saving ? "Importando..." : <><CheckCircle2 className="h-4 w-4" /> Crear productos y agregar cantidades</>}</button></div>
         </form>

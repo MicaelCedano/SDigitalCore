@@ -13,6 +13,7 @@ import {
 } from "@/lib/validation/goods-receipt";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 /**
  * Genera un número de folio correlativo único (Ej: REC-20260807-001)
@@ -27,6 +28,31 @@ function normalizeReceiptText(value: string | null | undefined) {
 function normalizedKey(value: string | null | undefined) {
   return normalizeReceiptText(value).toLocaleLowerCase("es");
 }
+
+function normalizedColorKey(value: string | null | undefined) {
+  const key = normalizedKey(value).replace(/\s+/g, " ");
+  const aliases: Record<string, string> = {
+    black: "black", negro: "black",
+    gray: "gray", grey: "gray", gris: "gray",
+    white: "white", blanco: "white",
+    blue: "blue", azul: "blue",
+    green: "green", verde: "green",
+    orange: "orange", naranja: "orange",
+    red: "red", rojo: "red",
+    purple: "purple", morado: "purple", violeta: "purple", violet: "purple",
+    pink: "pink", rosado: "pink", rosa: "pink",
+    gold: "gold", dorado: "gold",
+    silver: "silver", plateado: "silver",
+  };
+  return aliases[key] || key;
+}
+
+const warehouseProductIdentitySchema = z.object({
+  brand: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  capacity: z.string().trim().optional().default(""),
+  color: z.string().trim().optional().default(""),
+});
 
 async function autoIndexCatalogModels(models: string[]) {
   try {
@@ -298,6 +324,42 @@ export async function getGoodsReceiptByIdAction(id: string) {
     return { success: true, data: receipt };
   } catch (error: any) {
     return { success: false, error: "Error al cargar el recibo" };
+  }
+}
+
+export async function getWarehouseProductSuggestionAction(input: unknown) {
+  try {
+    await requirePermission("warehouse.read");
+    const identity = warehouseProductIdentitySchema.parse(input);
+    const candidates = await prisma.warehouseProduct.findMany({
+      where: {
+        status: "ACTIVE",
+        brand: { equals: identity.brand, mode: "insensitive" },
+        name: { equals: identity.name, mode: "insensitive" },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+    });
+    const matches = candidates.filter((product) =>
+      normalizedKey(product.capacity) === normalizedKey(identity.capacity) &&
+      normalizedColorKey(product.color) === normalizedColorKey(identity.color),
+    );
+    if (matches.length !== 1) return { success: true, data: null, matchCount: matches.length };
+    const product = matches[0];
+    return {
+      success: true,
+      data: {
+        code: product.code,
+        unitsPerBox: product.unitsPerBox,
+        boxes: product.boxes,
+        looseUnits: product.looseUnits,
+        totalUnits: product.totalUnits,
+      },
+      matchCount: 1,
+    };
+  } catch (error) {
+    console.error("Error al buscar producto existente para importar recibo:", error);
+    return { success: false, data: null, matchCount: 0 };
   }
 }
 

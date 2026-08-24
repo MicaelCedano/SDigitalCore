@@ -47,3 +47,6 @@ ALTER TABLE "warehouse_receipt_import_line"
   FOREIGN KEY ("import_id") REFERENCES "warehouse_receipt_import"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT "warehouse_receipt_import_line_product_id_fkey"
   FOREIGN KEY ("product_id") REFERENCES "warehouse_product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "warehouse_receipt_import" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "warehouse_receipt_import_line" ENABLE ROW LEVEL SECURITY;
