@@ -20,6 +20,7 @@ import {
   uploadDevicePhotosAction,
 } from "../actions/device-photos";
 import { compressImage } from "@/lib/image-compression";
+import { cacheDevicePhotos, getCachedDevicePhotos, clearCachedDevicePhotos } from "../lib/photo-cache";
 
 const CHECKLIST_ITEMS = [
   { id: "pantalla", label: "Pantalla & Táctil" },
@@ -71,11 +72,16 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const cached = getCachedDevicePhotos(device.id);
+      if (cached) {
+        setExistingPhotos(cached);
+        return;
+      }
       const res = await getDevicePhotosAction(device.id);
       if (!cancelled && res.success) {
-        setExistingPhotos(
-          (res.data ?? []).flatMap((p) => (p && p.url ? [{ id: p.id, url: p.url }] : []))
-        );
+        const photos = (res.data ?? []).flatMap((p) => (p && p.url ? [{ id: p.id, url: p.url }] : []));
+        setExistingPhotos(photos);
+        cacheDevicePhotos(device.id, photos);
       }
     })();
     return () => {
@@ -173,6 +179,8 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
         setIsLoading(false);
         return;
       }
+      // La caché anterior ya no contiene las fotos recién guardadas.
+      clearCachedDevicePhotos(device.id);
     }
 
     const res = await reviewDeviceAction({
@@ -196,6 +204,7 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
     const res = await deleteDevicePhotoAction(photoId);
     if (res.success) {
       setExistingPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      clearCachedDevicePhotos(device.id);
     } else {
       setError(res.error || "No se pudo eliminar la foto.");
     }

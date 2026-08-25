@@ -113,7 +113,7 @@ export function DefectPhotosUploader({
             className="relative aspect-square rounded-xl border border-slate-200 bg-slate-50 overflow-hidden group shadow-sm"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.url} alt="Defecto existente" className="w-full h-full object-cover" />
+            <img src={photo.url} alt="Defecto existente" loading="lazy" decoding="async" className="w-full h-full object-cover" />
             {onDeleteExistingPhoto && !isUploading && (
               <button
                 type="button"

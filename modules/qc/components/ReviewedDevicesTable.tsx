@@ -21,6 +21,7 @@ import { formatDateTimeRD } from "@/lib/utils/format";
 import { getDeviceHistoryAction } from "../actions/device-history";
 import { updateDeviceAction } from "../actions/device-edit";
 import { useRouter } from "next/navigation";
+import { cacheDevicePhotos, getCachedDevicePhotos } from "../lib/photo-cache";
 
 export type ReviewedInspection = {
   id: string;
@@ -194,8 +195,13 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
     let cancelled = false;
     setHistory(null);
     (async () => {
+      const cachedPhotos = getCachedDevicePhotos(selected.device.id);
       const res = await getDeviceHistoryAction(selected.device.id);
-      if (!cancelled && res.success && res.data) setHistory(res.data);
+      if (!cancelled && res.success && res.data) {
+        const photos = cachedPhotos ?? res.data.photos;
+        if (!cachedPhotos) cacheDevicePhotos(selected.device.id, photos);
+        setHistory({ ...res.data, photos });
+      }
     })();
     return () => {
       cancelled = true;
@@ -401,7 +407,7 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
                         className="aspect-square overflow-hidden rounded-xl border border-[#e4e7ec] bg-[#f9fafb] hover:border-[#4f46e5] transition-all"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={photo.url} alt="Foto del equipo" className="h-full w-full object-cover" />
+                        <img src={photo.url} alt="Foto del equipo" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       </button>
                     ))}
                   </div>
