@@ -107,6 +107,7 @@
 
 @media print {
   @page {
+    size: A4 portrait;
     margin: 8mm;
   }
 
@@ -178,12 +179,18 @@
   }
 
   body.invoice-printing #invoice-print-root .invoice-document-header,
-  body.invoice-printing #invoice-print-root .invoice-client-info,
-  body.invoice-printing #invoice-print-root .invoice-closing,
   body.invoice-printing #invoice-print-root .invoice-delivery-terms,
   body.invoice-printing #invoice-print-root .invoice-signatures {
     break-inside: avoid-page !important;
     page-break-inside: avoid !important;
+  }
+
+  /* Mantener el inicio del documento unido, pero permitir que la tabla y el
+     cierre continúen en la página siguiente sin dejar una página casi vacía. */
+  body.invoice-printing #invoice-print-root .invoice-document-header,
+  body.invoice-printing #invoice-print-root .invoice-client-info {
+    break-after: avoid-page !important;
+    page-break-after: avoid !important;
   }
 
   body.invoice-printing #invoice-print-root .invoice-document-header {
@@ -228,6 +235,10 @@
 
   body.invoice-printing #invoice-print-root .invoice-items-table {
     overflow: visible !important;
+    break-before: avoid-page !important;
+    break-inside: auto !important;
+    page-break-before: avoid !important;
+    page-break-inside: auto !important;
   }
 
   body.invoice-printing #invoice-print-root .invoice-items-table thead {
@@ -235,8 +246,13 @@
   }
 
   body.invoice-printing #invoice-print-root .invoice-items-table tr {
-    break-inside: avoid-page !important;
-    page-break-inside: avoid !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  body.invoice-printing #invoice-print-root .invoice-items-table td {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
 
   body.invoice-printing #invoice-print-root .invoice-signatures {
