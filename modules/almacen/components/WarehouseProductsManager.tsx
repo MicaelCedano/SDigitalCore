@@ -531,7 +531,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
               <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Cajas Iniciales
+                    Cajas en stock
                   </label>
                   <input
                     type="number"
