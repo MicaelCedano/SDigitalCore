@@ -416,7 +416,7 @@ export async function getPenaltiesAction(): Promise<
   try {
     await requirePenaltyAdmin();
 
-    const [penalties, summary, techniciansRaw, techOptions] = await Promise.all([
+    const [penalties, summary, techniciansRaw] = await Promise.all([
       prisma.penalty.findMany({
         orderBy: { createdAt: "desc" },
         take: 200,
@@ -446,27 +446,20 @@ export async function getPenaltiesAction(): Promise<
           name: true,
           username: true,
           roleCode: true,
-          qcInspections: {
-            where: { status: "COMPLETED" },
-            select: { id: true },
-          },
-          penaltiesReceived: {
-            where: { status: "ACTIVE", sourceSystem: null },
-            select: { id: true },
+          _count: {
+            select: {
+              qcInspections: { where: { status: "COMPLETED" } },
+              penaltiesReceived: { where: { status: "ACTIVE", sourceSystem: null } },
+            },
           },
         },
-      }),
-      prisma.user.findMany({
-        where: { roleCode: { in: ["QC", "TECNICO"] }, status: "ACTIVE" },
-        select: { id: true, name: true, username: true, roleCode: true },
-        orderBy: { name: "asc" },
       }),
     ]);
 
     const technicians = techniciansRaw
       .map((t) => {
-        const totalReviewed = t.qcInspections.length;
-        const totalPenalties = t.penaltiesReceived.length;
+        const totalReviewed = t._count.qcInspections;
+        const totalPenalties = t._count.penaltiesReceived;
         const percentage = totalReviewed > 0 ? Number(((totalPenalties / totalReviewed) * 100).toFixed(2)) : 0;
         return {
           id: t.id,
@@ -496,7 +489,9 @@ export async function getPenaltiesAction(): Promise<
         },
         penalties: penalties.map((p) => ({ ...p, monto: Number(p.monto) })),
         technicians,
-        techOptions: techOptions.map((t) => ({ ...t, name: t.name ?? t.username ?? t.id })),
+        techOptions: techniciansRaw
+          .toSorted((a, b) => (a.name ?? a.username ?? a.id).localeCompare(b.name ?? b.username ?? b.id, "es"))
+          .map((t) => ({ id: t.id, name: t.name ?? t.username ?? t.id, username: t.username, roleCode: t.roleCode })),
       },
     };
   } catch (error) {

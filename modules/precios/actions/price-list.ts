@@ -46,24 +46,26 @@ export async function getPriceListWorkspaceAction(query = "") {
     await requirePermission("precios.read");
     const brands = await ensureBrands();
     const term = query.trim();
-    const inventory = await prisma.priceListItem.findMany({
-      where: {
-        status: "ACTIVE",
-        ...(term ? {
-          OR: [
-            { brand: { contains: term, mode: "insensitive" } },
-            { model: { contains: term, mode: "insensitive" } },
-            { capacity: { contains: term, mode: "insensitive" } },
-          ],
-        } : {}),
-      },
-      orderBy: [{ brand: "asc" }, { model: "asc" }],
-    });
-    const activeList = await prisma.priceListItem.findMany({
-      where: { status: "ACTIVE", isActive: true },
-      orderBy: { sortOrder: "asc" },
-    });
-    const logoSetting = await prisma.priceListSetting.findUnique({ where: { key: "logo" } });
+    const [inventory, activeList, logoSetting] = await Promise.all([
+      prisma.priceListItem.findMany({
+        where: {
+          status: "ACTIVE",
+          ...(term ? {
+            OR: [
+              { brand: { contains: term, mode: "insensitive" } },
+              { model: { contains: term, mode: "insensitive" } },
+              { capacity: { contains: term, mode: "insensitive" } },
+            ],
+          } : {}),
+        },
+        orderBy: [{ brand: "asc" }, { model: "asc" }],
+      }),
+      prisma.priceListItem.findMany({
+        where: { status: "ACTIVE", isActive: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+      prisma.priceListSetting.findUnique({ where: { key: "logo" } }),
+    ]);
     return { success: true, data: { brands, inventory, activeList, logo: typeof logoSetting?.value === "string" ? logoSetting.value : null } };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "No se pudo cargar la lista de precios" };

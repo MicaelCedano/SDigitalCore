@@ -219,6 +219,7 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([module, createdAt])
+  @@index([action, createdAt])
   @@index([entityType, entityId])
   @@map("audit_log")
 }
@@ -276,6 +277,7 @@ model AccessRequest {
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
 
+  @@index([status, createdAt])
   @@map("access_request")
 }
 
@@ -697,6 +699,7 @@ model WalletLedgerEntry {
   @@index([walletId, occurredAt])
   @@index([accountId, occurredAt])
   @@index([batchId])
+  @@index([status, redeemedAt, createdAt])
   @@map("wallet_ledger_entry")
 }
 
@@ -987,6 +990,7 @@ model WarrantyCase {
   @@index([clientName])
   @@index([customerId])
   @@index([archivedAt])
+  @@index([archivedAt, status, createdAt])
   @@map("warranty_case")
 }
 
@@ -1229,6 +1233,7 @@ model GoodsReceipt {
   items GoodsReceiptItem[]
   warehouseImports WarehouseReceiptImport[]
 
+  @@index([status, receivedAt])
   @@map("goods_receipt")
 }
 
@@ -1467,6 +1472,7 @@ model WarehouseRequest {
 
   items WarehouseRequestItem[]
 
+  @@index([status, createdAt])
   @@map("warehouse_request")
 }
 
@@ -1504,6 +1510,8 @@ model PriceListItem {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  @@index([status, updatedAt])
+  @@index([status, isActive, sortOrder])
   @@map("price_list_item")
 }
 
@@ -1560,6 +1568,8 @@ model Invoice {
 
   items InvoiceItem[]
 
+  @@index([createdAt])
+  @@index([status, createdAt])
   @@map("invoice")
 }
 
