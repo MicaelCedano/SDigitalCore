@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/helpers";
 import { createServiceClient } from "@/lib/storage";
 
 const BUCKET = "defectos-equipos";
+const DRIVE_PREFIX = "drive:";
 
 /**
  * Historial completo de un equipo: todas sus inspecciones + fotos de defectos
@@ -44,6 +45,13 @@ export async function getDeviceHistoryAction(deviceId: string) {
       photosWithUrl = (
         await Promise.all(
           photos.map(async (photo) => {
+            if (photo.storagePath.startsWith(DRIVE_PREFIX)) {
+              const fileId = photo.storagePath.slice(DRIVE_PREFIX.length);
+              return {
+                id: photo.id,
+                url: `https://drive.google.com/uc?export=view&id=${encodeURIComponent(fileId)}`,
+              };
+            }
             const { data } = await supabase.storage.from(BUCKET).createSignedUrl(photo.storagePath, 3600);
             return data?.signedUrl ? { id: photo.id, url: data.signedUrl } : null;
           })
