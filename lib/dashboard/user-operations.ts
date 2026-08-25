@@ -182,7 +182,7 @@ export const getUserOperationsOverview = cache(
       fetchers.push(
         (async () => {
           try {
-            const [recentInvoices, todayInvoices, priceListTotalCount, priceListFeatured] = await Promise.all([
+            const [recentInvoices, todayInvoiceStats, priceListTotalCount, priceListFeatured] = await Promise.all([
               prisma.invoice.findMany({
                 orderBy: { createdAt: "desc" },
                 take: 5,
@@ -197,9 +197,10 @@ export const getUserOperationsOverview = cache(
                   createdAt: true,
                 },
               }),
-              prisma.invoice.findMany({
+              prisma.invoice.aggregate({
                 where: { createdAt: { gte: todayStart } },
-                select: { total: true },
+                _count: { _all: true },
+                _sum: { total: true },
               }),
               prisma.priceListItem.count({
                 where: { status: "ACTIVE" },
@@ -219,8 +220,8 @@ export const getUserOperationsOverview = cache(
               }),
             ]);
 
-            const invoicesCountToday = todayInvoices.length;
-            const totalAmountToday = todayInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+            const invoicesCountToday = todayInvoiceStats._count._all;
+            const totalAmountToday = Number(todayInvoiceStats._sum.total ?? 0);
 
             overview.sales = {
               recentInvoices,
@@ -518,10 +519,11 @@ export const getUserOperationsOverview = cache(
       fetchers.push(
         (async () => {
           try {
-            const [pendingJobs, completedCount, recentJobs] = await Promise.all([
-              prisma.repairJob.findMany({
+            const [pendingJobStats, completedCount, recentJobs] = await Promise.all([
+              prisma.repairJob.aggregate({
                 where: { technicianId: userId, status: "PENDING_PAYMENT" },
-                select: { montoTotal: true },
+                _count: { _all: true },
+                _sum: { montoTotal: true },
               }),
               prisma.repairJob.count({
                 where: { technicianId: userId, status: "PAID" },
@@ -542,9 +544,9 @@ export const getUserOperationsOverview = cache(
             ]);
 
             overview.repairs = {
-              pendingApprovalCount: pendingJobs.length,
+              pendingApprovalCount: pendingJobStats._count._all,
               completedCount,
-              totalPendingAmount: pendingJobs.reduce((sum, job) => sum + Number(job.montoTotal), 0),
+              totalPendingAmount: Number(pendingJobStats._sum.montoTotal ?? 0),
               recentJobs: recentJobs.map((j) => ({
                 id: j.id,
                 jobCode: j.jobCode,

@@ -25,6 +25,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     qcBatchesPending,
     pendingQcImeiRequests,
     walletRedemptionsPending,
+    assignmentAudits,
   ] = await Promise.all([
     prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
     prisma.warehouseRequest.findMany({
@@ -188,6 +189,12 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         },
       },
     }),
+    prisma.auditLog.findMany({
+      where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+      select: { entityId: true, action: true, createdAt: true, afterData: true },
+    }),
   ]);
 
   const warrantyCounts = warrantyGroupStats.reduce<Record<string, number>>(
@@ -206,12 +213,6 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
 
   // Las porciones QC se envían y se pagan por revisor. Se proyectan desde la
   // auditoría para no bloquear el dashboard hasta que termine el lote global.
-  const assignmentAudits = await prisma.auditLog.findMany({
-    where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
-    orderBy: { createdAt: "desc" },
-    take: 60,
-    select: { entityId: true, action: true, createdAt: true, afterData: true },
-  });
   const latestAssignments = new Map<string, { batchId: string; reviewerId: string; reviewerName: string; totalDevices: number; reviewedDevices: number; submittedAt: Date }>();
   const seenAssignments = new Set<string>();
   for (const audit of assignmentAudits) {
