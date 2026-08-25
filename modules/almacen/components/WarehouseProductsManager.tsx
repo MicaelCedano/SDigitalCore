@@ -26,6 +26,10 @@ import {
   EyeOff,
 } from "lucide-react";
 
+function getDisplayedTotalUnits(product: { boxes?: number | null; unitsPerBox?: number | null; looseUnits?: number | null }) {
+  return (product.boxes || 0) * (product.unitsPerBox || 1) + (product.looseUnits || 0);
+}
+
 export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: string }) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,10 +151,10 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
   const totalBoxes = products.reduce((acc, p) => acc + (p.boxes || 0), 0);
   const totalLooseUnits = products.reduce((acc, p) => acc + (p.looseUnits || 0), 0);
-  const totalUnits = products.reduce((acc, p) => acc + (p.totalUnits || 0), 0);
+  const totalUnits = products.reduce((acc, p) => acc + getDisplayedTotalUnits(p), 0);
   const visibleProducts = showOutOfStock
     ? products
-    : products.filter((p) => (p.boxes || 0) > 0 || (p.totalUnits || 0) > 0);
+    : products.filter((p) => getDisplayedTotalUnits(p) > 0);
 
   return (
     <div className="space-y-6">
@@ -271,7 +275,8 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
           <>
           <div className="md:hidden divide-y divide-slate-100">
             {visibleProducts.map((p) => {
-              const isOutOfStock = (p.totalUnits || 0) <= 0;
+              const displayedTotalUnits = getDisplayedTotalUnits(p);
+              const isOutOfStock = displayedTotalUnits <= 0;
 
               return (
               <article key={p.id} className={`p-4 space-y-3 ${isOutOfStock ? "bg-red-50/70" : ""}`}>
@@ -313,7 +318,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                   </div>
                   <div className={`rounded-lg border px-3 py-2 ${isOutOfStock ? "border-red-200 bg-red-100" : "border-indigo-200 bg-indigo-50"}`}>
                     <span className={`block font-semibold ${isOutOfStock ? "text-red-700" : "text-indigo-700"}`}>Total unidades</span>
-                    <strong className={`mt-0.5 block text-sm ${isOutOfStock ? "text-red-700" : "text-[#5750f1]"}`}>{p.totalUnits || 0}</strong>
+                    <strong className={`mt-0.5 block text-sm ${isOutOfStock ? "text-red-700" : "text-[#5750f1]"}`}>{displayedTotalUnits}</strong>
                   </div>
                   <div className="rounded-lg bg-slate-50 px-3 py-2 text-slate-600">
                     <span className="block font-semibold">Por caja</span>
@@ -345,7 +350,8 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {visibleProducts.map((p) => {
-                  const isOutOfStock = (p.totalUnits || 0) <= 0;
+                  const displayedTotalUnits = getDisplayedTotalUnits(p);
+                  const isOutOfStock = displayedTotalUnits <= 0;
 
                   return (
                   <tr key={p.id} className={`transition-colors ${isOutOfStock ? "bg-red-50/70 hover:bg-red-100/80" : "hover:bg-slate-50/80"}`}>
@@ -393,7 +399,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <span className={`font-extrabold px-2.5 py-1 rounded-lg border ${isOutOfStock ? "text-red-700 bg-red-100 border-red-200" : "text-[#5750f1] bg-[#5750f1]/10 border-[#5750f1]/20"}`}>
-                        {p.totalUnits} uds
+                        {displayedTotalUnits} uds
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
