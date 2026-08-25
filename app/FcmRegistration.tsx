@@ -15,11 +15,15 @@ function routeFromDeepLink(rawUrl: string) {
     const url = new URL(rawUrl);
     if (url.protocol !== "sdigitalcore:" || url.hostname !== "notification") return null;
     const route = url.searchParams.get("route");
-    if (!route || !route.startsWith("/") || route.startsWith("//")) return null;
+    if (!route || !isSafeInternalRoute(route)) return null;
     return route;
   } catch {
     return null;
   }
+}
+
+function isSafeInternalRoute(route: string) {
+  return route.startsWith("/") && !route.startsWith("//");
 }
 
 function describeError(error: unknown) {
@@ -46,11 +50,14 @@ export function FcmRegistration() {
   const pathname = usePathname();
   const router = useRouter();
   const pendingRoute = useRef<string | null>(null);
+  const seenDeepLinks = useRef(new Set<string>());
+  const [routeSignal, setRouteSignal] = useState(0);
 
   const navigateToNotificationRoute = useCallback(() => {
     const route = pendingRoute.current;
     if (!route || pathname === "/login" || pathname === "/recuperar-password" || pathname === "/solicitar-acceso") return;
     pendingRoute.current = null;
+    console.info("[DeepLink] Navegando a la ruta de la notificación", route);
     router.replace(route);
   }, [pathname, router]);
 
@@ -60,31 +67,41 @@ export function FcmRegistration() {
     let disposed = false;
 
     void import("@tauri-apps/plugin-deep-link").then(async ({ getCurrent, onOpenUrl }) => {
-      const consume = (urls: string[]) => {
-        const route = urls.map(routeFromDeepLink).find((value): value is string => Boolean(value));
-        if (!route) return;
+      const consume = (urls: string[], source: "initial" | "event") => {
+        const entry = urls
+          .map((rawUrl) => ({ rawUrl, route: routeFromDeepLink(rawUrl) }))
+          .find((value): value is { rawUrl: string; route: string } => Boolean(value.route));
+        if (!entry || seenDeepLinks.current.has(entry.rawUrl)) return;
+        seenDeepLinks.current.add(entry.rawUrl);
+        if (seenDeepLinks.current.size > 20) {
+          const oldest = seenDeepLinks.current.values().next().value;
+          if (oldest) seenDeepLinks.current.delete(oldest);
+        }
+        const route = entry.route;
         pendingRoute.current = route;
-        navigateToNotificationRoute();
+        console.info(`[DeepLink] Ruta recibida (${source})`, route);
+        setRouteSignal((signal) => signal + 1);
       };
       const initialUrls = await getCurrent();
-      if (initialUrls) consume(initialUrls);
-        const listener = await onOpenUrl(consume);
-        if (disposed) {
-          listener();
-        } else {
-          unlisten = listener;
-        }
+      if (disposed) return;
+      if (initialUrls) consume(initialUrls, "initial");
+      const listener = await onOpenUrl((urls) => consume(urls, "event"));
+      if (disposed) {
+        listener();
+      } else {
+        unlisten = listener;
+      }
     }).catch((error) => console.error("[FCM] No se pudo preparar la navegación profunda", error));
 
     return () => {
       disposed = true;
       unlisten?.();
     };
-  }, [navigateToNotificationRoute]);
+  }, []);
 
   useEffect(() => {
     navigateToNotificationRoute();
-  }, [navigateToNotificationRoute]);
+  }, [navigateToNotificationRoute, routeSignal]);
 
   const registerDevice = useCallback(async () => {
     if (!isAndroidTauri()) return;

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         prepareNotificationIntent(intent)
@@ -16,19 +17,28 @@ class MainActivity : TauriActivity() {
 
     override fun onNewIntent(intent: Intent) {
         prepareNotificationIntent(intent)
+        setIntent(intent)
         super.onNewIntent(intent)
     }
 
     private fun prepareNotificationIntent(intent: Intent?) {
-        val route = intent?.getStringExtra("route")
-            ?: intent?.getStringExtra("gcm.n.route")
-            ?: intent?.data?.getQueryParameter("route")
+        val notificationIntent = intent ?: return
+        val route = notificationIntent.getStringExtra("route")
+            ?: notificationIntent.getStringExtra("data.route")
+            ?: notificationIntent.getStringExtra("gcm.n.route")
+            ?: notificationIntent.data?.getQueryParameter("route")
             ?: return
-        if (!route.startsWith("/") || route.startsWith("//")) return
-        intent.data = Uri.parse("sdigitalcore://notification")
+        if (!route.startsWith("/") || route.startsWith("//")) {
+            Log.w("NotificationTap", "Se rechazo una ruta no interna")
+            return
+        }
+
+        notificationIntent.action = Intent.ACTION_VIEW
+        notificationIntent.data = Uri.parse("sdigitalcore://notification")
             .buildUpon()
             .appendQueryParameter("route", route)
             .build()
+        Log.i("NotificationTap", "Ruta FCM preparada para Tauri")
     }
 
     private fun requestLocationPermissionIfNeeded() {
