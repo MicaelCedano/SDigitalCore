@@ -60,6 +60,7 @@ export function GpsTracker({
   const start = () => {
     if (!navigator.geolocation) {
       setErrorStatus("Este dispositivo o navegador no soporta geolocalización.");
+      console.warn("[GPS] Geolocalización no disponible en este dispositivo");
       return;
     }
     if (watchId.current !== null) return;
@@ -67,6 +68,7 @@ export function GpsTracker({
     window.localStorage.setItem(trackingStorageKey(shipmentId), "active");
     setTracking(true);
     setMessage("Buscando señal satelital GPS…");
+    console.info("[GPS] Iniciando rastreo automático", shipmentId);
 
     watchId.current = navigator.geolocation.watchPosition(
       async (position) => {
@@ -133,6 +135,7 @@ export function GpsTracker({
         } else if (error.code === error.TIMEOUT) {
           errorMsg = "Tiempo de espera de GPS agotado. Reintentando...";
         }
+        console.warn("[GPS] No se pudo obtener la ubicación", error.code);
         setErrorStatus(errorMsg);
       },
       { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 }
@@ -146,13 +149,10 @@ export function GpsTracker({
       window.localStorage.removeItem(trackingStorageKey(shipmentId));
       return;
     }
-    const resumeTimer =
-      window.localStorage.getItem(trackingStorageKey(shipmentId)) === "active"
-        ? window.setTimeout(start, 0)
-        : undefined;
+    const autoStartTimer = window.setTimeout(start, 0);
 
     return () => {
-      if (resumeTimer) window.clearTimeout(resumeTimer);
+      window.clearTimeout(autoStartTimer);
       if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
       watchId.current = null;
     };
@@ -209,16 +209,16 @@ export function GpsTracker({
             >
               Detener GPS
             </button>
-          ) : (
+          ) : errorStatus ? (
             <button
               type="button"
               onClick={start}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition"
             >
               <Radio className="h-4 w-4" />
-              Activar GPS en este móvil
+              Reintentar GPS
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
