@@ -155,6 +155,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
   const visibleProducts = showOutOfStock
     ? products
     : products.filter((p) => getDisplayedTotalUnits(p) > 0);
+  const filteredTotalUnits = visibleProducts.reduce((acc, p) => acc + getDisplayedTotalUnits(p), 0);
 
   return (
     <div className="space-y-6">
@@ -427,6 +428,14 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="flex flex-col gap-1 border-t border-slate-200 bg-slate-50 px-4 py-3 text-right sm:flex-row sm:items-center sm:justify-end sm:gap-2">
+            <span className="text-xs font-semibold text-slate-500">
+              Total de unidades filtradas{search.trim() ? ` (${search.trim()})` : ""}:
+            </span>
+            <strong className="text-base font-black text-[#5750f1]">
+              {filteredTotalUnits.toLocaleString("es-DO")} uds
+            </strong>
           </div>
           </>
         )}
