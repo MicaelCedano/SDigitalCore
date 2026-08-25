@@ -3,6 +3,8 @@ import { requirePermission } from "@/lib/auth/helpers";
 import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
 import { syncShipmentWorkTasks } from "@/modules/centro-trabajo/integrations/envios";
 import { Prisma, WorkTaskStatus } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 const taskInclude = {
   creator: { select: { name: true, email: true } },
@@ -62,12 +64,19 @@ export async function getWorkCenterData() {
   });
   if (!user) throw new Error("Usuario no encontrado.");
 
-  try {
-    await Promise.all([
-      syncQcWorkTasks(user.id),
-      syncShipmentWorkTasks(user.id),
-    ]);
+  after(async () => {
+    try {
+      await Promise.all([
+        syncQcWorkTasks(user.id),
+        syncShipmentWorkTasks(user.id),
+      ]);
+      revalidatePath("/centro-trabajo");
+    } catch (error) {
+      console.error("[centro-trabajo] No se pudo actualizar la proyección automática:", error);
+    }
+  });
 
+  try {
     const scope = user.roleCode === "ADMIN"
       ? {}
       : {

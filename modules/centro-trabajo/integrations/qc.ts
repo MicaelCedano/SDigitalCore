@@ -17,30 +17,31 @@ type QcBatchForTasks = {
  */
 export async function syncQcWorkTasks(actorId: string) {
   const qcDeadline = nextMondayDeadline();
-  const batches = await prisma.qcRevisionBatch.findMany({
-    where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW"] } },
-    select: {
-      id: true,
-      batchNumber: true,
-      status: true,
-      totalDevices: true,
-      reviewedDevices: true,
-      createdAt: true,
-      devices: {
-        select: {
-          assignedToId: true,
-          inspections: {
-            where: { status: "COMPLETED" },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { status: true, createdAt: true },
+  const [batches, admin] = await Promise.all([
+    prisma.qcRevisionBatch.findMany({
+      where: { status: { in: ["PENDING_REVIEW", "IN_REVIEW"] } },
+      select: {
+        id: true,
+        batchNumber: true,
+        status: true,
+        totalDevices: true,
+        reviewedDevices: true,
+        createdAt: true,
+        devices: {
+          select: {
+            assignedToId: true,
+            inspections: {
+              where: { status: "COMPLETED" },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { status: true, createdAt: true },
+            },
           },
         },
       },
-    },
-  });
-
-  const admin = await prisma.user.findFirst({ where: { roleCode: "ADMIN", status: "ACTIVE" }, select: { id: true }, orderBy: { createdAt: "asc" } });
+    }),
+    prisma.user.findFirst({ where: { roleCode: "ADMIN", status: "ACTIVE" }, select: { id: true }, orderBy: { createdAt: "asc" } }),
+  ]);
   const creatorId = admin?.id ?? actorId;
   const desired = new Set<string>();
 
@@ -48,7 +49,7 @@ export async function syncQcWorkTasks(actorId: string) {
     const collaboratorIds = [...new Set(batch.devices.map((device) => device.assignedToId).filter((id): id is string => Boolean(id)))];
     const globalKey = `${batch.id}:global`;
     desired.add(globalKey);
-    await upsertQcTask({
+    const globalTaskPromise = upsertQcTask({
       sourceType: "qc_revision_batch_global",
       sourceId: batch.id,
       assigneeId: null,
@@ -65,15 +66,19 @@ export async function syncQcWorkTasks(actorId: string) {
       sourceUrl: `/qc/lotes/${batch.id}`,
     });
 
+    const [existingTasks] = await Promise.all([
+      prisma.workTask.findMany({
+        where: {
+          sourceType: "qc_revision_batch_assigned",
+          sourceId: batch.id,
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+        },
+        select: { assigneeId: true, createdAt: true },
+      }),
+      globalTaskPromise,
+    ]);
+
     const byAssignee = new Map<string, { done: number; total: number }>();
-    const existingTasks = await prisma.workTask.findMany({
-      where: {
-        sourceType: "qc_revision_batch_assigned",
-        sourceId: batch.id,
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-      },
-      select: { assigneeId: true, createdAt: true },
-    });
     const taskStartedAt = new Map(
       existingTasks
         .filter((task): task is typeof task & { assigneeId: string } => Boolean(task.assigneeId))
@@ -87,10 +92,10 @@ export async function syncQcWorkTasks(actorId: string) {
       if (device.inspections.some((inspection) => !startedAt || inspection.createdAt >= startedAt)) current.done += 1;
       byAssignee.set(device.assignedToId, current);
     }
-    for (const [assigneeId, progress] of byAssignee) {
+    const assigneeTasks = [...byAssignee.entries()].map(([assigneeId, progress]) => {
       const key = `${batch.id}:${assigneeId}`;
       desired.add(key);
-      await upsertQcTask({
+      return upsertQcTask({
         sourceType: "qc_revision_batch_assigned",
         sourceId: batch.id,
         assigneeId,
@@ -106,16 +111,23 @@ export async function syncQcWorkTasks(actorId: string) {
         sourceCode: batch.batchNumber,
         sourceUrl: `/qc/lotes/${batch.id}`,
       });
-    }
+    });
+    await Promise.all(assigneeTasks);
   }
 
   const existing = await prisma.workTask.findMany({
     where: { sourceType: { in: ["qc_revision_batch_global", "qc_revision_batch_assigned"] }, status: { notIn: ["COMPLETED", "CANCELLED"] } },
     select: { id: true, sourceId: true, sourceType: true, assigneeId: true },
   });
-  for (const task of existing) {
+  const staleTaskIds = existing.filter((task) => {
     const key = `${task.sourceId}:${task.sourceType === "qc_revision_batch_global" ? "global" : task.assigneeId}`;
-    if (!desired.has(key)) await prisma.workTask.update({ where: { id: task.id }, data: { status: "CANCELLED", completedAt: null } });
+    return !desired.has(key);
+  }).map((task) => task.id);
+  if (staleTaskIds.length) {
+    await prisma.workTask.updateMany({
+      where: { id: { in: staleTaskIds }, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      data: { status: "CANCELLED", completedAt: null },
+    });
   }
 }
 
