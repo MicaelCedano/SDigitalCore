@@ -6,6 +6,29 @@ import { logAudit } from "@/lib/audit";
 import { createServiceClient } from "@/lib/storage";
 
 const BUCKET = "defectos-equipos";
+const DRIVE_PREFIX = "drive:";
+
+function driveScriptUrl() {
+  return process.env.QC_GOOGLE_APPS_SCRIPT_URL?.trim() || "";
+}
+
+function driveFileUrl(storagePath: string) {
+  const fileId = storagePath.slice(DRIVE_PREFIX.length);
+  return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(fileId)}`;
+}
+
+async function callDriveScript(payload: Record<string, unknown>) {
+  const url = driveScriptUrl();
+  if (!url) return null;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...payload, token: process.env.QC_GOOGLE_APPS_SCRIPT_TOKEN }),
+  });
+  const data = (await response.json()) as { success?: boolean; error?: string; uploaded?: Array<{ id: string }> };
+  if (!response.ok || !data.success) throw new Error(data.error || "Google Drive rechazó la operación.");
+  return data;
+}
 
 async function ensureBucket(supabase: ReturnType<typeof createServiceClient>) {
   const { data: buckets } = await supabase.storage.listBuckets();
@@ -48,6 +71,36 @@ export async function uploadDevicePhotosAction(formData: FormData) {
 
     const access = await assertDeviceAccess(deviceId, actor.id);
     if (access.error) return { success: false, error: access.error, uploaded: 0 };
+
+    const device = access.device;
+    const imei = String(formData.get("imei") || device?.id || deviceId);
+    const driveFiles = driveScriptUrl()
+      ? await callDriveScript({
+          action: "upload",
+          deviceId,
+          imei,
+          files: await Promise.all(
+            files.map(async (file) => ({
+              base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+              mimeType: file.type || "image/webp",
+              extension: file.type.includes("png") ? "png" : "webp",
+            }))
+          ),
+        })
+      : null;
+
+    if (driveFiles) {
+      for (const file of driveFiles.uploaded ?? []) {
+        await prisma.devicePhoto.create({
+          data: { deviceId, storagePath: `${DRIVE_PREFIX}${file.id}`, createdById: actor.id },
+        });
+      }
+      const uploaded = driveFiles.uploaded?.length ?? 0;
+      await logAudit({ userId: actor.id, action: "device_photo.upload", module: "qc", entityType: "device_unit", entityId: deviceId, afterData: { uploaded, provider: "google_drive" } });
+      return uploaded > 0
+        ? { success: true, uploaded }
+        : { success: false, error: "Google Drive no devolvió archivos subidos.", uploaded: 0 };
+    }
 
     const supabase = createServiceClient();
     await ensureBucket(supabase);
@@ -106,6 +159,9 @@ export async function getDevicePhotosAction(deviceId: string) {
     const withUrls = (
       await Promise.all(
         photos.map(async (photo) => {
+          if (photo.storagePath.startsWith(DRIVE_PREFIX)) {
+            return { ...photo, url: driveFileUrl(photo.storagePath) };
+          }
           const { data } = await supabase.storage.from(BUCKET).createSignedUrl(photo.storagePath, 3600);
           return data?.signedUrl ? { ...photo, url: data.signedUrl } : null;
         })
@@ -138,7 +194,11 @@ export async function deleteDevicePhotoAction(photoId: string) {
     }
 
     const supabase = createServiceClient();
-    await supabase.storage.from(BUCKET).remove([photo.storagePath]);
+    if (photo.storagePath.startsWith(DRIVE_PREFIX)) {
+      await callDriveScript({ action: "delete", fileId: photo.storagePath.slice(DRIVE_PREFIX.length) });
+    } else {
+      await supabase.storage.from(BUCKET).remove([photo.storagePath]);
+    }
     await prisma.devicePhoto.delete({ where: { id: photoId } });
 
     await logAudit({

@@ -163,6 +163,7 @@ export function ReviewDeviceModal({ device, onClose, onSaved }: ReviewDeviceModa
     if (selectedFiles.length > 0) {
       const formData = new FormData();
       formData.set("deviceId", device.id);
+      formData.set("imei", device.imei || device.serialNumber || device.id);
       for (const file of selectedFiles) {
         try {
           const blob = await compressImage(file);
