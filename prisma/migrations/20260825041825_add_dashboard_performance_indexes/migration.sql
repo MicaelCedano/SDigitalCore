@@ -1,5 +1,5 @@
 -- Indices for the most frequent dashboard filters and orderings.
--- Apply manually in the target environment after reviewing with Supabase.
+-- Applied to Supabase project SDigitalCore as migration 20260825041825.
 
 CREATE INDEX IF NOT EXISTS "access_request_status_created_at_idx"
   ON "access_request" ("status", "created_at");

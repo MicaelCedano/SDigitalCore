@@ -63,8 +63,10 @@ export async function getWorkCenterData() {
   if (!user) throw new Error("Usuario no encontrado.");
 
   try {
-    await syncQcWorkTasks(user.id);
-    await syncShipmentWorkTasks(user.id);
+    await Promise.all([
+      syncQcWorkTasks(user.id),
+      syncShipmentWorkTasks(user.id),
+    ]);
 
     const scope = user.roleCode === "ADMIN"
       ? {}
@@ -93,18 +95,20 @@ export async function getWorkCenterData() {
       completedAt: { lt: weekStart },
     };
 
-    const tasks = await prisma.workTask.findMany({
-      where: currentTasksWhere,
-      include: taskInclude,
-      orderBy: [{ status: "asc" }, { dueAt: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
-      take: 100,
-    });
-    const historyTasks = await prisma.workTask.findMany({
-      where: historyTasksWhere,
-      include: taskInclude,
-      orderBy: { completedAt: "desc" },
-      take: 50,
-    });
+    const [tasks, historyTasks] = await Promise.all([
+      prisma.workTask.findMany({
+        where: currentTasksWhere,
+        include: taskInclude,
+        orderBy: [{ status: "asc" }, { dueAt: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
+        take: 100,
+      }),
+      prisma.workTask.findMany({
+        where: historyTasksWhere,
+        include: taskInclude,
+        orderBy: { completedAt: "desc" },
+        take: 50,
+      }),
+    ]);
 
     const [activeUsers, completedToday] = await Promise.all([
       prisma.user.findMany({

@@ -233,16 +233,18 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     });
   }
   const assignmentBatchIds = [...new Set([...latestAssignments.values()].map((item) => item.batchId))];
-  const assignmentBatches = await prisma.qcRevisionBatch.findMany({
-    where: { id: { in: assignmentBatchIds } },
-    select: { id: true, batchNumber: true, supplierName: true },
-  });
-  const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
   const assignmentPaymentKeys = [...latestAssignments.values()].map((item) => `qc-payment:${item.batchId}:${item.reviewerId}`);
-  const paidAssignments = await prisma.walletLedgerEntry.findMany({
-    where: { externalKey: { in: assignmentPaymentKeys }, type: "CREDIT", status: "POSTED" },
-    select: { externalKey: true },
-  });
+  const [assignmentBatches, paidAssignments] = await Promise.all([
+    prisma.qcRevisionBatch.findMany({
+      where: { id: { in: assignmentBatchIds } },
+      select: { id: true, batchNumber: true, supplierName: true },
+    }),
+    prisma.walletLedgerEntry.findMany({
+      where: { externalKey: { in: assignmentPaymentKeys }, type: "CREDIT", status: "POSTED" },
+      select: { externalKey: true },
+    }),
+  ]);
+  const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
   const paidAssignmentKeys = new Set(paidAssignments.map((entry) => entry.externalKey));
   const partialQcBatches: any[] = [];
   for (const assignment of latestAssignments.values()) {
