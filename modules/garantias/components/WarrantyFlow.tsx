@@ -144,6 +144,7 @@ export function WarrantyFlow({
   const [search, setSearch] = useState("");
   const [counterpartyFilter, setCounterpartyFilter] = useState("ALL");
   const [resultFilter, setResultFilter] = useState<"ALL" | "REPAIRED" | "UNREPAIRED">("ALL");
+  const [receiveResult, setReceiveResult] = useState<"REPAIRED" | "UNREPAIRED">("REPAIRED");
   const [activeTab, setActiveTab] = useState<"scan" | "list">("scan");
   const [scanInput, setScanInput] = useState("");
   const [scanMessage, setScanMessage] = useState("");
@@ -282,6 +283,7 @@ export function WarrantyFlow({
       caseCodes: selected,
       counterpartyName: counterparty,
       reason,
+      receiveResult: operation === "receiveTech" ? receiveResult : undefined,
       caseObservations: operation === "receiveTech" ? caseObservations : undefined,
     };
     const result =
@@ -306,6 +308,7 @@ export function WarrantyFlow({
     setCaseObservations({});
     setCounterparty("");
     setResultFilter("ALL");
+    setReceiveResult("REPAIRED");
     setSupplierLocked(false);
     setScanInput("");
     setScanMessage("");
@@ -449,6 +452,22 @@ export function WarrantyFlow({
                 </div>
               )}
             </label>
+            {operation === "receiveTech" && (
+              <label className="text-sm font-semibold text-slate-700">
+                Resultado de la recepción
+                <select
+                  value={receiveResult}
+                  onChange={(event) => setReceiveResult(event.target.value as typeof receiveResult)}
+                  className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
+                >
+                  <option value="REPAIRED">Reparado</option>
+                  <option value="UNREPAIRED">Sin reparar</option>
+                </select>
+                <span className="mt-1.5 block text-[11px] font-normal text-slate-500">
+                  Aplica cuando el equipo quedó en reparación y lo recibes directamente.
+                </span>
+              </label>
+            )}
           </div>
         )}
 
@@ -620,7 +639,7 @@ export function WarrantyFlow({
                     )}
                     {operation === "receiveTech" && item.assignedTechnicianName && (
                       <span className="mt-0.5 block text-[11px] font-medium text-violet-600">
-                        Técnico: {item.assignedTechnicianName} · {item.status === "TECHNICIAN_REPORTED_REPAIRED" ? "reportó reparado" : "reportó sin reparar"}
+                        Técnico: {item.assignedTechnicianName} · {item.status === "TECHNICIAN_REPORTED_REPAIRED" ? "reportó reparado" : item.status === "TECHNICIAN_REPORTED_UNREPAIRED" ? "reportó sin reparar" : "equipo en reparación, pendiente de recepción"}
                       </span>
                     )}
                     {operation === "receiveSupplier" && item.currentSupplierName && (

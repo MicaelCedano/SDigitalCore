@@ -390,8 +390,8 @@ const flowRules: Record<FlowOperation, {
   needsReason: boolean;
 }> = {
   assign: { toStatus: "IN_REPAIR", allowed: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], documentType: "TECHNICIAN_ASSIGNMENT", eventType: "ASSIGNED_TO_TECHNICIAN", needsCounterparty: true, needsReason: false },
-  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["TECHNICIAN_REPORTED_REPAIRED"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: false },
-  "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["TECHNICIAN_REPORTED_UNREPAIRED"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: false },
+  "receive-repaired": { toStatus: "RECEIVED_FROM_TECHNICIAN", allowed: ["TECHNICIAN_REPORTED_REPAIRED", "IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_REPAIRED", eventType: "RECEIVED_REPAIRED", needsCounterparty: true, needsReason: false },
+  "receive-unrepaired": { toStatus: "RECEIVED", allowed: ["TECHNICIAN_REPORTED_UNREPAIRED", "IN_REPAIR"], documentType: "TECHNICIAN_RECEIPT_UNREPAIRED", eventType: "RECEIVED_UNREPAIRED", needsCounterparty: true, needsReason: false },
   "send-supplier": { toStatus: "SENT_TO_SUPPLIER", allowed: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN"], documentType: "SUPPLIER_SHIPMENT", eventType: "SENT_TO_SUPPLIER", needsCounterparty: true, needsReason: false },
   "receive-supplier": { toStatus: "RECEIVED_FROM_SUPPLIER", allowed: ["SENT_TO_SUPPLIER"], documentType: "SUPPLIER_RECEIPT", eventType: "RECEIVED_FROM_SUPPLIER", needsCounterparty: true, needsReason: true },
   "mark-ready": { toStatus: "READY_FOR_CUSTOMER", allowed: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], documentType: null, eventType: "READY_FOR_CUSTOMER", needsCounterparty: false, needsReason: false },
@@ -530,6 +530,13 @@ export async function receiveCasesFromTechnician(input: unknown) {
   if (cases.length !== caseCodes.length) return { success: false as const, error: "Uno o más equipos ya no están pendientes de confirmación." };
   const repaired = cases.every((item) => item.status === "TECHNICIAN_REPORTED_REPAIRED");
   const unrepaired = cases.every((item) => item.status === "TECHNICIAN_REPORTED_UNREPAIRED");
+  const inRepair = cases.every((item) => item.status === "IN_REPAIR");
+  if (inRepair) {
+    const receiveResult = (input as { receiveResult?: unknown })?.receiveResult;
+    if (receiveResult === "REPAIRED") return flow(input, "receive-repaired");
+    if (receiveResult === "UNREPAIRED") return flow(input, "receive-unrepaired");
+    return { success: false as const, error: "Indica si el equipo se recibe reparado o sin reparar." };
+  }
   if (!repaired && !unrepaired) return { success: false as const, error: "Selecciona equipos del mismo resultado: reparados o sin reparar." };
   return flow(input, repaired ? "receive-repaired" : "receive-unrepaired");
 }

@@ -49,6 +49,7 @@ export const flowSchema = caseCodesSchema.extend({
   counterpartyName: optionalText(160),
   reason: optionalText(1000),
   technicianId: z.string().optional(),
+  receiveResult: z.enum(["REPAIRED", "UNREPAIRED"]).optional(),
   caseObservations: z.record(z.string(), z.string().trim().max(1000)).optional(),
 });
 export const archiveWarrantySchema = z.object({ caseCode: text("El código", 40), reason: text("El motivo", 1000) });

@@ -15,7 +15,7 @@ export default async function GarantiasPage() {
   if (!cases.success) throw new Error(cases.error);
   if (!stats.success) throw new Error(stats.error);
 
-  const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], receiveTech: ["TECHNICIAN_REPORTED_REPAIRED", "TECHNICIAN_REPORTED_UNREPAIRED"], sendSupplier: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], markReady: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], deliver: ["READY_FOR_CUSTOMER"], credit: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER", "READY_FOR_CUSTOMER"] };
+  const eligible: Record<string, WarrantyStatus[]> = { assign: ["RECEIVED", "RECEIVED_FROM_SUPPLIER"], receiveTech: ["TECHNICIAN_REPORTED_REPAIRED", "TECHNICIAN_REPORTED_UNREPAIRED", "IN_REPAIR"], sendSupplier: ["RECEIVED", "RECEIVED_FROM_TECHNICIAN"], receiveSupplier: ["SENT_TO_SUPPLIER"], markReady: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"], deliver: ["READY_FOR_CUSTOMER"], credit: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER", "READY_FOR_CUSTOMER"] };
   const quickCases: Record<string, WarrantyFlowCase[]> = canTransition
     ? Object.fromEntries(Object.keys(eligible).map((operation) => [operation, []]))
     : {};
