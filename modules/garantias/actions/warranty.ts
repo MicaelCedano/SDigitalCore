@@ -402,6 +402,10 @@ const flowRules: Record<FlowOperation, {
 async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode?: string; status: WarrantyStatus }>> {
   try {
     const actor = await requirePermission("warranties.transition");
+    const actorRecord = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { roleCode: true },
+    });
     const parsed = flowSchema.safeParse(input);
     if (!parsed.success) return { success: false, error: "Revisa los datos del flujo." };
     const data = parsed.data;
@@ -447,7 +451,11 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       const cases = await tx.warrantyCase.findMany({ where: { caseCode: { in: data.caseCodes }, archivedAt: null } });
       if (cases.length !== data.caseCodes.length) throw new WarrantyActionError("Uno o más casos no existen o están archivados.");
       if (cases.some((item) => !rule.allowed.includes(item.status))) throw new WarrantyActionError("Uno o más casos cambiaron de estado y ya no son elegibles.");
-      if ((operation === "receive-repaired" || operation === "receive-unrepaired") && cases.some((item) => item.assignedTechnicianId === actor.id)) {
+      if (
+        (operation === "receive-repaired" || operation === "receive-unrepaired") &&
+        actorRecord?.roleCode === "TECNICO" &&
+        cases.some((item) => item.assignedTechnicianId === actor.id)
+      ) {
         throw new WarrantyActionError("El técnico que reportó el resultado no puede confirmar su propia recepción. Debe confirmarla otra persona.");
       }
       if (operation === "deliver" && cases.some((item) => comparableName(item.clientName) !== comparableName(counterpartyName))) {
