@@ -34,6 +34,18 @@ const legacyWarehouseProductSelect = {
   updatedAt: true,
 } satisfies Prisma.WarehouseProductSelect;
 
+function buildWarehouseProductSearchWhere(query?: string): Prisma.WarehouseProductWhereInput | undefined {
+  const terms = query?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (terms.length === 0) return undefined;
+
+  const searchableFields = ["code", "name", "brand", "color", "capacity"] as const;
+  return {
+    AND: terms.map((term) => ({
+      OR: searchableFields.map((field) => ({ [field]: { contains: term, mode: "insensitive" as const } })),
+    })),
+  };
+}
+
 async function requireWarehouseAdmin() {
   const actor = await requirePermission("warehouse.read");
   const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
@@ -99,16 +111,8 @@ export async function getWarehouseProductsAction(query?: string) {
   try {
     await requirePermission("warehouse.read");
     const where: Prisma.WarehouseProductWhereInput = { status: "ACTIVE" };
-    if (query && query.trim() !== "") {
-      const q = query.trim();
-      where.OR = [
-        { code: { contains: q, mode: "insensitive" } },
-        { name: { contains: q, mode: "insensitive" } },
-        { brand: { contains: q, mode: "insensitive" } },
-        { color: { contains: q, mode: "insensitive" } },
-        { capacity: { contains: q, mode: "insensitive" } },
-      ];
-    }
+    const searchWhere = buildWarehouseProductSearchWhere(query);
+    if (searchWhere) Object.assign(where, searchWhere);
 
     const products = await prisma.warehouseProduct.findMany({
       where,
@@ -124,16 +128,8 @@ export async function getWarehouseProductsAction(query?: string) {
 
     if (missingStatusColumn) {
       const legacyWhere: Prisma.WarehouseProductWhereInput = {};
-      if (query && query.trim() !== "") {
-        const q = query.trim();
-        legacyWhere.OR = [
-          { code: { contains: q, mode: "insensitive" } },
-          { name: { contains: q, mode: "insensitive" } },
-          { brand: { contains: q, mode: "insensitive" } },
-          { color: { contains: q, mode: "insensitive" } },
-          { capacity: { contains: q, mode: "insensitive" } },
-        ];
-      }
+      const searchWhere = buildWarehouseProductSearchWhere(query);
+      if (searchWhere) Object.assign(legacyWhere, searchWhere);
 
       const products = await prisma.warehouseProduct.findMany({
         where: legacyWhere,

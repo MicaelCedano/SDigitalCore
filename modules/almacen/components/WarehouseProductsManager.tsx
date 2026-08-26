@@ -294,9 +294,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                   </div>
                   {roleCode === "ADMIN" && (
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <button onClick={() => handleOpenEdit(p)} className="rounded-lg bg-slate-100 p-2 text-slate-700" title="Editar producto" aria-label={`Editar ${p.name}`}>
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                        <button onClick={() => handleOpenEdit(p)} className="rounded-lg bg-slate-100 p-2 text-slate-700" title="Editar producto" aria-label={`Editar ${p.name}`}>
+                          <Pencil className="h-4 w-4" />
+                        </button>
                       <button onClick={(e) => handleDelete(p.id, e)} className="rounded-lg bg-red-50 p-2 text-red-600" title="Eliminar producto" aria-label={`Eliminar ${p.name}`}>
                         <Trash2 className="h-4 w-4" />
                       </button>

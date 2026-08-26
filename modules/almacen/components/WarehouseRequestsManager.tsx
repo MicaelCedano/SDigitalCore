@@ -42,8 +42,13 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
   const availableProducts = useMemo(() => products.filter((p) => type === "ENTRY" || Number(p.totalUnits) > 0), [products, type]);
   const filtered = useMemo(() => {
-    const query = productSearch.trim().toLowerCase();
-    return availableProducts.filter((p) => !selected[p.id] && (!query || `${p.name} ${p.brand ?? ""} ${p.code} ${p.color ?? ""} ${p.capacity ?? ""}`.toLowerCase().includes(query)));
+    const terms = productSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return availableProducts.filter((p) => {
+      if (selected[p.id]) return false;
+      if (terms.length === 0) return true;
+      const searchableText = `${p.name} ${p.brand ?? ""} ${p.code} ${p.color ?? ""} ${p.capacity ?? ""}`.toLowerCase();
+      return terms.every((term) => searchableText.includes(term));
+    });
   }, [availableProducts, productSearch, selected]);
   const selectedItems = Object.entries(selected).map(([productId, choice]) => {
     const product = products.find((p) => p.id === productId);
