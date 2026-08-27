@@ -289,9 +289,9 @@ export async function GET(request: Request) {
       detail: `${item.cliente} · ${item.problema}`,
       status: item.job.status,
       date: item.createdAt.toISOString(),
-       // Si el resultado es del propio técnico, nunca lo enviamos al flujo
-       // de aprobación/pago. Ese flujo corresponde a otro administrador.
-       href: item.job.technicianId === user.id ? "/reparaciones" : "/reparaciones/pagos",
+       // Solo ADMIN puede llegar al flujo de aprobación/pago desde el buscador.
+       // Un técnico, incluido el dueño del trabajo, vuelve a su panel operativo.
+       href: isAdmin && item.job.technicianId !== user.id ? "/reparaciones/pagos" : "/reparaciones",
      })),
     ...pageItems(unlockRecords).map((item) => ({
       id: `unlock-${item.id}`,

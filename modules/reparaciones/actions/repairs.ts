@@ -364,6 +364,10 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
 export async function getPendingRepairJobsAction() {
   try {
     const actor = await requirePermission("reparaciones.write");
+    const persistedActor = await getPersistedCurrentUser();
+    if (persistedActor?.roleCode !== "ADMIN") {
+      return fail(new Error("Solo un administrador puede consultar los pagos de reparaciones."));
+    }
     const jobs = await prisma.repairJob.findMany({
       // Un administrador nunca debe aprobar ni pagarse su propio trabajo.
       // El filtro mejora la UI; la protección definitiva está en approveRepairJobAction.
@@ -391,6 +395,10 @@ export async function getPendingRepairJobsAction() {
 export async function approveRepairJobAction(input: { jobId: string; customMonto?: number; saveAsDefault?: boolean }): Promise<Result<ApproveRepairJobResult>> {
   try {
     const actor = await requirePermission("reparaciones.write");
+    const persistedActor = await getPersistedCurrentUser();
+    if (persistedActor?.roleCode !== "ADMIN") {
+      return fail(new Error("Solo un administrador puede aprobar pagos de reparaciones."));
+    }
     const parsed = z.object({
       jobId: z.string().min(1),
       customMonto: z.number().min(0).max(100000).optional(),
