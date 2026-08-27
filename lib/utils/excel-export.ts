@@ -45,6 +45,8 @@ export interface DetailedImeiRow {
 export function parseImeiList(input?: string | null): string[] {
   if (!input) return [];
   return input
+    // Acepta el pegado habitual desde Excel/proveedores: espacios, saltos,
+    // comas, punto y coma o barras verticales.
     .split(/[\s,;|]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);

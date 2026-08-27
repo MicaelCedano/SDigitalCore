@@ -278,10 +278,18 @@ export function GoodsReceiptForm({
   const countValidImeis = (text: string | null | undefined): number => {
     if (!text) return 0;
     return text
-      .split(/[\n,;]+/)
+      // Los proveedores suelen pegar IMEIs separados por espacios, saltos,
+      // comas o punto y coma. Todos deben contar igual y conservarse tal cual.
+      .split(/[\s,;|]+/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0).length;
   };
+
+  const getItemExportDescription = (item: any) =>
+    [item.brand, item.model, item.capacity]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(" ") || item.description || "Producto no especificado";
 
   const handleColorVariantChange = (
     itemIndex: number,
@@ -426,7 +434,8 @@ export function GoodsReceiptForm({
       receivedAt: new Date(),
       items: items.map((i) => ({
         code: i.code,
-        description: i.description || "Producto no especificado",
+        description: getItemExportDescription(i),
+        condition: i.condition || "Nuevo",
         quantity: (i.colorVariants || []).reduce((sum: number, v: any) => {
           const imeiCount = countValidImeis(v.imeis);
           return sum + (imeiCount > 0 ? imeiCount : Number(v.quantity) || 1);
