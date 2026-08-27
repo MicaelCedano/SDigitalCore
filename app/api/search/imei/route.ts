@@ -166,7 +166,7 @@ export async function GET(request: Request) {
             cliente: true,
             problema: true,
             createdAt: true,
-            job: { select: { jobCode: true, status: true, createdAt: true } },
+            job: { select: { jobCode: true, status: true, createdAt: true, technicianId: true } },
           },
           orderBy: { createdAt: "desc" },
           skip,
@@ -289,8 +289,10 @@ export async function GET(request: Request) {
       detail: `${item.cliente} · ${item.problema}`,
       status: item.job.status,
       date: item.createdAt.toISOString(),
-      href: "/reparaciones/pagos",
-    })),
+       // Si el resultado es del propio técnico, nunca lo enviamos al flujo
+       // de aprobación/pago. Ese flujo corresponde a otro administrador.
+       href: item.job.technicianId === user.id ? "/reparaciones" : "/reparaciones/pagos",
+     })),
     ...pageItems(unlockRecords).map((item) => ({
       id: `unlock-${item.id}`,
       source: "unlock" as const,

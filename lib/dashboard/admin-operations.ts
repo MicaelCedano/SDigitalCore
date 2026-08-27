@@ -118,7 +118,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     }),
     // Reparaciones: trabajos pendientes de pago (admin aprueba en /reparaciones/pagos)
     prisma.repairJob.findMany({
-      where: { status: "PENDING_PAYMENT" },
+      // No mostrar al administrador sus propios trabajos como pagables.
+      where: { status: "PENDING_PAYMENT", technicianId: { not: userId } },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {
