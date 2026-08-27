@@ -363,9 +363,11 @@ export async function reportRepairWorkAction(input: unknown): Promise<Result<{ j
 
 export async function getPendingRepairJobsAction() {
   try {
-    await requirePermission("reparaciones.write");
+    const actor = await requirePermission("reparaciones.write");
     const jobs = await prisma.repairJob.findMany({
-      where: { status: "PENDING_PAYMENT" },
+      // Un administrador nunca debe aprobar ni pagarse su propio trabajo.
+      // El filtro mejora la UI; la protección definitiva está en approveRepairJobAction.
+      where: { status: "PENDING_PAYMENT", technicianId: { not: actor.id } },
       orderBy: { createdAt: "asc" },
       include: {
         technician: {
@@ -405,6 +407,9 @@ export async function approveRepairJobAction(input: { jobId: string; customMonto
       });
       if (!job) throw new Error("Trabajo no encontrado");
       if (job.status !== "PENDING_PAYMENT") throw new Error("Este trabajo ya fue procesado.");
+      if (job.technicianId === actor.id) {
+        throw new Error("No puedes aprobar ni pagarte tu propio trabajo de reparación. Debe aprobarlo otro administrador.");
+      }
 
       // Tarifa: custom > config del técnico > fallback 50
       let montoPorEquipo = customMonto;
