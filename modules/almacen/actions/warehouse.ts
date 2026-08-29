@@ -64,6 +64,11 @@ function resolveMovementLine(item: { unitsCount: number; measure?: "BOXES" | "UN
   };
 }
 
+function availableQuantity(product: { boxes: number; looseUnits: number; totalUnits: number }, measure: "BOXES" | "UNITS") {
+  if (measure === "BOXES") return Math.max(0, product.boxes);
+  return product.boxes === 0 ? Math.max(product.looseUnits, product.totalUnits) : Math.max(0, product.looseUnits);
+}
+
 async function applyStockDelta(
   tx: Prisma.TransactionClient,
   productId: string,
@@ -71,6 +76,18 @@ async function applyStockDelta(
   line: { measure: "BOXES" | "UNITS"; quantity: number; unitsCount: number },
 ) {
   const direction = type === "ENTRY" ? 1 : -1;
+  if (type === "EXIT" && line.measure === "UNITS") {
+    const current = await tx.warehouseProduct.findUnique({ where: { id: productId }, select: { boxes: true, looseUnits: true, totalUnits: true } });
+    // Algunos registros antiguos dejaron las unidades en totalUnits con cero
+    // cajas, pero no las copiaron a looseUnits. Regularizamos ese caso antes
+    // de descontar para que la salida de unidades sueltas sea consistente.
+    if (current && current.boxes === 0 && current.looseUnits < current.totalUnits) {
+      await tx.warehouseProduct.updateMany({
+        where: { id: productId, boxes: 0, looseUnits: current.looseUnits, totalUnits: current.totalUnits },
+        data: { looseUnits: current.totalUnits },
+      });
+    }
+  }
   const changed = await tx.warehouseProduct.updateMany({
     where: {
       id: productId,
@@ -253,7 +270,7 @@ export async function createWarehouseMovementAction(input: WarehouseMovementInpu
     }
 
     const line = resolveMovementLine(validated, product.unitsPerBox);
-    const available = line.measure === "BOXES" ? product.boxes : product.looseUnits;
+    const available = availableQuantity(product, line.measure);
     if (validated.type === "EXIT" && available < line.quantity) {
       return { success: false, error: `Stock insuficiente en ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"}. Disponible: ${available}, solicitado: ${line.quantity}` };
     }
@@ -309,7 +326,7 @@ export async function createWarehouseMovementsBulkAction(input: WarehouseBulkMov
       for (const item of validated.items) {
         const product = byId.get(item.productId)!;
         const line = resolveMovementLine(item, product.unitsPerBox);
-        const available = line.measure === "BOXES" ? product.boxes : product.looseUnits;
+        const available = availableQuantity(product, line.measure);
         if (validated.type === "EXIT" && available < line.quantity) {
           throw new Error(`Stock insuficiente en ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"} para ${product.name}. Disponible: ${available}.`);
         }
@@ -396,7 +413,7 @@ export async function createWarehouseRequestAction(input: WarehouseRequestInput)
         const product = products.find((candidate) => candidate.id === item.productId);
         if (!product) return { success: false, error: "Uno de los productos seleccionados ya no existe." };
         const line = resolveMovementLine(item, product.unitsPerBox);
-        const available = line.measure === "BOXES" ? product.boxes : product.looseUnits;
+        const available = availableQuantity(product, line.measure);
         if (available < line.quantity) return { success: false, error: `No hay suficientes ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"} de ${product.name}. Disponible: ${available}.` };
       }
     }
