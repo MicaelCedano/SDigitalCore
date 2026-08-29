@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   AlertTriangle,
@@ -41,6 +41,7 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
   const [success, setSuccess] = useState<string | null>(null);
   const [automaticMode, setAutomaticMode] = useState(false);
   const automaticImeis = useRef(new Set<string>());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const noFuncionales = useMemo(
     () => devices.filter((d) => d.result === "NON_FUNCTIONAL"),
@@ -95,6 +96,11 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
     void handleMarkFuncional(device.id, value);
   };
 
+  useEffect(() => {
+    if (!automaticMode || loadingId !== null || noFuncionales.length === 0) return;
+    searchInputRef.current?.focus();
+  }, [automaticMode, loadingId, noFuncionales.length]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm"
@@ -146,6 +152,7 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={search}
                     onChange={(e) => handleSearchChange(e.target.value)}
