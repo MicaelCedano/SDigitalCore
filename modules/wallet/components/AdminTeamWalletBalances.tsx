@@ -1,5 +1,6 @@
 import { Banknote, ShieldCheck, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
+import { ManualWalletCreditModal } from "./ManualWalletCreditModal";
 
 type WalletRow = {
   id: string;
@@ -67,6 +68,7 @@ export function AdminTeamWalletBalances({
                   {row.walletStatus === "FROZEN" ? "CONGELADA" : row.walletStatus === null ? "SIN WALLET" : "ACTIVA"}
                 </span>
                 <span className="font-mono text-base font-black text-slate-900">{money(row.balance, row.currency)}</span>
+                <ManualWalletCreditModal userId={row.id} recipientName={row.name} />
               </div>
             </div>
           ))}
