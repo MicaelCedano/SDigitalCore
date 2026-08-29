@@ -40,6 +40,42 @@ export interface DetailedImeiRow {
 }
 
 /**
+ * Ordena los productos por modelo usando un orden natural.
+ *
+ * Así, por ejemplo, "iPhone X", "iPhone 11", "iPhone 12"...
+ * quedan en el orden esperado en Excel, en vez de ordenarse como texto.
+ */
+export function sortGoodsReceiptItemsByModel(
+  items: GoodsReceiptExportItem[],
+): GoodsReceiptExportItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const modelComparison = compareModelNames(a.item.description, b.item.description);
+      return modelComparison !== 0 ? modelComparison : a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
+function compareModelNames(left: string, right: string) {
+  const leftKey = normalizeModelName(left);
+  const rightKey = normalizeModelName(right);
+
+  return leftKey.localeCompare(rightKey, "es-DO", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function normalizeModelName(value: string) {
+  return value
+    .trim()
+    // iPhone X representa la generación 10 y debe ir antes de iPhone 11.
+    .replace(/\biphone\s+x\b/gi, "iPhone 10")
+    .replace(/\s+/g, " ");
+}
+
+/**
  * Convierte cualquier string de IMEIs en un arreglo de IMEIs limpios.
  */
 export function parseImeiList(input?: string | null): string[] {
@@ -118,7 +154,8 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
     timeStyle: "short",
   });
 
-  const detailedImeis = extractDetailedImeis(data.items);
+  const sortedItems = sortGoodsReceiptItemsByModel(data.items);
+  const detailedImeis = extractDetailedImeis(sortedItems);
   const statusLabel =
     data.status === "COMPLETED" ? "COMPLETADO" : data.status === "DRAFT" ? "BORRADOR" : "CANCELADO";
   const statusColor =
@@ -239,7 +276,7 @@ export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
   let currentRowIdx = tableHeaderRowIdx + 1;
   let totalItemsCount = 0;
 
-  data.items.forEach((item, index) => {
+  sortedItems.forEach((item, index) => {
     const qty = item.quantity || 1;
     totalItemsCount += qty;
 
