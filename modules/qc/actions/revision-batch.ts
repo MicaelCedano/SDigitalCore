@@ -1647,7 +1647,31 @@ export async function getQcPaymentsAction(): Promise<
         submittedAt: audit.createdAt,
       });
     }
-    const assignmentBatchIds = [...new Set(assignmentSubmissions.map((item) => item.batchId))];
+    // Pagos anteriores a los IDs de porción: la clave vieja era lote + revisor.
+    // Se asigna cada pago histórico a la porción histórica más antigua del mismo
+    // lote/revisor. Así una fila antigua ya pagada no reaparece como pendiente,
+    // pero una segunda porción del mismo revisor sí queda disponible para pagar.
+    const legacyPaymentCounts = new Map<string, number>();
+    for (const entry of paymentEntries) {
+      const parts = entry.externalKey.split(":");
+      if (parts.length !== 3) continue;
+      const key = `${parts[1]}:${parts[2]}`;
+      legacyPaymentCounts.set(key, (legacyPaymentCounts.get(key) ?? 0) + 1);
+    }
+    const legacyPaymentUse = new Map<string, number>();
+    const visibleAssignments = assignmentSubmissions
+      .slice()
+      .sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime())
+      .filter((assignment) => {
+        if (!assignment.portionId.startsWith("LEGACY-")) return true;
+        const key = `${assignment.batchId}:${assignment.reviewerId}`;
+        const used = legacyPaymentUse.get(key) ?? 0;
+        const available = legacyPaymentCounts.get(key) ?? 0;
+        if (used >= available) return true;
+        legacyPaymentUse.set(key, used + 1);
+        return false;
+      });
+    const assignmentBatchIds = [...new Set(visibleAssignments.map((item) => item.batchId))];
     const assignmentBatches = await prisma.qcRevisionBatch.findMany({
       where: { id: { in: assignmentBatchIds } },
       select: { id: true, batchNumber: true, supplierName: true },
@@ -1656,7 +1680,7 @@ export async function getQcPaymentsAction(): Promise<
     const paidAssignmentKeys = new Set(
       paymentEntries.map((entry) => entry.externalKey).filter((key) => key.startsWith("qc-payment:")),
     );
-    for (const assignment of assignmentSubmissions) {
+    for (const assignment of visibleAssignments) {
       const batch = assignmentBatchById.get(assignment.batchId);
       const paymentKey = `qc-payment:${assignment.batchId}:${assignment.portionId}:${assignment.reviewerId}`;
       if (!batch || paidAssignmentKeys.has(paymentKey)) continue;
