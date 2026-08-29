@@ -29,6 +29,10 @@ function normalizedKey(value: string | null | undefined) {
   return normalizeReceiptText(value).toLocaleLowerCase("es");
 }
 
+function normalizedBrandKey(value: string | null | undefined) {
+  return normalizedKey(value).replace(/[\s-]+/g, "");
+}
+
 function normalizedColorKey(value: string | null | undefined) {
   const key = normalizedKey(value).replace(/\s+/g, " ");
   const aliases: Record<string, string> = {
@@ -42,7 +46,7 @@ function normalizedColorKey(value: string | null | undefined) {
     purple: "purple", morado: "purple", violeta: "purple", violet: "purple",
     pink: "pink", rosado: "pink", rosa: "pink",
     gold: "gold", dorado: "gold",
-    silver: "silver", plateado: "silver",
+    silver: "silver", silvery: "silver", plateado: "silver",
   };
   return aliases[key] || key;
 }
@@ -338,7 +342,9 @@ export async function getWarehouseProductSuggestionAction(input: unknown) {
     const candidates = await prisma.warehouseProduct.findMany({
       where: {
         status: "ACTIVE",
-        brand: { equals: identity.brand, mode: "insensitive" },
+        // La marca puede venir escrita como "M HORSE" en inventario y
+        // "M-Horse" en el recibo; traemos candidatos por modelo y
+        // verificamos la identidad normalizada abajo.
         name: { contains: identity.name, mode: "insensitive" },
       },
       orderBy: { updatedAt: "desc" },
@@ -352,9 +358,10 @@ export async function getWarehouseProductSuggestionAction(input: unknown) {
       const productName = normalizedKey(product.name);
       const productIdentityText = normalizedKey(`${product.name} ${product.color}`).replace(/\s+/g, "");
       const sameModel = productName === requestedName || productName.startsWith(`${requestedName} `);
+      const sameBrand = normalizedBrandKey(product.brand) === normalizedBrandKey(identity.brand);
       const sameColorName = normalizedColorKey(product.color) === normalizedColorKey(requestedColorName || identity.color);
       const sameColorCode = Boolean(requestedColorCode) && productIdentityText.includes(requestedColorCode);
-      return normalizedKey(product.capacity) === normalizedKey(identity.capacity) && sameModel && (sameColorName || sameColorCode);
+      return sameBrand && normalizedKey(product.capacity) === normalizedKey(identity.capacity) && sameModel && (sameColorName || sameColorCode);
     });
     if (matches.length !== 1) return { success: true, data: null, matchCount: matches.length };
     const product = matches[0];
