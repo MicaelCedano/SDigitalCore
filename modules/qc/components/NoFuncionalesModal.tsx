@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   X,
   AlertTriangle,
@@ -39,6 +39,8 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [automaticMode, setAutomaticMode] = useState(false);
+  const automaticImeis = useRef(new Set<string>());
 
   const noFuncionales = useMemo(
     () => devices.filter((d) => d.result === "NON_FUNCTIONAL"),
@@ -58,7 +60,7 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
   const deviceLabel = (d: NoFuncionalDevice) =>
     `${d.brand ?? ""} ${d.model}${d.storageGb ? ` ${d.storageGb}GB` : ""}`.trim() || "Sin modelo";
 
-  const handleMarkFuncional = async (deviceId: string) => {
+  const handleMarkFuncional = async (deviceId: string, automaticImei?: string) => {
     setLoadingId(deviceId);
     setError(null);
     setSuccess(null);
@@ -66,10 +68,31 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
     setLoadingId(null);
     if (res.success) {
       setSuccess(res.message ?? "Equipo marcado como funcional.");
+      if (automaticImei) {
+        setSearch("");
+        automaticImeis.current.add(automaticImei);
+      }
       onChanged();
     } else {
+      if (automaticImei) automaticImeis.current.delete(automaticImei);
       setError(res.error ?? "Error al actualizar");
     }
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setError(null);
+
+    if (!automaticMode || !/^\d{15}$/.test(value) || automaticImeis.current.has(value)) return;
+
+    const device = noFuncionales.find((candidate) => candidate.imei === value);
+    if (!device) {
+      setError("No encontré ese IMEI entre los no funcionales de este lote.");
+      return;
+    }
+
+    automaticImeis.current.add(value);
+    void handleMarkFuncional(device.id, value);
   };
 
   return (
@@ -119,16 +142,38 @@ export function NoFuncionalesModal({ batchNumber, devices, onClose, onChanged }:
             </div>
           ) : (
             <>
-              <div className="relative mb-4">
-                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por IMEI, serie o modelo..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-700 focus:border-rose-300 focus:bg-white focus:outline-none"
-                />
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    placeholder="Buscar por IMEI, serie o modelo..."
+                    inputMode="numeric"
+                    autoFocus
+                    disabled={loadingId !== null}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-700 focus:border-rose-300 focus:bg-white focus:outline-none disabled:cursor-wait disabled:opacity-60"
+                  />
+                </div>
+                <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={automaticMode}
+                    onChange={(e) => {
+                      setAutomaticMode(e.target.checked);
+                      setError(null);
+                    }}
+                    className="h-4 w-4 accent-emerald-600"
+                  />
+                  Modo automático
+                </label>
               </div>
+              {automaticMode ? (
+                <p className="-mt-2 mb-4 text-[11px] font-semibold text-emerald-700">
+                  Escribe o escanea un IMEI de 15 dígitos: se marcará funcional y el campo se limpiará para el siguiente.
+                </p>
+              ) : null}
 
               <div className="overflow-hidden rounded-2xl border border-slate-200">
                 {filtered.length === 0 ? (
