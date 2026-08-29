@@ -8,6 +8,7 @@ interface ConfirmBatchModalProps {
   batch: {
     id: string;
     batchNumber: string;
+    portionId?: string | null;
     supplierName?: string | null;
     reviewedDevices: number;
     totalDevices: number;
@@ -24,7 +25,7 @@ interface ConfirmBatchModalProps {
 export function ConfirmBatchModal({ batch, reject, loading, onCancel, onConfirm }: ConfirmBatchModalProps) {
   if (!batch) return null;
 
-  const title = reject ? "Devolver lote a revisión" : "Aceptar lote y acreditar pago";
+  const title = reject ? "Devolver porción a revisión" : "Aceptar porción y acreditar pago";
   const description = reject
     ? "El lote volverá a EN REVISIÓN sin acreditar ningún pago. El equipo de control de calidad podrá seguir trabajando."
     : "Al aceptar el lote se acreditará el pago automáticamente a la wallet de los revisores que hicieron cada revisión.";
@@ -57,13 +58,17 @@ export function ConfirmBatchModal({ batch, reject, loading, onCancel, onConfirm 
           <h2 className="text-lg font-bold text-slate-800 tracking-tight">{title}</h2>
           <p className="mt-1 text-xs text-slate-500 leading-relaxed">{description}</p>
 
-          {/* Detalle del lote */}
+          {/* Detalle de la porción */}
           <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-slate-400" /> Lote
+                <Package className="w-3.5 h-3.5 text-slate-400" /> Porción
               </span>
-              <span className="font-mono font-black text-slate-800 text-sm">{batch.batchNumber}</span>
+              <span className="font-mono font-black text-slate-800 text-sm">{batch.portionId || "Histórica"}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Lote</span>
+              <span className="font-mono font-bold text-slate-700 text-xs">{batch.batchNumber}</span>
             </div>
             {batch.supplierName && (
               <div className="flex items-center justify-between">

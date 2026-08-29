@@ -21,6 +21,7 @@ import {
 } from "@/lib/validation/revision-batch";
 import type { QcBatchStatus } from "@prisma/client";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
@@ -494,7 +495,7 @@ export async function updateRevisionBatchBranchAction(input: UpdateRevisionBatch
  * equipos del lote ya fueron revisados (reviewed == total). El lote pasa de
  * IN_REVIEW → SUBMITTED. El pago NO ocurre aquí (lo acredita el admin).
  */
-export async function submitRevisionBatchAction(input: { id: string }): Promise<Result<{ id: string; batchNumber: string; status: string }>> {
+export async function submitRevisionBatchAction(input: { id: string }): Promise<Result<{ id: string; batchNumber: string; portionId: string; status: string }>> {
   try {
     const actor = await requirePermission("qc.write");
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
@@ -507,13 +508,9 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
       select: { id: true, batchNumber: true, status: true, createdAt: true },
     });
     if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
-    if (["COMPLETED", "CANCELLED"].includes(batch.status)) {
-      return { success: false, error: `Este lote ya no está activo (estado actual: ${batch.status}).` };
+    if (batch.status === "CANCELLED") {
+      return { success: false, error: "Este lote está cancelado y ya no admite porciones." };
     }
-    if (batch.status === "SUBMITTED") {
-      return { success: false, error: "Este lote ya fue enviado con el flujo anterior y está esperando aprobación." };
-    }
-
     const assignedDevices = await prisma.deviceUnit.findMany({
       where: { batchId: batch.id, assignedToId: actor.id },
       select: {
@@ -533,6 +530,7 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
     const functionalCount = assignedDevices.filter((device) => device.inspections[0]?.result === "FUNCTIONAL").length;
     const nonFunctionalCount = assignedDevices.filter((device) => device.inspections[0]?.result === "NON_FUNCTIONAL").length;
     const reviewerName = actor.name || actor.email || "QC";
+    const portionId = `POR-${batch.batchNumber}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
     await logAudit({
       userId: actor.id,
@@ -542,16 +540,18 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
       entityId: batch.id,
       afterData: {
         batchNumber: batch.batchNumber,
+        portionId,
         reviewerId: actor.id,
         reviewerName,
         assignedDevices: assignedDevices.length,
+        deviceIds: assignedDevices.map((device) => device.id),
         reviewedDevices: assignedDevices.length,
         functionalCount,
         nonFunctionalCount,
       },
     });
     await sendPushToRole("ADMIN", {
-      title: `Porción de ${batch.batchNumber} lista`,
+      title: `Porción ${portionId} lista`,
       body: `${reviewerName} terminó ${assignedDevices.length} equipo(s) y espera su pago.`,
       route: `/qc/lotes/${batch.id}`,
       type: "qc_batch.assignment_submitted",
@@ -563,8 +563,8 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
 
     return {
       success: true,
-      data: { id: batch.id, batchNumber: batch.batchNumber, status: "ASSIGNMENT_SUBMITTED" },
-      message: `Tu porción de ${batch.batchNumber} fue enviada. El administrador puede acreditar tu pago sin esperar al resto del lote.`,
+      data: { id: batch.id, batchNumber: batch.batchNumber, portionId, status: "ASSIGNMENT_SUBMITTED" },
+      message: `Tu porción ${portionId} de ${batch.batchNumber} fue enviada. El administrador puede acreditar tu pago sin esperar al resto del lote.`,
     };
   } catch (error: any) {
     console.error("Error al enviar lote:", error);
@@ -577,7 +577,7 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
  * El pago actual se procesa únicamente por reviewerId desde la bandeja
  * de pagos individuales; nunca se debe pagar el lote completo.
  */
-export async function approveRevisionBatchAction(input: { id: string; reviewerId?: string | null; reject?: boolean }): Promise<Result<{ id: string; batchNumber: string; status: string; paidReviewers: number }>> {
+export async function approveRevisionBatchAction(input: { id: string; reviewerId?: string | null; portionId?: string | null; reject?: boolean }): Promise<Result<{ id: string; batchNumber: string; status: string; paidReviewers: number }>> {
   try {
     const actor = await requirePermission("qc.write");
     const persisted = await getPersistedCurrentUser();
@@ -585,7 +585,7 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
       return { success: false, error: "Solo el administrador puede aceptar el lote." };
     }
 
-    const parsed = z.object({ id: z.string().min(1), reviewerId: z.string().min(1).optional().nullable(), reject: z.boolean().optional() }).safeParse(input);
+    const parsed = z.object({ id: z.string().min(1), reviewerId: z.string().min(1).optional().nullable(), portionId: z.string().min(1).optional().nullable(), reject: z.boolean().optional() }).safeParse(input);
     if (!parsed.success) return { success: false, error: "Lote inválido." };
 
     const batch = await prisma.qcRevisionBatch.findUnique({
@@ -596,23 +596,26 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
 
     // Cada QC puede enviar y cobrar su porción sin esperar al resto del lote.
     // Las entregas antiguas siguen usando el flujo global SUBMITTED de abajo.
-    if (parsed.data.reviewerId) {
+    if (parsed.data.reviewerId && parsed.data.portionId) {
       const reviewerId = parsed.data.reviewerId;
+      const portionId = parsed.data.portionId;
       const assignmentAudits = await prisma.auditLog.findMany({
         where: { entityId: batch.id, action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
         orderBy: { createdAt: "desc" },
         take: 100,
-        select: { action: true, userId: true, afterData: true, createdAt: true },
+        select: { id: true, action: true, userId: true, afterData: true, createdAt: true },
       });
       const latestSubmission = assignmentAudits.find((audit) => {
         const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
-        return audit.action === "qc_batch.assignment_submit" && data.reviewerId === reviewerId;
+        const auditPortionId = typeof data.portionId === "string" ? data.portionId : `LEGACY-${audit.id}`;
+        return audit.action === "qc_batch.assignment_submit" && data.reviewerId === reviewerId && auditPortionId === portionId;
       });
       if (!latestSubmission) return { success: false, error: "La porción enviada no existe o ya fue procesada." };
       const processedAfter = assignmentAudits.find((audit) => {
         if (audit.createdAt <= latestSubmission.createdAt || !["qc_batch.assignment_reject", "qc_batch.assignment_approve"].includes(audit.action)) return false;
         const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
-        return data.reviewerId === reviewerId;
+        const auditPortionId = typeof data.portionId === "string" ? data.portionId : `LEGACY-${latestSubmission.id}`;
+        return data.reviewerId === reviewerId && auditPortionId === portionId;
       });
       if (processedAfter) return { success: false, error: "Esta porción ya fue procesada." };
 
@@ -623,10 +626,10 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
           module: "qc",
           entityType: "qc_revision_batch",
           entityId: batch.id,
-          afterData: { batchNumber: batch.batchNumber, reviewerId },
+          afterData: { batchNumber: batch.batchNumber, reviewerId, portionId },
         });
         await sendPushToUsers([reviewerId], {
-          title: `Porción de ${batch.batchNumber} devuelta`,
+          title: `Porción ${portionId} devuelta`,
           body: "El administrador devolvió tu porción para revisión.",
           route: `/qc/lotes/${batch.id}`,
           type: "qc_batch.assignment_rejected",
@@ -637,8 +640,21 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
 
       let paidReviewers = 0;
       await prisma.$transaction(async (tx) => {
-        paidReviewers = await payReviewersForBatch(batch.id, tx, reviewerId);
-        await tx.deviceUnit.updateMany({ where: { batchId: batch.id, assignedToId: reviewerId }, data: { assignedToId: null } });
+        const submissionData = latestSubmission.afterData && typeof latestSubmission.afterData === "object"
+          ? latestSubmission.afterData as Record<string, unknown>
+          : {};
+        const deviceIds = Array.isArray(submissionData.deviceIds)
+          ? submissionData.deviceIds.filter((id): id is string => typeof id === "string")
+          : undefined;
+        paidReviewers = await payReviewersForBatch(batch.id, tx, reviewerId, portionId, deviceIds);
+        await tx.deviceUnit.updateMany({
+          where: {
+            batchId: batch.id,
+            assignedToId: reviewerId,
+            ...(deviceIds?.length ? { id: { in: deviceIds } } : {}),
+          },
+          data: { assignedToId: null },
+        });
       });
       await logAudit({
         userId: persisted.id,
@@ -646,7 +662,7 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
         module: "qc",
         entityType: "qc_revision_batch",
         entityId: batch.id,
-        afterData: { batchNumber: batch.batchNumber, reviewerId, paidReviewers },
+        afterData: { batchNumber: batch.batchNumber, reviewerId, portionId, paidReviewers },
       });
       await sendPushToUsers([reviewerId], {
         title: `Porción de ${batch.batchNumber} aprobada`,
@@ -1512,6 +1528,7 @@ export async function getQcPaymentsAction(): Promise<
       amount: number;
       paidAt: Date;
       description: string | null;
+      portionId: string | null;
     }>;
   }>
 > {
@@ -1601,19 +1618,25 @@ export async function getQcPaymentsAction(): Promise<
       where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
       orderBy: { createdAt: "desc" },
       take: 300,
-      select: { entityId: true, action: true, createdAt: true, afterData: true },
+      select: { id: true, entityId: true, action: true, createdAt: true, afterData: true },
     });
-    const assignmentSubmissions = new Map<string, { batchId: string; reviewerId: string; reviewerName: string; assignedDevices: number; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number; submittedAt: Date }>();
-    const seenAssignmentKeys = new Set<string>();
-    for (const audit of assignmentAudits) {
+    const assignmentSubmissions: Array<{ portionId: string; batchId: string; reviewerId: string; reviewerName: string; assignedDevices: number; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number; submittedAt: Date }> = [];
+    const submissionAudits = assignmentAudits.filter((audit) => audit.action === "qc_batch.assignment_submit");
+    for (const [index, audit] of submissionAudits.entries()) {
       const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
       const reviewerId = typeof data.reviewerId === "string" ? data.reviewerId : null;
       if (!audit.entityId || !reviewerId) continue;
-      const key = `${audit.entityId}:${reviewerId}`;
-      if (seenAssignmentKeys.has(key)) continue;
-      seenAssignmentKeys.add(key);
-      if (audit.action !== "qc_batch.assignment_submit") continue;
-      assignmentSubmissions.set(key, {
+      const portionId = typeof data.portionId === "string" ? data.portionId : `LEGACY-${audit.id}`;
+      const nextNewerSubmission = index > 0 ? submissionAudits[index - 1] : null;
+      const processed = assignmentAudits.some((candidate) => {
+        if (!["qc_batch.assignment_reject", "qc_batch.assignment_approve"].includes(candidate.action) || candidate.createdAt <= audit.createdAt) return false;
+        const candidateData = candidate.afterData && typeof candidate.afterData === "object" ? candidate.afterData as Record<string, unknown> : {};
+        if (typeof data.portionId === "string") return candidateData.portionId === portionId;
+        return candidateData.reviewerId === reviewerId && (!nextNewerSubmission || candidate.createdAt < nextNewerSubmission.createdAt);
+      });
+      if (processed) continue;
+      assignmentSubmissions.push({
+        portionId,
         batchId: audit.entityId,
         reviewerId,
         reviewerName: typeof data.reviewerName === "string" ? data.reviewerName : "QC",
@@ -1624,7 +1647,7 @@ export async function getQcPaymentsAction(): Promise<
         submittedAt: audit.createdAt,
       });
     }
-    const assignmentBatchIds = [...new Set([...assignmentSubmissions.values()].map((item) => item.batchId))];
+    const assignmentBatchIds = [...new Set(assignmentSubmissions.map((item) => item.batchId))];
     const assignmentBatches = await prisma.qcRevisionBatch.findMany({
       where: { id: { in: assignmentBatchIds } },
       select: { id: true, batchNumber: true, supplierName: true },
@@ -1633,13 +1656,14 @@ export async function getQcPaymentsAction(): Promise<
     const paidAssignmentKeys = new Set(
       paymentEntries.map((entry) => entry.externalKey).filter((key) => key.startsWith("qc-payment:")),
     );
-    for (const assignment of assignmentSubmissions.values()) {
+    for (const assignment of assignmentSubmissions) {
       const batch = assignmentBatchById.get(assignment.batchId);
-      const paymentKey = `qc-payment:${assignment.batchId}:${assignment.reviewerId}`;
+      const paymentKey = `qc-payment:${assignment.batchId}:${assignment.portionId}:${assignment.reviewerId}`;
       if (!batch || paidAssignmentKeys.has(paymentKey)) continue;
       mapPending.push({
         id: assignment.batchId,
         assignmentKey: paymentKey,
+        portionId: assignment.portionId,
         reviewerId: assignment.reviewerId,
         batchNumber: batch.batchNumber,
         supplierName: batch.supplierName,
@@ -1677,6 +1701,16 @@ export async function getQcPaymentsAction(): Promise<
       },
     });
     const paymentCounts = new Map<string, { reviewedDevices: number; functionalCount: number; nonFunctionalCount: number }>();
+    const portionCounts = new Map<string, { reviewedDevices: number; functionalCount: number; nonFunctionalCount: number }>();
+    for (const audit of submissionAudits) {
+      const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
+      if (typeof data.portionId !== "string") continue;
+      portionCounts.set(data.portionId, {
+        reviewedDevices: Number(data.reviewedDevices) || 0,
+        functionalCount: Number(data.functionalCount) || 0,
+        nonFunctionalCount: Number(data.nonFunctionalCount) || 0,
+      });
+    }
     for (const device of paidDevices) {
       if (!device.batchId) continue;
       const inspection = device.inspections[0];
@@ -1690,11 +1724,12 @@ export async function getQcPaymentsAction(): Promise<
       paymentCounts.set(key, counts);
     }
     const payments = paymentEntries.flatMap((entry) => {
-      const [, batchId, reviewerId] = entry.externalKey.split(":");
+      const [, batchId, keyPart, keyReviewerId] = entry.externalKey.split(":");
+      const reviewerId = keyReviewerId ?? keyPart;
       const batchNumber = batchId ? batchNumberById.get(batchId) : undefined;
       if (!batchId || !batchNumber) return [];
       const reviewer = entry.wallet.user;
-      const counts = paymentCounts.get(`${batchId}:${reviewerId}`) ?? {
+      const counts = (keyReviewerId ? portionCounts.get(keyPart) : null) ?? paymentCounts.get(`${batchId}:${reviewerId}`) ?? {
         reviewedDevices: Math.round(Number(entry.amount) / RATE),
         functionalCount: 0,
         nonFunctionalCount: 0,
@@ -1705,6 +1740,7 @@ export async function getQcPaymentsAction(): Promise<
         batchNumber,
         reviewerName: reviewer.name ?? reviewer.username ?? reviewer.email,
         reviewerId: reviewerId ?? null,
+        portionId: keyReviewerId ? keyPart : null,
         ...counts,
         amount: Number(entry.amount),
         paidAt: entry.occurredAt,

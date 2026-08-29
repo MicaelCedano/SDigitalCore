@@ -8,12 +8,15 @@ export const QC_REVIEW_RATE = 50; // RD$ por equipo revisado (fórmula SDigitalS
  * Fórmula SDigitalSystem (approveLote): N equipos revisados × RD$50,
  * acreditado al wallet del revisor que hizo la inspección más reciente
  * de cada equipo. Idempotente: cada pago tiene externalKey único
- * `qc-payment:{batchId}:{reviewerId}`.
+ * `qc-payment:{batchId}:{portionId}:{reviewerId}`. Cada porción tiene su propio pago,
+ * incluso cuando pertenece al mismo lote y revisor.
  */
 export async function payReviewersForBatch(
   batchId: string,
   tx: Prisma.TransactionClient = prisma,
   onlyReviewerId?: string,
+  portionId?: string,
+  onlyDeviceIds?: string[],
 ) {
   const batch = await tx.qcRevisionBatch.findUnique({
     where: { id: batchId },
@@ -27,7 +30,11 @@ export async function payReviewersForBatch(
   // historial previo de un reingreso NO cuenta. El resultado no importa:
   // funcional o no funcional, la revisión se paga igual.
   const devices = await tx.deviceUnit.findMany({
-    where: { batchId: batch.id, ...(onlyReviewerId ? { assignedToId: onlyReviewerId } : {}) },
+    where: {
+      batchId: batch.id,
+      ...(onlyReviewerId ? { assignedToId: onlyReviewerId } : {}),
+      ...(onlyDeviceIds?.length ? { id: { in: onlyDeviceIds } } : {}),
+    },
     select: {
       inspections: {
         where: { createdAt: { gte: batch.createdAt } },
@@ -48,7 +55,7 @@ export async function payReviewersForBatch(
 
   let paidReviewers = 0;
   for (const [reviewerId, count] of perReviewer) {
-    const externalKey = `qc-payment:${batch.id}:${reviewerId}`;
+    const externalKey = `qc-payment:${batch.id}:${portionId ?? `LEGACY-${reviewerId}`}:${reviewerId}`;
     const existing = await tx.walletLedgerEntry.findUnique({ where: { externalKey } });
     if (existing) continue; // ya pagado (idempotente)
 
@@ -77,12 +84,12 @@ export async function payReviewersForBatch(
         accountId: account.id,
         type: "CREDIT",
         amount,
-        description: `Pago por Lote QC: ${batch.batchNumber} (${count} equipo(s) × RD$${QC_REVIEW_RATE})`,
+        description: `Pago por Porción ${portionId ?? "histórica"} del Lote QC ${batch.batchNumber}: (${count} equipo(s) × RD$${QC_REVIEW_RATE})`,
         externalKey,
         actorId: reviewerId,
         // OJO: NO usar batch_id aquí — el FK wallet_ledger_entry_batch_id_fkey
         // apunta a legacy_migration_batch, no a qc_revision_batch. El lote QC
-        // queda trazado en externalKey (`qc-payment:{batchId}:{reviewerId}`)
+        // queda trazado en externalKey (`qc-payment:{batchId}:{portionId}:{reviewerId}`)
         // y en description (batchNumber).
       },
     });
