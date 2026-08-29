@@ -10,8 +10,8 @@ type Result<T> = { success: true; data: T; message?: string } | { success: false
 
 /**
  * Edición de datos del equipo (device_unit) desde Equipos Revisados.
- * Solo admin. NO se editan imei/serial (identidad) ni status (lo maneja el
- * flujo QC: revisiones, reingresos, verificación física).
+ * Solo admin. NO se editan imei/serial (identidad). La clasificación de la
+ * inspección sí puede corregirse desde el registro de equipos revisados.
  */
 const updateDeviceSchema = z.object({
   deviceId: z.string().min(1),
@@ -19,6 +19,7 @@ const updateDeviceSchema = z.object({
   model: z.string().trim().min(1).max(150),
   storageGb: z.number().int().min(1).max(4096).nullable().optional(),
   color: z.string().trim().max(80).optional(),
+  result: z.enum(["FUNCTIONAL", "NON_FUNCTIONAL", "UNSPECIFIED"]),
 });
 
 export async function updateDeviceAction(input: z.input<typeof updateDeviceSchema>): Promise<Result<{ deviceId: string }>> {
@@ -30,7 +31,17 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
     }
     const data = updateDeviceSchema.parse(input);
 
-    const device = await prisma.deviceUnit.findUnique({ where: { id: data.deviceId }, select: { id: true } });
+    const device = await prisma.deviceUnit.findUnique({
+      where: { id: data.deviceId },
+      include: {
+        batch: true,
+        inspections: {
+          where: { status: "COMPLETED" },
+          orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
+      },
+    });
     if (!device) return { success: false, error: "Equipo no encontrado." };
 
     const next = {
@@ -40,12 +51,47 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
       color: data.color?.trim() || null,
     };
 
-    const before = await prisma.deviceUnit.findUnique({
-      where: { id: data.deviceId },
-      select: { brand: true, model: true, storageGb: true, color: true },
-    });
+    const currentInspection = device.inspections[0];
+    const previousStatus = device.status;
+    const nextStatus = data.result === "FUNCTIONAL" ? "AVAILABLE" : data.result === "NON_FUNCTIONAL" ? "QUARANTINED" : "PENDING_QC";
 
-    await prisma.deviceUnit.update({ where: { id: data.deviceId }, data: next });
+    await prisma.$transaction(async (tx) => {
+      await tx.deviceUnit.update({ where: { id: data.deviceId }, data: { ...next, status: nextStatus } });
+
+      if (currentInspection) {
+        await tx.qcInspection.update({
+          where: { id: currentInspection.id },
+          data: { result: data.result },
+        });
+      }
+
+      if (device.batch && currentInspection?.createdAt >= device.batch.createdAt) {
+        const batchDevices = await tx.deviceUnit.findMany({
+          where: { batchId: device.batch.id },
+          include: {
+            inspections: {
+              where: { status: "COMPLETED", createdAt: { gte: device.batch.createdAt } },
+              orderBy: [{ reviewedAt: "desc" }, { createdAt: "desc" }],
+              take: 1,
+            },
+          },
+        });
+        let reviewedDevices = 0;
+        let functionalCount = 0;
+        let nonFunctionalCount = 0;
+        for (const batchDevice of batchDevices) {
+          const inspection = batchDevice.inspections[0];
+          if (!inspection) continue;
+          reviewedDevices += 1;
+          if (inspection.result === "FUNCTIONAL") functionalCount += 1;
+          if (inspection.result === "NON_FUNCTIONAL") nonFunctionalCount += 1;
+        }
+        await tx.qcRevisionBatch.update({
+          where: { id: device.batch.id },
+          data: { reviewedDevices, functionalCount, nonFunctionalCount },
+        });
+      }
+    });
 
     await logAudit({
       userId: persisted.id,
@@ -54,12 +100,14 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
       entityType: "device_unit",
       entityId: data.deviceId,
       beforeData: {
-        brand: before?.brand ?? null,
-        model: before?.model ?? null,
-        storageGb: before?.storageGb ?? null,
-        color: before?.color ?? null,
+        brand: device.brand ?? null,
+        model: device.model,
+        storageGb: device.storageGb ?? null,
+        color: device.color ?? null,
+        result: currentInspection?.result ?? null,
+        status: previousStatus,
       },
-      afterData: next,
+      afterData: { ...next, result: data.result, status: nextStatus },
     });
 
     for (const path of ["/qc/equipos-revisados", "/qc", "/qc/lotes"]) revalidatePath(path);

@@ -123,7 +123,7 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
   // Edición del equipo (admin)
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState({ brand: "", model: "", storageGb: "", color: "" });
+  const [editForm, setEditForm] = useState({ brand: "", model: "", storageGb: "", color: "", result: "UNSPECIFIED" as "FUNCTIONAL" | "NON_FUNCTIONAL" | "UNSPECIFIED" });
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const showToast = (type: "success" | "error", text: string) => {
@@ -138,6 +138,7 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
       model: selected.device.model ?? "",
       storageGb: selected.device.storageGb ? String(selected.device.storageGb) : "",
       color: selected.device.color ?? "",
+      result: selected.result ?? "UNSPECIFIED",
     });
     setEditing(true);
   };
@@ -156,6 +157,7 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
       model: editForm.model.trim(),
       storageGb,
       color: editForm.color.trim() || undefined,
+      result: editForm.result,
     });
     setSaving(false);
     if (res.success) {
@@ -167,7 +169,9 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
           model: editForm.model.trim(),
           storageGb,
           color: editForm.color.trim() || null,
+          status: editForm.result === "FUNCTIONAL" ? "AVAILABLE" : editForm.result === "NON_FUNCTIONAL" ? "QUARANTINED" : "PENDING_QC",
         },
+        result: editForm.result,
       });
       setEditing(false);
       showToast("success", res.message ?? "Equipo actualizado.");
@@ -550,8 +554,20 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
                   />
                 </div>
               </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">Resultado de revisión</label>
+                <select
+                  value={editForm.result}
+                  onChange={(e) => setEditForm({ ...editForm, result: e.target.value as typeof editForm.result })}
+                  className="mt-1.5 w-full rounded-xl border border-[#d0d5dd] bg-white px-3.5 py-2.5 text-sm text-[#101828] outline-none focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10"
+                >
+                  <option value="FUNCTIONAL">Funcional</option>
+                  <option value="NON_FUNCTIONAL">No funcional</option>
+                  <option value="UNSPECIFIED">Sin clasificación</option>
+                </select>
+              </div>
               <p className="text-xs text-[#98a2b3]">
-                El IMEI y el estado no se editan aquí: el estado lo define el flujo de revisión.
+                El IMEI no se edita aquí. Al cambiar el resultado, también se actualiza el estado operativo del equipo.
               </p>
             </div>
 
