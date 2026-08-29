@@ -6,20 +6,22 @@ type ExportBatch = {
   branch?: string | null;
   receivedAt?: string | Date | null;
   status?: string | null;
-  devices: Array<{
-    imei?: string | null;
-    serialNumber?: string | null;
-    brand?: string | null;
-    model: string;
-    storageGb?: number | null;
-    inspections?: Array<{
-      status?: string | null;
-      result?: string | null;
-      grade?: string | null;
-      batteryHealth?: number | null;
-      functionalityNotes?: string | null;
-      physicalNotes?: string | null;
-    }>;
+  devices: ExportDevice[];
+};
+
+type ExportDevice = {
+  imei?: string | null;
+  serialNumber?: string | null;
+  brand?: string | null;
+  model: string;
+  storageGb?: number | null;
+  inspections?: Array<{
+    status?: string | null;
+    result?: string | null;
+    grade?: string | null;
+    batteryHealth?: number | null;
+    functionalityNotes?: string | null;
+    physicalNotes?: string | null;
   }>;
 };
 
@@ -27,6 +29,29 @@ const resultLabels: Record<string, string> = {
   FUNCTIONAL: "FUNCIONAL",
   NON_FUNCTIONAL: "DEFECTUOSO",
 };
+
+/** Ordena los equipos por modelo usando un orden natural para Excel. */
+export function sortQcDevicesByModel(devices: ExportDevice[]): ExportDevice[] {
+  return devices
+    .map((device, index) => ({ device, index }))
+    .sort((a, b) => {
+      const modelComparison = normalizeModelName(a.device.model).localeCompare(
+        normalizeModelName(b.device.model),
+        "es-DO",
+        { numeric: true, sensitivity: "base" },
+      );
+      return modelComparison !== 0 ? modelComparison : a.index - b.index;
+    })
+    .map(({ device }) => device);
+}
+
+function normalizeModelName(value: string) {
+  return value
+    .trim()
+    // iPhone X representa la generación 10 y debe ir antes de iPhone 11.
+    .replace(/\biphone\s+x\b/gi, "iPhone 10")
+    .replace(/\s+/g, " ");
+}
 
 /** Descarga una compra QC como un libro XLSX real, compatible con Excel. */
 export async function exportRevisionBatchToExcel(batch: ExportBatch) {
@@ -76,7 +101,9 @@ export async function exportRevisionBatchToExcel(batch: ExportBatch) {
   let functionalCount = 0;
   let nonFunctionalCount = 0;
 
-  batch.devices.forEach((device, index) => {
+  const sortedDevices = sortQcDevicesByModel(batch.devices);
+
+  sortedDevices.forEach((device, index) => {
     const inspection = device.inspections?.[0];
     const reviewed = inspection?.status === "COMPLETED";
     const result = reviewed ? resultLabels[inspection?.result || ""] || inspection?.result || "" : "PENDIENTE";
