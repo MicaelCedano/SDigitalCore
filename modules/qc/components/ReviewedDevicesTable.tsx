@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BatteryMedium,
   CheckCircle2,
@@ -21,7 +21,7 @@ import { formatDateTimeRD } from "@/lib/utils/format";
 import { getDeviceHistoryAction } from "../actions/device-history";
 import { updateDeviceAction } from "../actions/device-edit";
 import { useRouter } from "next/navigation";
-import { cacheDevicePhotos, getCachedDevicePhotos } from "../lib/photo-cache";
+import { cacheDevicePhotos, clearCachedDevicePhotos, getCachedDevicePhotos } from "../lib/photo-cache";
 
 export type ReviewedInspection = {
   id: string;
@@ -119,6 +119,7 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
   const [selected, setSelected] = useState<ReviewedInspection | null>(null);
   const [history, setHistory] = useState<DeviceHistory | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const photoRefreshAttempted = useRef(false);
 
   // Edición del equipo (admin)
   const [editing, setEditing] = useState(false);
@@ -197,6 +198,7 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
       return;
     }
     let cancelled = false;
+    photoRefreshAttempted.current = false;
     setHistory(null);
     (async () => {
       const cachedPhotos = getCachedDevicePhotos(selected.device.id);
@@ -211,6 +213,17 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
       cancelled = true;
     };
   }, [selected]);
+
+  const refreshPhotosAfterError = async () => {
+    if (!selected || photoRefreshAttempted.current) return;
+    photoRefreshAttempted.current = true;
+    clearCachedDevicePhotos(selected.device.id);
+    const res = await getDeviceHistoryAction(selected.device.id);
+    if (res.success && res.data) {
+      cacheDevicePhotos(selected.device.id, res.data.photos);
+      setHistory((current) => (current ? { ...current, photos: res.data.photos } : res.data));
+    }
+  };
 
   return (
     <>
@@ -411,7 +424,15 @@ export function ReviewedDevicesTable({ inspections }: { inspections: ReviewedIns
                         className="aspect-square overflow-hidden rounded-xl border border-[#e4e7ec] bg-[#f9fafb] hover:border-[#4f46e5] transition-all"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={photo.url} alt="Foto del equipo" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        <img
+                          src={photo.url}
+                          alt="Foto del equipo"
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={() => void refreshPhotosAfterError()}
+                          className="h-full w-full object-cover"
+                        />
                       </button>
                     ))}
                   </div>
