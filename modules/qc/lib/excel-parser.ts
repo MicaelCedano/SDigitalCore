@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { normalizeModelName } from "./model-name";
 
 export interface ParsedExcelRow {
     imei: string;
@@ -166,7 +167,7 @@ export async function readPurchaseExcel(file: File): Promise<ExcelImportResult> 
                 imei,
                 rawModel,
                 brand,
-                modelName: parsed.modelName,
+                modelName: normalizeModelName(parsed.modelName, brand),
                 storageGb: parsed.storageGb,
                 color: finalColor
             });

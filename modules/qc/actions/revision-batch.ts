@@ -22,6 +22,7 @@ import {
 import type { QcBatchStatus } from "@prisma/client";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import { normalizeModelName } from "../lib/model-name";
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
@@ -67,7 +68,7 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
 
     // Extraer IMEIs pegados masivamente o ítems individuales
     const bulkImeis = parseBulkImeisText(validated.devicesText);
-    const defaultModel = validated.defaultModel?.trim() || "Modelo no especificado";
+    const defaultModel = normalizeModelName(validated.defaultModel?.trim() || "Modelo no especificado", validated.defaultBrand);
     const defaultBrand = validated.defaultBrand?.trim() || null;
 
     const devicesToCreate: { imei?: string; serialNumber?: string; brand: string | null; model: string; storageGb?: number; color?: string }[] = [];
@@ -90,7 +91,7 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
           imei: dev.imei ? dev.imei.trim() : undefined,
           serialNumber: dev.serialNumber ? dev.serialNumber.trim() : undefined,
           brand: dev.brand?.trim() || defaultBrand,
-          model: dev.model.trim(),
+          model: normalizeModelName(dev.model, dev.brand?.trim() || defaultBrand),
           storageGb: dev.storageGb ?? undefined,
           color: dev.color ? dev.color.trim() : undefined,
         });
@@ -827,7 +828,7 @@ export async function addDevicesToBatchAction(input: {
       return { success: false, error: "No se pueden agregar equipos a un lote completado o cancelado." };
     }
 
-    const mdl = defaultModel?.trim() || "Modelo no especificado";
+    const mdl = normalizeModelName(defaultModel?.trim() || "Modelo no especificado", defaultBrand);
     const brd = defaultBrand?.trim() || null;
 
     // IMEIs pegados masivamente
@@ -848,7 +849,7 @@ export async function addDevicesToBatchAction(input: {
           imei: dev.imei ? dev.imei.trim() : undefined,
           serialNumber: dev.serialNumber ? dev.serialNumber.trim() : undefined,
           brand: dev.brand?.trim() || brd,
-          model: dev.model.trim(),
+          model: normalizeModelName(dev.model, dev.brand?.trim() || brd),
           storageGb: dev.storageGb ?? undefined,
         });
       }

@@ -13,6 +13,7 @@ import { AssignDeviceModal } from "./AssignDeviceModal";
 import { FisicoVerifierModal } from "./FisicoVerifierModal";
 import { NoFuncionalesModal } from "./NoFuncionalesModal";
 import { AddDevicesModal } from "./AddDevicesModal";
+import { PurchaseDeviceEditModal } from "./PurchaseDeviceEditModal";
 import { exportRevisionBatchToExcel } from "../lib/excel-export";
 import {
   ArrowLeft,
@@ -34,6 +35,7 @@ import {
   Trash2,
   Loader2,
   Plus,
+  Pencil,
 } from "lucide-react";
 
 interface RevisionBatchDetailViewProps {
@@ -51,6 +53,7 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
   const [showVerifier, setShowVerifier] = useState(false);
   const [showNoFuncionales, setShowNoFuncionales] = useState(false);
   const [showAddDevices, setShowAddDevices] = useState(false);
+  const [editDevice, setEditDevice] = useState<any>(null);
   const router = useRouter();
 
   const refreshBatch = async () => {
@@ -405,6 +408,16 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
                           >
                             <UserCheck className="w-3.5 h-3.5" />
                           </button>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditDevice(dev)}
+                              title="Editar marca y modelo"
+                              className="p-1.5 bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700 rounded-lg text-xs transition-colors inline-flex items-center"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => setReviewDevice(dev)}
@@ -505,6 +518,21 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
           existingModels={[]}
           onClose={() => setShowAddDevices(false)}
           onChanged={() => refreshBatch()}
+        />
+      )}
+
+      {editDevice && (
+        <PurchaseDeviceEditModal
+          batchId={batch.id}
+          device={editDevice}
+          onClose={() => setEditDevice(null)}
+          onSaved={(data) => {
+            setBatch((current: any) => ({
+              ...current,
+              devices: current.devices.map((candidate: any) => candidate.id === editDevice.id ? { ...candidate, ...data } : candidate),
+            }));
+            setEditDevice(null);
+          }}
         />
       )}
     </div>

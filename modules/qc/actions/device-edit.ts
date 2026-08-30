@@ -5,6 +5,7 @@ import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { normalizeModelName } from "../lib/model-name";
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
@@ -46,7 +47,7 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
 
     const next = {
       brand: data.brand?.trim() || null,
-      model: data.model.trim(),
+      model: normalizeModelName(data.model, data.brand),
       storageGb: data.storageGb ?? null,
       color: data.color?.trim() || null,
     };
@@ -112,6 +113,58 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
 
     for (const path of ["/qc/equipos-revisados", "/qc", "/qc/lotes"]) revalidatePath(path);
     return { success: true, data: { deviceId: data.deviceId }, message: "Equipo actualizado." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el equipo." };
+  }
+}
+
+const updatePurchaseDeviceSchema = z.object({
+  batchId: z.string().min(1),
+  deviceId: z.string().min(1),
+  brand: z.string().trim().max(100).optional().nullable(),
+  model: z.string().trim().min(1).max(150),
+  storageGb: z.number().int().min(1).max(4096).nullable().optional(),
+  color: z.string().trim().max(80).optional().nullable(),
+});
+
+/** Edita los datos de identificación operativa desde Compras, sin tocar IMEI,
+ * estado QC ni inspecciones históricas. */
+export async function updatePurchaseDeviceAction(
+  input: z.input<typeof updatePurchaseDeviceSchema>,
+): Promise<Result<{ deviceId: string }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede editar equipos." };
+    }
+    const data = updatePurchaseDeviceSchema.parse(input);
+    const device = await prisma.deviceUnit.findFirst({
+      where: { id: data.deviceId, batchId: data.batchId },
+      select: { id: true, batchId: true, brand: true, model: true, storageGb: true, color: true },
+    });
+    if (!device) return { success: false, error: "El equipo no pertenece a esta compra." };
+
+    const next = {
+      brand: data.brand?.trim() || null,
+      model: normalizeModelName(data.model, data.brand),
+      storageGb: data.storageGb ?? null,
+      color: data.color?.trim() || null,
+    };
+    await prisma.deviceUnit.update({ where: { id: device.id }, data: next });
+    await logAudit({
+      userId: actor.id,
+      action: "qc.purchase_device.update",
+      module: "qc",
+      entityType: "device_unit",
+      entityId: device.id,
+      beforeData: { brand: device.brand, model: device.model, storageGb: device.storageGb, color: device.color },
+      afterData: next,
+    });
+    revalidatePath(`/qc/lotes/${data.batchId}`);
+    revalidatePath("/qc/lotes");
+    revalidatePath("/qc/equipos-revisados");
+    return { success: true, data: { deviceId: device.id }, message: "Equipo actualizado." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el equipo." };
   }
