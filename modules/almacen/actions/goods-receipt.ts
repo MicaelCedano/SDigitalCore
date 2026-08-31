@@ -335,6 +335,51 @@ export async function getGoodsReceiptByIdAction(id: string) {
   }
 }
 
+/**
+ * Devuelve identidades usadas en recibos anteriores para completar el modelo,
+ * la marca y la capacidad juntos al registrar una nueva mercancía.
+ */
+export async function getGoodsReceiptModelSuggestionsAction(search?: string, brand?: string) {
+  try {
+    await requirePermission("warehouse.read");
+    const searchKey = normalizedKey(search);
+    const brandKey = normalizedBrandKey(brand);
+    const receipts = await prisma.goodsReceipt.findMany({
+      select: { items: { select: { description: true, colorVariants: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    });
+    const suggestions = new Map<string, { model: string; brand: string; capacity: string }>();
+
+    for (const receipt of receipts) {
+      for (const item of receipt.items) {
+        const variants = Array.isArray(item.colorVariants) ? item.colorVariants : [];
+        const candidates = variants.length > 0 ? variants : [{ model: item.description }];
+        for (const rawCandidate of candidates) {
+          const candidate = rawCandidate as Record<string, unknown>;
+          const model = normalizeReceiptText(typeof candidate.model === "string" ? candidate.model : item.description);
+          const itemBrand = normalizeReceiptText(typeof candidate.brand === "string" ? candidate.brand : "");
+          const capacity = normalizeReceiptText(typeof candidate.capacity === "string" ? candidate.capacity : "");
+          if (!model || (searchKey && !normalizedKey(model).includes(searchKey))) continue;
+          if (brandKey && normalizedBrandKey(itemBrand) !== brandKey) continue;
+          const key = `${normalizedBrandKey(itemBrand)}|${normalizedKey(model)}|${normalizedKey(capacity)}`;
+          suggestions.set(key, { model, brand: itemBrand, capacity });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: [...suggestions.values()].sort((a, b) => {
+        const modelOrder = a.model.localeCompare(b.model, "es");
+        return modelOrder || a.capacity.localeCompare(b.capacity, "es");
+      }).slice(0, 20),
+    };
+  } catch {
+    return { success: false, data: [] };
+  }
+}
+
 export async function getWarehouseProductSuggestionAction(input: unknown) {
   try {
     await requirePermission("warehouse.read");

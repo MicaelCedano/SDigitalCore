@@ -66,6 +66,9 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
   const isConduce = invoice.type === "CONDUCE";
   const displayBranch = COMPANY_LABEL;
   const itemCount = Array.isArray(invoice.items) ? invoice.items.length : 0;
+  const totalEquipmentCount = Array.isArray(invoice.items)
+    ? invoice.items.reduce((total: number, item: any) => total + (Number(item.quantity) || 0), 0)
+    : 0;
   const printDensity = itemCount >= 16
     ? "invoice-print-density-tight"
     : itemCount >= 9
@@ -250,7 +253,12 @@ export function InvoicePDFPreviewModal({ invoice, onClose }: InvoicePDFPreviewMo
                 </div>
               ) : (
                 <div className="invoice-delivery-terms bg-amber-50 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 font-medium">
-                  <p className="font-bold">Conduce de Entrega Final — {displayBranch}</p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="font-bold">Conduce de Entrega Final — {displayBranch}</p>
+                    <p className="rounded-lg border border-amber-300 bg-white/70 px-3 py-2 text-center text-sm font-black uppercase tracking-wide text-amber-900">
+                      Total de equipos: {totalEquipmentCount}
+                    </p>
+                  </div>
                   <p className="text-[11px] mt-0.5">
                     Al firmar como "Recibido Conforme", el cliente acepta las políticas de la empresa y certifica que ha recibido la mercancía detallada.
                     Cualquier reclamo debe realizarse antes de retirar la mercancía. No nos hacemos responsables tras la salida.

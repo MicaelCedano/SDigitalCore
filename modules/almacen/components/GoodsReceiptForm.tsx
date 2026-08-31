@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   saveGoodsReceiptAction,
-  getCatalogModelsAction,
+  getGoodsReceiptModelSuggestionsAction,
   getGoodsReceiptSuggestionsAction,
 } from "../actions/goods-receipt";
 import { getBranchesAction } from "@/modules/configuracion/actions/branch";
@@ -101,7 +101,7 @@ export function GoodsReceiptForm({
   );
 
   // Sugerencias de autocompletado para modelos
-  const [catalogSuggestions, setCatalogSuggestions] = useState<string[]>([]);
+  const [catalogSuggestions, setCatalogSuggestions] = useState<Array<{ model: string; brand: string; capacity: string }>>([]);
   const [supplierSuggestions, setSupplierSuggestions] = useState<string[]>([]);
   const [colorSuggestions, setColorSuggestions] = useState<string[]>([]);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
@@ -148,22 +148,35 @@ export function GoodsReceiptForm({
   };
 
   // Cargar catálogo de sugerencias al escribir
-  const handleDescriptionChange = async (index: number, val: string) => {
+  const handleDescriptionChange = (index: number, val: string) => {
     handleItemChange(index, "model", val);
     setActiveSuggestionIndex(index);
 
     if (val.trim().length >= 1) {
-      const res = await getCatalogModelsAction(val, items[index]?.brand);
-      if (res.success && res.data) {
-        setCatalogSuggestions(res.data);
-      }
+      void getGoodsReceiptModelSuggestionsAction(val, items[index]?.brand).then((res) => {
+        if (res.success && res.data) setCatalogSuggestions(res.data);
+      });
     } else {
       setCatalogSuggestions([]);
     }
   };
 
-  const handleSelectSuggestion = (index: number, modelName: string) => {
-    handleItemChange(index, "description", modelName);
+  const handleSelectSuggestion = (index: number, suggestion: { model: string; brand: string; capacity: string }) => {
+    const selectedModel = String(suggestion.model || "").trim();
+    const selectedBrand = String(suggestion.brand || "").trim();
+    const selectedCapacity = String(suggestion.capacity || "").trim();
+    setItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        // Conserva lo escrito si una sugerencia antigua no trae modelo en su
+        // identidad, pero siempre aplica la marca y capacidad disponibles.
+        model: selectedModel || updated[index].model,
+        brand: selectedBrand || updated[index].brand,
+        capacity: selectedCapacity || updated[index].capacity,
+      };
+      return updated;
+    });
     setCatalogSuggestions([]);
     setActiveSuggestionIndex(null);
   };
@@ -752,7 +765,7 @@ export function GoodsReceiptForm({
                                 onClick={() => handleSelectSuggestion(itemIdx, sug)}
                                 className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-[#5750f1]/10 hover:text-[#5750f1] font-medium transition-colors flex items-center justify-between"
                               >
-                                <span>{sug}</span>
+                                <span>{[sug.brand, sug.model, sug.capacity].filter(Boolean).join(" ")}</span>
                                 <span className="text-[10px] text-slate-400">Sugerencia</span>
                               </button>
                             ))}
