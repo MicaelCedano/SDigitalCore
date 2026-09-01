@@ -286,14 +286,9 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
       success: true,
       data: batches.map((batch) => ({
         ...batch,
-        // Compatibilidad con lotes que llegaron a 100% antes de la transición
-        // automática: quedan listos para aprobación sin editar datos aquí.
-        status:
-          (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
-          batch.totalDevices > 0 &&
-          batch.reviewedDevices >= batch.totalDevices
-            ? "COMPLETED"
-            : batch.status,
+        // Llegar al 100% de revisión no significa que la compra esté pagada.
+        // El QC todavía debe enviar su porción y el admin aprobarla.
+        status: batch.status,
       })),
     };
   } catch (error: any) {
@@ -357,18 +352,13 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
       }
     }
 
-    const effectiveStatus =
-      (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
-      totalDevices > 0 &&
-      reviewedDevices >= totalDevices
-        ? "COMPLETED"
-        : batch.status;
-
     return {
       success: true,
       data: {
         ...batch,
-        status: effectiveStatus,
+        // Una compra revisada al 100% sigue abierta hasta que cada porción
+        // sea enviada y aprobada. COMPLETED se reserva para el cierre/pago.
+        status: batch.status,
         devices,
         totalDevices,
         reviewedDevices,
@@ -1098,17 +1088,9 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
         }
       }
 
-      const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
-      // El lote se completa al terminar la revisión. El pago se procesa aparte
-      // por cada porción enviada por el revisor.
-      const nextStatus =
-        batch.status === "COMPLETED"
-          ? "COMPLETED"
-          : allReviewed
-            ? "COMPLETED"
-            : batch.status === "SUBMITTED"
-              ? "SUBMITTED"
-              : batch.status;
+      // La revisión completa no cierra ni paga la compra. Cada QC todavía
+      // debe enviar su porción y el admin aprobarla desde Pagos QC.
+      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : batch.status;
 
       const updatedBatch = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
@@ -1117,7 +1099,7 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
           status: nextStatus as QcBatchStatus,
-          completedAt: nextStatus === "COMPLETED" ? batch.completedAt : null,
+          completedAt: null,
         },
       });
 
@@ -1143,10 +1125,10 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       },
     });
 
-    if (updatedBatch.status === "COMPLETED" && batch.status !== "COMPLETED") {
+    if (updatedBatch.reviewedDevices >= updatedBatch.totalDevices && batch.reviewedDevices < batch.totalDevices) {
       await sendPushToRole("ADMIN", {
-        title: `Lote ${batch.batchNumber} completado`,
-        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Los pagos se gestionan por porción.`,
+        title: `Lote ${batch.batchNumber} listo para enviar`,
+        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. El QC debe enviar sus porciones para cobrar.`,
         route: `/qc/lotes/${batch.id}`,
         type: "qc_batch.completed",
       });
@@ -1163,10 +1145,9 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
     }
     revalidatePath("/centro-trabajo");
 
-    const completed = updatedBatch.status === "COMPLETED";
     return {
       success: true,
-      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). Lote ${batch.batchNumber}${completed ? " completado." : ""}`,
+      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). Lote ${batch.batchNumber} actualizado; ya puedes enviar tu porción cuando termines.`,
       data: updatedBatch,
     };
   } catch (error: any) {
@@ -1247,17 +1228,9 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
           else if (last.result === "NON_FUNCTIONAL") nonFunctional++;
         }
       }
-      const allReviewed = batchDevices.length > 0 && reviewed === batchDevices.length;
-      // La corrección administrativa también puede completar la revisión.
-      // El pago se procesa aparte por cada porción del revisor.
-      const nextStatus =
-        batch.status === "COMPLETED"
-          ? "COMPLETED"
-          : allReviewed
-            ? "COMPLETED"
-            : batch.status === "SUBMITTED"
-              ? "SUBMITTED"
-              : batch.status;
+      // La corrección administrativa no cierra ni paga la compra. El pago se
+      // acredita por porción desde Pagos QC.
+      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : batch.status;
 
       const updated = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
@@ -1266,7 +1239,7 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
           status: nextStatus as QcBatchStatus,
-          completedAt: nextStatus === "COMPLETED" ? batch.completedAt : null,
+          completedAt: null,
         },
       });
 
@@ -1284,10 +1257,10 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
       afterData: { batchId: batch.id, batchNumber: batch.batchNumber, deviceId: device.id },
     });
 
-    if (updatedBatch.status === "COMPLETED" && batch.status !== "COMPLETED") {
+    if (updatedBatch.reviewedDevices >= updatedBatch.totalDevices && batch.reviewedDevices < batch.totalDevices) {
       await sendPushToRole("ADMIN", {
-        title: `Lote ${batch.batchNumber} completado`,
-        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Los pagos se gestionan por porción.`,
+        title: `Lote ${batch.batchNumber} listo para enviar`,
+        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. El QC debe enviar sus porciones para cobrar.`,
         route: `/qc/lotes/${batch.id}`,
         type: "qc_batch.completed",
       });
@@ -1356,7 +1329,9 @@ export async function getQcDashboardAction() {
 
     const [devices, hoyInspecciones, myRequests, wallet, availableDevices] = await Promise.all([
       prisma.deviceUnit.findMany({
-        where: { assignedToId: persisted.id, batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } } },
+        // Compatibilidad con compras que quedaron COMPLETED por el cierre
+        // automático anterior pero todavía tienen una porción sin enviar.
+        where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
         orderBy: { updatedAt: "desc" },
         take: 100,
         include: {

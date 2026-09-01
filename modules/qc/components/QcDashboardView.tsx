@@ -102,7 +102,9 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     const map = new Map<string, any>();
     for (const dev of devices || []) {
       const b = dev.batch;
-      if (!b || b.status === "COMPLETED" || b.status === "CANCELLED") continue;
+      // Las compras antiguas que quedaron COMPLETED por el cierre automático
+      // siguen siendo accionables si todavía tienen equipos asignados.
+      if (!b || b.status === "CANCELLED") continue;
       const entry = map.get(b.id) || {
         id: b.id,
         batchNumber: b.batchNumber,
@@ -127,7 +129,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   }, [devices]);
 
   const canSubmitLote = (lote: any) =>
-    (lote.status === "IN_REVIEW" || lote.status === "PENDING_REVIEW") &&
+    (lote.status === "IN_REVIEW" || lote.status === "PENDING_REVIEW" || lote.status === "COMPLETED") &&
     lote.reviewedDevices >= lote.totalDevices &&
     lote.totalDevices > 0;
 
