@@ -10,6 +10,7 @@ export function ManualWalletCreditModal({ userId, recipientName }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
 
   const submit = async (formData: FormData) => {
     setPending(true);
@@ -23,6 +24,7 @@ export function ManualWalletCreditModal({ userId, recipientName }: Props) {
     setPending(false);
     if (result.success) {
       setMessage(result.message ?? "Pago acreditado.");
+      setAmount("");
       window.setTimeout(() => setOpen(false), 1200);
     } else setMessage(result.error ?? "No se pudo acreditar el pago manual.");
   };
@@ -40,11 +42,11 @@ export function ManualWalletCreditModal({ userId, recipientName }: Props) {
               <button type="button" onClick={() => setOpen(false)} disabled={pending} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
             </div>
             <form action={submit} className="mt-5 grid gap-3">
-              <label className="grid gap-1 text-xs font-bold text-slate-700">Monto (RD$)<input name="amount" type="number" min="0.01" step="0.01" defaultValue="2500" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-              <label className="grid gap-1 text-xs font-bold text-slate-700">Motivo<textarea name="reason" required minLength={10} defaultValue="Ajuste por 50 equipos QC pendientes — Lote 116" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} /></label>
-              <label className="grid gap-1 text-xs font-bold text-slate-700">Referencia única<input name="reference" required pattern="[a-zA-Z0-9_-]+" defaultValue="qc-lote-116-alberto-50" className="rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" /></label>
+              <label className="grid gap-1 text-xs font-bold text-slate-700">Monto (RD$)<input name="amount" type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Ej. 1600" required className="rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
+              <label className="grid gap-1 text-xs font-bold text-slate-700">Motivo<textarea name="reason" required minLength={10} placeholder="Ej. Compensación por revisión QC no acreditada" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} /></label>
+              <label className="grid gap-1 text-xs font-bold text-slate-700">Referencia única<input name="reference" required pattern="[a-zA-Z0-9_-]+" placeholder="Ej. compensacion-alberto-20260831" className="rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm" /></label>
               {message ? <p className="rounded-lg bg-slate-50 p-3 text-xs font-semibold text-slate-700">{message}</p> : null}
-              <button type="submit" disabled={pending} className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />} {pending ? "Acreditando..." : "Confirmar RD$2,500"}</button>
+              <button type="submit" disabled={pending || !amount} className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />} {pending ? "Acreditando..." : amount ? `Confirmar RD$${Number(amount).toLocaleString("es-DO")}` : "Escribe el monto"}</button>
             </form>
           </div>
         </div>
