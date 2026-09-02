@@ -78,6 +78,7 @@ interface GoodsReceiptDetailModalProps {
   receipt: GoodsReceiptDetail;
   onClose: () => void;
   onEdit?: (receipt: GoodsReceiptDetail) => void;
+  onEditFinalized?: (receipt: GoodsReceiptDetail) => void;
   onImportToWarehouse?: (receipt: GoodsReceiptDetail) => void;
   onCancelWarehouseImport?: (importId: string) => Promise<void>;
 }
@@ -187,6 +188,7 @@ export function GoodsReceiptDetailModal({
   receipt,
   onClose,
   onEdit,
+  onEditFinalized,
   onImportToWarehouse,
   onCancelWarehouseImport,
 }: GoodsReceiptDetailModalProps) {
@@ -485,6 +487,21 @@ export function GoodsReceiptDetailModal({
             >
               Cerrar
             </button>
+            {receipt.status === "COMPLETED" && !receipt.warehouseImportedAt && onEditFinalized && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEditFinalized(receipt);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-700"
+              >
+                <Pencil className="h-4 w-4" /> Corregir nombre / modelo
+              </button>
+            )}
+            {receipt.status === "COMPLETED" && receipt.warehouseImportedAt && (
+              <span className="max-w-[230px] text-right text-[11px] leading-4 text-slate-500">Para corregir este recibo, primero cancela su entrada al almacén.</span>
+            )}
             {receipt.status === "DRAFT" && onEdit && (
               <button
                 type="button"

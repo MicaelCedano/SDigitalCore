@@ -335,6 +335,91 @@ export async function getGoodsReceiptByIdAction(id: string) {
   }
 }
 
+const finalizedReceiptEditSchema = z.object({
+  receiptId: z.string().min(1),
+  items: z.array(z.object({
+    itemId: z.string().min(1),
+    model: z.string().trim().min(1, "El modelo es requerido").max(160),
+    brand: z.string().trim().max(100).optional().nullable(),
+    capacity: z.string().trim().max(80).optional().nullable(),
+  })).min(1),
+});
+
+/**
+ * Corrige únicamente la identidad visible de un recibo completado.
+ * Los IMEI, cantidades, precios, códigos y fechas quedan fuera del payload.
+ */
+export async function updateFinalizedGoodsReceiptIdentityAction(input: unknown) {
+  try {
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const validated = finalizedReceiptEditSchema.parse(input);
+    const receipt = await prisma.goodsReceipt.findUnique({
+      where: { id: validated.receiptId },
+      include: { items: true, warehouseImports: { where: { status: "ACTIVE" }, select: { id: true } } },
+    });
+    if (!receipt) return { success: false, error: "Recibo no encontrado." };
+    if (receipt.status !== "COMPLETED") return { success: false, error: "Solo los recibos finalizados pueden corregirse aquí." };
+    if (receipt.warehouseImports.length > 0 || receipt.warehouseImportedAt) {
+      return { success: false, error: "Este recibo ya fue importado al almacén. Primero cancela esa entrada para corregirlo sin descuadrar el inventario." };
+    }
+
+    const itemIds = new Set(receipt.items.map((item) => item.id));
+    if (validated.items.some((item) => !itemIds.has(item.itemId))) {
+      return { success: false, error: "Una de las líneas no pertenece a este recibo." };
+    }
+
+    const beforeData = { items: receipt.items.map((item) => ({
+      itemId: item.id,
+      description: item.description,
+      colorVariants: item.colorVariants,
+    })) };
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const edit of validated.items) {
+        const current = receipt.items.find((item) => item.id === edit.itemId);
+        if (!current) throw new Error("Línea de recibo no encontrada.");
+        const brand = edit.brand?.trim() || null;
+        const model = edit.model.trim();
+        const capacity = edit.capacity?.trim() || null;
+        const variants = Array.isArray(current.colorVariants)
+          ? current.colorVariants.map((rawVariant) => ({
+              ...(rawVariant as Record<string, unknown>),
+              brand,
+              model,
+              capacity,
+            }))
+          : null;
+        await tx.goodsReceiptItem.update({
+          where: { id: edit.itemId },
+          data: {
+            // Legacy lines used description as their model. Preserve that
+            // compatibility while modern lines keep description as notes.
+            description: variants && variants.length > 0 ? current.description : model,
+            colorVariants: variants as Prisma.InputJsonValue ?? undefined,
+          },
+        });
+      }
+      return tx.goodsReceipt.findUnique({ where: { id: receipt.id }, include: { items: true } });
+    });
+
+    await logAudit({
+      userId: actor.id,
+      action: "goods_receipt.correct_identity",
+      module: "almacen",
+      entityType: "goods_receipt",
+      entityId: receipt.id,
+      beforeData,
+      afterData: { receiptNumber: receipt.receiptNumber, items: updated?.items.map((item) => ({ itemId: item.id, description: item.description, colorVariants: item.colorVariants })) },
+    });
+    revalidatePath("/almacen/recibos");
+    revalidatePath("/dashboard");
+    return { success: true, data: updated, message: "Identidad del recibo corregida exitosamente." };
+  } catch (error: any) {
+    console.error("Error al corregir la identidad del recibo:", error);
+    return { success: false, error: error.message || "No se pudo corregir el recibo." };
+  }
+}
+
 /**
  * Devuelve identidades usadas en recibos anteriores para completar el modelo,
  * la marca y la capacidad juntos al registrar una nueva mercancía.
