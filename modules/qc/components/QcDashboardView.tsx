@@ -102,15 +102,15 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     const map = new Map<string, any>();
     for (const dev of devices || []) {
       const b = dev.batch;
-      // Las compras antiguas que quedaron COMPLETED por el cierre automático
-      // siguen siendo accionables si todavía tienen equipos asignados.
+      // Cada asignación vive en su propio lote de trabajo; el lote de compra
+      // original nunca debe reutilizarse para nuevas entregas.
       if (!b || b.status === "CANCELLED") continue;
       const entry = map.get(b.id) || {
         id: b.id,
         batchNumber: b.batchNumber,
         supplierName: b.supplierName,
         status: b.status,
-        // En el panel del QC el avance es el de su porción, no el del lote global.
+        // El avance corresponde únicamente a este lote de trabajo.
         totalDevices: 0,
         reviewedDevices: 0,
         myCount: 0,
@@ -273,7 +273,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                 <Package className="w-4 h-4 text-[#5750f1]" /> Mis lotes en revisión
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Cuando termines tu porción, envíala al administrador para que acepte y acredite tu pago; no tienes que esperar a los demás.
+                Cada lote se envía y se paga por separado; el lote de origen no se reutiliza.
               </p>
             </div>
           </div>
@@ -319,7 +319,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                         />
                       </div>
                       <span className="text-[11px] font-bold text-slate-600">
-                        {lote.reviewedDevices}/{lote.totalDevices} de tu porción revisados
+                        {lote.reviewedDevices}/{lote.totalDevices} de tu lote revisados
                       </span>
                       <span className="text-[11px] text-slate-400">
                         · tuyos: {lote.myReviewed}/{lote.myCount}
@@ -442,7 +442,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
 
             <div className="space-y-4 px-6 py-5">
               <p className="text-sm leading-6 text-slate-600">
-                Vas a enviar únicamente los equipos que tienes asignados. Los demás revisores podrán continuar con sus propias porciones.
+                Vas a enviar únicamente los equipos de este lote de trabajo. Los demás lotes se procesan por separado.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
@@ -450,7 +450,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                   <p className="mt-1 truncate font-mono text-sm font-black text-slate-800">{confirmLote.batchNumber}</p>
                 </div>
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Tu porción</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Tu lote</p>
                   <p className="mt-1 text-sm font-black text-emerald-800">{confirmLote.myReviewed}/{confirmLote.myCount} equipos</p>
                 </div>
               </div>
