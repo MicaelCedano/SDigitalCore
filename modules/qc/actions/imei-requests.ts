@@ -5,7 +5,6 @@ import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "node:crypto";
 import {
   createImeiRequestSchema,
   resolveImeiRequestSchema,
@@ -288,17 +287,7 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
           imei: true,
           batchId: true,
           assignedToId: true,
-          batch: {
-            select: {
-              id: true,
-              batchNumber: true,
-              supplierId: true,
-              supplierName: true,
-              branch: true,
-              receivedBy: true,
-              createdAt: true,
-            },
-          },
+          batch: { select: { createdAt: true } },
           inspections: {
             where: { status: "COMPLETED" },
             orderBy: { createdAt: "desc" },
@@ -313,91 +302,38 @@ export async function resolveImeiRequestAction(input: ResolveImeiRequestInput) {
         return !hasVigente && (!d.assignedToId || d.assignedToId === request.requesterId);
       });
       if (free.length > 0) {
-        const now = new Date();
-        const workBatchIds: string[] = [];
-        await prisma.$transaction(async (tx) => {
-          const bySourceBatch = new Map<string, typeof free>();
-          for (const device of free) {
-            if (!device.batch) continue;
-            const group = bySourceBatch.get(device.batch.id) ?? [];
-            group.push(device);
-            bySourceBatch.set(device.batch.id, group);
-          }
-
-          for (const [sourceBatchId, sourceDevices] of bySourceBatch) {
-            const source = sourceDevices[0].batch!;
-            const workBatch = await tx.qcRevisionBatch.create({
-              data: {
-                batchNumber: `${source.batchNumber}-R-${request.id.slice(-8).toUpperCase()}`.slice(0, 60),
-                supplierId: source.supplierId,
-                supplierName: source.supplierName,
-                branch: source.branch,
-                receivedBy: source.receivedBy,
-                assignedToId: request.requesterId,
-                status: "IN_REVIEW",
-                totalDevices: sourceDevices.length,
-                isWorkLot: true,
-                parentBatchId: sourceBatchId,
-                requestId: bySourceBatch.size === 1 ? request.id : null,
-                notes: `Lote de trabajo creado desde la solicitud ${request.id}. Lote de origen: ${source.batchNumber}.`,
-                receivedAt: now,
-              },
-            });
-            workBatchIds.push(workBatch.id);
-            await tx.deviceUnit.updateMany({
-              where: { id: { in: sourceDevices.map((device) => device.id) } },
-              data: { batchId: workBatch.id, assignedToId: request.requesterId, status: "IN_QC" },
-            });
-          }
-
-          assigned = free.length;
-          await tx.qcImeiRequest.update({
-            where: { id: request.id },
-            data: {
-              status: "ACCEPTED",
-              acceptedBy: persisted.id,
-              resolvedAt: now,
-            },
-          });
+        const res = await prisma.deviceUnit.updateMany({
+          where: { id: { in: free.map((d) => d.id) } },
+          data: { assignedToId: request.requesterId, status: "IN_QC" },
         });
+        assigned = res.count;
 
-        // La tarea anterior pertenece al lote de origen; se cancela solo la
-        // proyección, mientras el nuevo lote de trabajo queda independiente.
-        const sourceBatchIds = [...new Set(free.map((device) => device.batchId).filter((id): id is string => Boolean(id)))];
-        if (sourceBatchIds.length > 0) {
+        // La tarea automática anterior puede representar una asignación
+        // distinta del mismo lote. Se cancela solo la proyección; el
+        // historial de inspecciones y la auditoría permanecen intactos.
+        const batchIds = [...new Set(free.map((device) => device.batchId).filter((id): id is string => Boolean(id)))];
+        if (batchIds.length > 0) {
           await prisma.workTask.updateMany({
             where: {
               sourceType: "qc_revision_batch_assigned",
-              sourceId: { in: sourceBatchIds },
+              sourceId: { in: batchIds },
               assigneeId: request.requesterId,
               status: { notIn: ["COMPLETED", "CANCELLED"] },
             },
             data: { status: "CANCELLED", completedAt: null },
           });
         }
-
-        await logAudit({
-          userId: persisted.id,
-          action: "qc_work_lot.create",
-          module: "qc",
-          entityType: "qc_revision_batch",
-          entityId: workBatchIds[0] ?? null,
-          afterData: { requestId: request.id, workBatchIds, sourceBatchIds, assignedDevices: assigned },
-        });
-      } else {
-        await prisma.qcImeiRequest.update({
-          where: { id: request.id },
-          data: { status: "ACCEPTED", acceptedBy: persisted.id, resolvedAt: new Date() },
-        });
       }
-    } else {
-      await prisma.qcImeiRequest.update({
-        where: { id: request.id },
-        data: { status: "REJECTED", acceptedBy: null, resolvedAt: new Date() },
-      });
     }
 
-    const updated = await prisma.qcImeiRequest.findUniqueOrThrow({ where: { id: request.id } });
+    const updated = await prisma.qcImeiRequest.update({
+      where: { id: request.id },
+      data: {
+        status: validated.accept ? "ACCEPTED" : "REJECTED",
+        acceptedBy: validated.accept ? persisted.id : null,
+        resolvedAt: new Date(),
+      },
+    });
 
     await logAudit({
       userId: persisted.id,
@@ -447,14 +383,7 @@ export async function assignDeviceToQcAction(deviceId: string, qcId: string | nu
 
     const device = await prisma.deviceUnit.findUnique({
       where: { id: deviceId },
-      select: {
-        id: true,
-        imei: true,
-        assignedToId: true,
-        batchId: true,
-        originBatchId: true,
-        batch: { select: { id: true, batchNumber: true, supplierId: true, supplierName: true, branch: true, receivedBy: true, status: true, isWorkLot: true } },
-      },
+      select: { id: true, imei: true, assignedToId: true, batchId: true },
     });
     if (!device) {
       return { success: false, error: "Equipo no encontrado." };
@@ -475,31 +404,9 @@ export async function assignDeviceToQcAction(deviceId: string, qcId: string | nu
       message = "IMEI asignado al QC correctamente.";
     }
 
-    let targetBatchId = device.batchId;
-    if (qcId && device.batch && !device.batch.isWorkLot) {
-      const workBatch = await prisma.qcRevisionBatch.create({
-        data: {
-          batchNumber: `${device.batch.batchNumber}-D-${randomUUID().slice(0, 8).toUpperCase()}`.slice(0, 60),
-          supplierId: device.batch.supplierId,
-          supplierName: device.batch.supplierName,
-          branch: device.batch.branch,
-          receivedBy: device.batch.receivedBy,
-          assignedToId: qcId,
-          status: "IN_REVIEW",
-          totalDevices: 1,
-          isWorkLot: true,
-          parentBatchId: device.batch.id,
-          notes: `Lote de trabajo creado por asignación directa. Lote de origen: ${device.batch.batchNumber}.`,
-        },
-      });
-      targetBatchId = workBatch.id;
-    }
-
     const updated = await prisma.deviceUnit.update({
       where: { id: deviceId },
       data: {
-        batchId: targetBatchId,
-        originBatchId: qcId ? (device.originBatchId ?? device.batchId) : device.originBatchId,
         assignedToId: qcId || null,
         status: qcId ? "IN_QC" : "PENDING_QC",
       },

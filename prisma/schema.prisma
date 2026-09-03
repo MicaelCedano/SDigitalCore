@@ -790,22 +790,13 @@ model QcRevisionBatch {
   completedAt        DateTime?     @map("completed_at")
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
-  isWorkLot          Boolean       @default(false) @map("is_work_lot")
-  parentBatchId      String?       @map("parent_batch_id")
-  requestId          String?       @unique @map("request_id")
 
   assignedTo User?        @relation("QcBatchAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  parentBatch QcRevisionBatch? @relation("QcBatchReassignments", fields: [parentBatchId], references: [id], onDelete: SetNull)
-  childBatches QcRevisionBatch[] @relation("QcBatchReassignments")
-  request     QcImeiRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
-  originDevices DeviceUnit[] @relation("QcDeviceOriginBatch")
   devices    DeviceUnit[]
 
   @@index([status, receivedAt])
   @@index([assignedToId])
   @@index([supplierName, receivedAt])
-  @@index([parentBatchId])
-  @@index([isWorkLot, status, createdAt])
   @@map("qc_revision_batch")
 }
 
@@ -819,7 +810,6 @@ model DeviceUnit {
   color          String?                 @db.VarChar(80)
   status         DeviceOperationalStatus @default(PENDING_QC)
   batchId        String?                 @map("batch_id")
-  originBatchId  String?                 @map("origin_batch_id")
   assignedToId   String?                 @map("assigned_to_id")
   sourceSystem   String?                 @map("source_system") @db.VarChar(50)
   sourceRecordId String?                 @map("source_record_id") @db.VarChar(80)
@@ -827,7 +817,6 @@ model DeviceUnit {
   updatedAt      DateTime                @updatedAt @map("updated_at")
 
   batch       QcRevisionBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  originBatch QcRevisionBatch? @relation("QcDeviceOriginBatch", fields: [originBatchId], references: [id], onDelete: SetNull)
   assignedTo  User?            @relation("QcDeviceAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   inspections QcInspection[]
   photos      DevicePhoto[]    @relation("DevicePhotos")
@@ -838,7 +827,6 @@ model DeviceUnit {
   @@index([brand, model])
   @@index([batchId])
   @@index([assignedToId])
-  @@index([originBatchId])
   @@map("device_unit")
 }
 
@@ -886,7 +874,6 @@ model QcImeiRequest {
 
   requester User  @relation("QcImeiRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   acceptor  User? @relation("QcImeiRequestAcceptor", fields: [acceptedBy], references: [id], onDelete: SetNull)
-  workBatches QcRevisionBatch[]
 
   @@index([requesterId, createdAt])
   @@index([status, createdAt])

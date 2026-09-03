@@ -112,11 +112,11 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
     // reparados o vendidos) se REINGRESAN: conservan su historial (mismo id
     // e inspecciones) y vuelven a pasar por QC en este lote.
     const imeisToCheck = devicesToCreate.map((d) => d.imei).filter(Boolean) as string[];
-    const existingByImei = new Map<string, { id: string; imei: string | null; status: string; batchId: string | null; originBatchId: string | null }>();
+    const existingByImei = new Map<string, { id: string; imei: string | null; status: string }>();
     if (imeisToCheck.length > 0) {
       const existingUnits = await prisma.deviceUnit.findMany({
         where: { imei: { in: imeisToCheck } },
-        select: { id: true, imei: true, status: true, batchId: true, originBatchId: true },
+        select: { id: true, imei: true, status: true },
       });
       for (const unit of existingUnits) {
         if (unit.imei) existingByImei.set(unit.imei, unit);
@@ -152,24 +152,22 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
           functionalCount: 0,
           nonFunctionalCount: 0,
           notes: validated.notes || null,
+          devices: {
+            create: newDevicesToCreate.map((d) => ({
+              imei: d.imei || null,
+              serialNumber: d.serialNumber || null,
+              brand: d.brand,
+              model: d.model,
+              storageGb: d.storageGb || null,
+              color: d.color || null,
+              status: "PENDING_QC",
+            })),
+          },
+        },
+        include: {
+          devices: true,
         },
       });
-
-      if (newDevicesToCreate.length > 0) {
-        await tx.deviceUnit.createMany({
-          data: newDevicesToCreate.map((d) => ({
-            imei: d.imei || null,
-            serialNumber: d.serialNumber || null,
-            brand: d.brand,
-            model: d.model,
-            storageGb: d.storageGb || null,
-            color: d.color || null,
-            status: "PENDING_QC",
-            batchId: batch.id,
-            originBatchId: batch.id,
-          })),
-        });
-      }
 
       // Reingresos: reasignar el device_unit existente al lote nuevo (mismo id → historial intacto)
       for (const re of reingresoUnits) {
@@ -179,7 +177,6 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
           where: { id: existing.id },
           data: {
             batchId: batch.id,
-            originBatchId: existing.originBatchId ?? existing.batchId ?? batch.id,
             status: "PENDING_QC",
             brand: re.brand,
             model: re.model,
@@ -499,7 +496,7 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
 
     const batch = await prisma.qcRevisionBatch.findUnique({
       where: { id: parsed.data.id },
-      select: { id: true, batchNumber: true, status: true, createdAt: true, isWorkLot: true },
+      select: { id: true, batchNumber: true, status: true, createdAt: true },
     });
     if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
     if (batch.status === "CANCELLED") {
@@ -524,9 +521,7 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
     const functionalCount = assignedDevices.filter((device) => device.inspections[0]?.result === "FUNCTIONAL").length;
     const nonFunctionalCount = assignedDevices.filter((device) => device.inspections[0]?.result === "NON_FUNCTIONAL").length;
     const reviewerName = actor.name || actor.email || "QC";
-    const portionId = batch.isWorkLot
-      ? `WORKLOT-${batch.id}`
-      : `POR-${batch.batchNumber}-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const portionId = `POR-${batch.batchNumber}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
     await logAudit({
       userId: actor.id,
@@ -547,7 +542,7 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
       },
     });
     await sendPushToRole("ADMIN", {
-      title: `Lote ${batch.batchNumber} listo`,
+      title: `Porción ${portionId} lista`,
       body: `${reviewerName} terminó ${assignedDevices.length} equipo(s) y espera su pago.`,
       route: `/qc/lotes/${batch.id}`,
       type: "qc_batch.assignment_submitted",
@@ -560,7 +555,7 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
     return {
       success: true,
       data: { id: batch.id, batchNumber: batch.batchNumber, portionId, status: "ASSIGNMENT_SUBMITTED" },
-      message: `Tu lote de trabajo ${batch.batchNumber} fue enviado. El administrador puede acreditar tu pago.`,
+      message: `Tu porción ${portionId} de ${batch.batchNumber} fue enviada. El administrador puede acreditar tu pago sin esperar al resto del lote.`,
     };
   } catch (error: any) {
     console.error("Error al enviar lote:", error);
@@ -867,11 +862,11 @@ export async function addDevicesToBatchAction(input: {
 
     // Existentes en el sistema: fuera de cola activa → reingreso; en cola activa → bloquean
     const imeisToCheck = devicesToCreate.map((d) => d.imei).filter(Boolean) as string[];
-    const existingByImei = new Map<string, { id: string; imei: string | null; status: string; batchId: string | null; originBatchId: string | null }>();
+    const existingByImei = new Map<string, { id: string; imei: string | null; status: string }>();
     if (imeisToCheck.length > 0) {
       const existingUnits = await prisma.deviceUnit.findMany({
         where: { imei: { in: imeisToCheck } },
-        select: { id: true, imei: true, status: true, batchId: true, originBatchId: true },
+        select: { id: true, imei: true, status: true },
       });
       for (const unit of existingUnits) {
         if (unit.imei) existingByImei.set(unit.imei, unit);
@@ -902,7 +897,6 @@ export async function addDevicesToBatchAction(input: {
             storageGb: d.storageGb || null,
             status: "PENDING_QC",
             batchId: batch.id,
-            originBatchId: batch.id,
           })),
         });
       }
@@ -912,7 +906,7 @@ export async function addDevicesToBatchAction(input: {
         if (!existing) continue;
         await tx.deviceUnit.update({
           where: { id: existing.id },
-          data: { batchId: batch.id, originBatchId: existing.originBatchId ?? existing.batchId ?? batch.id, status: "PENDING_QC", brand: re.brand, model: re.model, storageGb: re.storageGb ?? undefined },
+          data: { batchId: batch.id, status: "PENDING_QC", brand: re.brand, model: re.model, storageGb: re.storageGb ?? undefined },
         });
       }
 
@@ -1350,7 +1344,6 @@ export async function getQcDashboardAction() {
               status: true,
               totalDevices: true,
               reviewedDevices: true,
-              isWorkLot: true,
             },
           },
           inspections: { orderBy: { createdAt: "desc" }, take: 3 },

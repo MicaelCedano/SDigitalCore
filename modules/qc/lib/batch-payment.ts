@@ -20,7 +20,7 @@ export async function payReviewersForBatch(
 ) {
   const batch = await tx.qcRevisionBatch.findUnique({
     where: { id: batchId },
-    select: { id: true, batchNumber: true, createdAt: true, isWorkLot: true },
+    select: { id: true, batchNumber: true, createdAt: true },
   });
   if (!batch) return 0;
 
@@ -55,11 +55,7 @@ export async function payReviewersForBatch(
 
   let paidReviewers = 0;
   for (const [reviewerId, count] of perReviewer) {
-    // Un lote de trabajo solo puede tener un pago por revisor. La clave no
-    // cambia si el admin devuelve y el QC vuelve a enviar el mismo lote.
-    const externalKey = batch.isWorkLot
-      ? `qc-payment:${batch.id}:WORKLOT:${reviewerId}`
-      : `qc-payment:${batch.id}:${portionId ?? `LEGACY-${reviewerId}`}:${reviewerId}`;
+    const externalKey = `qc-payment:${batch.id}:${portionId ?? `LEGACY-${reviewerId}`}:${reviewerId}`;
     const existing = await tx.walletLedgerEntry.findUnique({ where: { externalKey } });
     if (existing) continue; // ya pagado (idempotente)
 
