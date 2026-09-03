@@ -26,6 +26,13 @@ import { normalizeModelName } from "../lib/model-name";
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
+// Los lotes con sufijo -R- fueron creados por la migración temporal de
+// porciones. No son compras nuevas y no deben aparecer en las bandejas
+// operativas mientras se conserva su historial para la limpieza manual.
+function isLegacyWorkLot(batchNumber: string) {
+  return /-R-[^-]+-/i.test(batchNumber);
+}
+
 /**
  * Función auxiliar para procesar texto libre de IMEIs / Números de Serie
  */
@@ -284,11 +291,14 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
 
     return {
       success: true,
-      data: batches.map((batch) => ({
+      data: batches.filter((batch) => !isLegacyWorkLot(batch.batchNumber)).map((batch) => ({
         ...batch,
-        // Llegar al 100% de revisión no significa que la compra esté pagada.
-        // El QC todavía debe enviar su porción y el admin aprobarla.
-        status: batch.status,
+        status:
+          (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
+          batch.totalDevices > 0 &&
+          batch.reviewedDevices >= batch.totalDevices
+            ? "COMPLETED"
+            : batch.status,
       })),
     };
   } catch (error: any) {
@@ -356,9 +366,12 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
       success: true,
       data: {
         ...batch,
-        // Una compra revisada al 100% sigue abierta hasta que cada porción
-        // sea enviada y aprobada. COMPLETED se reserva para el cierre/pago.
-        status: batch.status,
+        status:
+          (batch.status === "IN_REVIEW" || batch.status === "PENDING_REVIEW") &&
+          totalDevices > 0 &&
+          reviewedDevices >= totalDevices
+            ? "COMPLETED"
+            : batch.status,
         devices,
         totalDevices,
         reviewedDevices,
@@ -584,6 +597,54 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
       select: { id: true, batchNumber: true, status: true, totalDevices: true, reviewedDevices: true },
     });
     if (!batch) return { success: false, error: "Lote de Revisión no encontrado" };
+
+    // Flujo oficial de SDigitalSystem: el administrador aprueba y paga el
+    // lote completo. Se conserva debajo la lectura de auditorías antiguas
+    // únicamente para que los registros históricos sigan siendo consultables.
+    if (!parsed.data.reviewerId && !parsed.data.portionId) {
+      if (parsed.data.reject) {
+        await prisma.qcRevisionBatch.update({
+          where: { id: batch.id },
+          data: { status: "IN_REVIEW", completedAt: null },
+        });
+        await logAudit({
+          userId: persisted.id,
+          action: "qc_batch.reject",
+          module: "qc",
+          entityType: "qc_revision_batch",
+          entityId: batch.id,
+          afterData: { batchNumber: batch.batchNumber, status: "IN_REVIEW" },
+        });
+        revalidatePath("/qc/pagos");
+        revalidatePath(`/qc/lotes/${batch.id}`);
+        return { success: true, data: { id: batch.id, batchNumber: batch.batchNumber, status: "IN_REVIEW", paidReviewers: 0 }, message: "Lote devuelto a revisión." };
+      }
+      if (batch.status !== "COMPLETED" && batch.status !== "SUBMITTED") {
+        return { success: false, error: "El lote todavía no está completado para aprobación." };
+      }
+      let paidReviewers = 0;
+      await prisma.$transaction(async (tx) => {
+        paidReviewers = await payReviewersForBatch(batch.id, tx);
+        await tx.qcRevisionBatch.update({
+          where: { id: batch.id },
+          data: { status: "COMPLETED", completedAt: new Date() },
+        });
+        await tx.deviceUnit.updateMany({ where: { batchId: batch.id }, data: { assignedToId: null } });
+      });
+      await logAudit({
+        userId: persisted.id,
+        action: "qc_batch.approve",
+        module: "qc",
+        entityType: "qc_revision_batch",
+        entityId: batch.id,
+        afterData: { batchNumber: batch.batchNumber, paidReviewers, status: "COMPLETED" },
+      });
+      revalidatePath("/qc/pagos");
+      revalidatePath("/qc");
+      revalidatePath(`/qc/lotes/${batch.id}`);
+      revalidatePath("/dashboard");
+      return { success: true, data: { id: batch.id, batchNumber: batch.batchNumber, status: "COMPLETED", paidReviewers }, message: "Lote aprobado y pagado correctamente." };
+    }
 
     // Cada QC puede enviar y cobrar su porción sin esperar al resto del lote.
     // Las entregas antiguas siguen usando el flujo global SUBMITTED de abajo.
@@ -1088,9 +1149,10 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
         }
       }
 
-      // La revisión completa no cierra ni paga la compra. Cada QC todavía
-      // debe enviar su porción y el admin aprobarla desde Pagos QC.
-      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : batch.status;
+      // Igual que SDigitalSystem: completar el último equipo cierra el lote.
+      // El pago se confirma después, desde la bandeja administrativa del lote.
+      const allReviewed = batchDevices.length > 0 && reviewed >= batchDevices.length;
+      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "COMPLETED" : batch.status;
 
       const updatedBatch = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
@@ -1099,7 +1161,7 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
           status: nextStatus as QcBatchStatus,
-          completedAt: null,
+          completedAt: nextStatus === "COMPLETED" ? new Date() : batch.completedAt,
         },
       });
 
@@ -1127,8 +1189,8 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
 
     if (updatedBatch.reviewedDevices >= updatedBatch.totalDevices && batch.reviewedDevices < batch.totalDevices) {
       await sendPushToRole("ADMIN", {
-        title: `Lote ${batch.batchNumber} listo para enviar`,
-        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. El QC debe enviar sus porciones para cobrar.`,
+        title: `Lote ${batch.batchNumber} completado`,
+        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Está listo para aprobación y pago.`,
         route: `/qc/lotes/${batch.id}`,
         type: "qc_batch.completed",
       });
@@ -1147,7 +1209,7 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
 
     return {
       success: true,
-      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). Lote ${batch.batchNumber} actualizado; ya puedes enviar tu porción cuando termines.`,
+      message: `Equipo ${validated.result === "FUNCTIONAL" ? "funcional" : "no funcional"} (grado ${validated.grade}). ${updatedBatch.status === "COMPLETED" ? `Lote ${batch.batchNumber} completado.` : `Lote ${batch.batchNumber} actualizado.`}`,
       data: updatedBatch,
     };
   } catch (error: any) {
@@ -1228,9 +1290,8 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
           else if (last.result === "NON_FUNCTIONAL") nonFunctional++;
         }
       }
-      // La corrección administrativa no cierra ni paga la compra. El pago se
-      // acredita por porción desde Pagos QC.
-      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : batch.status;
+      const allReviewed = batchDevices.length > 0 && reviewed >= batchDevices.length;
+      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "COMPLETED" : batch.status;
 
       const updated = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
@@ -1239,11 +1300,9 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
           status: nextStatus as QcBatchStatus,
-          completedAt: null,
+          completedAt: nextStatus === "COMPLETED" ? new Date() : batch.completedAt,
         },
       });
-
-      // Sin pago aquí: el pago se acredita por porción desde Pagos QC.
 
       return updated;
     });
@@ -1259,8 +1318,8 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
 
     if (updatedBatch.reviewedDevices >= updatedBatch.totalDevices && batch.reviewedDevices < batch.totalDevices) {
       await sendPushToRole("ADMIN", {
-        title: `Lote ${batch.batchNumber} listo para enviar`,
-        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. El QC debe enviar sus porciones para cobrar.`,
+        title: `Lote ${batch.batchNumber} completado`,
+        body: `${updatedBatch.reviewedDevices}/${updatedBatch.totalDevices} equipos revisados. Está listo para aprobación y pago.`,
         route: `/qc/lotes/${batch.id}`,
         type: "qc_batch.completed",
       });
@@ -1331,7 +1390,7 @@ export async function getQcDashboardAction() {
       prisma.deviceUnit.findMany({
         // Compatibilidad con compras que quedaron COMPLETED por el cierre
         // automático anterior pero todavía tienen una porción sin enviar.
-        where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
+        where: { assignedToId: persisted.id, batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } } },
         orderBy: { updatedAt: "desc" },
         take: 100,
         include: {
@@ -1372,17 +1431,18 @@ export async function getQcDashboardAction() {
         where: {
           status: "PENDING_QC",
           assignedToId: null,
-          batch: { status: { not: "CANCELLED" } },
+          batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } },
         },
       }),
     ]);
 
+    const visibleDevices = devices.filter((device) => !device.batch || !isLegacyWorkLot(device.batch.batchNumber));
     const availableForReview = availableDevices;
 
     const assignmentAudits = await prisma.auditLog.findMany({
       where: {
         action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] },
-        entityId: { in: [...new Set(devices.map((device) => device.batchId).filter((id): id is string => Boolean(id)))] },
+        entityId: { in: [...new Set(visibleDevices.map((device) => device.batchId).filter((id): id is string => Boolean(id)))] },
       },
       orderBy: { createdAt: "desc" },
       take: 40,
@@ -1412,7 +1472,7 @@ export async function getQcDashboardAction() {
 
     // Reingresos: solo cuentan inspecciones posteriores a la creación del lote actual
     let revisados = 0;
-    const devicesConInspeccion = devices.map((d) => {
+    const devicesConInspeccion = visibleDevices.map((d) => {
       const batchStart = d.batch?.createdAt ?? new Date(0);
       const vigente = d.inspections.find((i) => i.createdAt >= batchStart) ?? null;
       if (vigente && vigente.status === "COMPLETED") revisados++;
@@ -1440,10 +1500,10 @@ export async function getQcDashboardAction() {
         devices: devicesConInspeccion,
         myRequests: visibleRequests,
           stats: {
-            asignados: devices.length,
+            asignados: visibleDevices.length,
             availableForReview,
             revisados,
-          pendientes: devices.length - revisados,
+          pendientes: visibleDevices.length - revisados,
           revisadosHoy: hoyPorEquipo.size,
           aprobadosHoy: hoyFuncional,
           rechazadosHoy: hoyNoFuncional,
@@ -1518,7 +1578,7 @@ export async function getQcPaymentsAction(): Promise<
     const [pending, history, audits, paymentEntries] = await Promise.all([
       // Lotes enviados esperando aceptación
       prisma.qcRevisionBatch.findMany({
-        where: { status: "SUBMITTED" },
+        where: { status: { in: ["COMPLETED", "SUBMITTED"] } },
         orderBy: { updatedAt: "desc" },
         take: 50,
         select: {
@@ -1587,9 +1647,10 @@ export async function getQcPaymentsAction(): Promise<
     }
 
     const RATE = QC_REVIEW_RATE;
-    // El pago global del lote quedó deshabilitado. La bandeja solo muestra
-    // envíos individuales por reviewerId.
-    const mapPending: Array<any> = [];
+    // La bandeja muestra lotes completos terminados que todavía no tienen
+    // ningún pago asociado. Los pagos históricos por porción no se borran ni
+    // se vuelven a presentar como pendientes.
+    let mapPending: Array<any> = [];
     const assignmentAudits = await prisma.auditLog.findMany({
       where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
       orderBy: { createdAt: "desc" },
@@ -1676,6 +1737,28 @@ export async function getQcPaymentsAction(): Promise<
         estimatedAmount: assignment.reviewedDevices * RATE,
       });
     }
+    const paidBatchIds = new Set(
+      paymentEntries
+        .map((entry) => entry.externalKey.split(":")[1])
+        .filter((id): id is string => Boolean(id)),
+    );
+    mapPending = pending
+      .filter((batch) => !paidBatchIds.has(batch.id) && !isLegacyWorkLot(batch.batchNumber))
+      .map((batch) => {
+        const submitter = submitterByBatch.get(batch.id);
+        return {
+          id: batch.id,
+          batchNumber: batch.batchNumber,
+          supplierName: batch.supplierName,
+          totalDevices: batch.totalDevices,
+          reviewedDevices: batch.reviewedDevices,
+          functionalCount: batch.functionalCount,
+          nonFunctionalCount: batch.nonFunctionalCount,
+          submittedBy: submitter?.name ?? "QC",
+          submittedAt: submitter?.submittedAt ?? batch.updatedAt,
+          estimatedAmount: batch.reviewedDevices * RATE,
+        };
+      });
     const mapHistory = history.map((b) => ({
       ...b,
       estimatedAmount: b.reviewedDevices * RATE,

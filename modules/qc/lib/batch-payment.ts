@@ -8,8 +8,9 @@ export const QC_REVIEW_RATE = 50; // RD$ por equipo revisado (fórmula SDigitalS
  * Fórmula SDigitalSystem (approveLote): N equipos revisados × RD$50,
  * acreditado al wallet del revisor que hizo la inspección más reciente
  * de cada equipo. Idempotente: cada pago tiene externalKey único
- * `qc-payment:{batchId}:{portionId}:{reviewerId}`. Cada porción tiene su propio pago,
- * incluso cuando pertenece al mismo lote y revisor.
+ * `qc-payment:{batchId}:LEGACY-{reviewerId}`. Cada revisor recibe una sola
+ * acreditación por lote; las claves antiguas por porción se conservan para
+ * lectura histórica y no se vuelven a generar.
  */
 export async function payReviewersForBatch(
   batchId: string,
@@ -56,7 +57,15 @@ export async function payReviewersForBatch(
   let paidReviewers = 0;
   for (const [reviewerId, count] of perReviewer) {
     const externalKey = `qc-payment:${batch.id}:${portionId ?? `LEGACY-${reviewerId}`}:${reviewerId}`;
-    const existing = await tx.walletLedgerEntry.findUnique({ where: { externalKey } });
+    // Compatibilidad anti-doble-pago: un lote que ya recibió una clave
+    // histórica por porción no debe volver a pagar al mismo revisor al usar
+    // ahora el flujo global.
+    const existing = await tx.walletLedgerEntry.findFirst({
+      where: {
+        externalKey: { startsWith: `qc-payment:${batch.id}:` },
+        actorId: reviewerId,
+      },
+    });
     if (existing) continue; // ya pagado (idempotente)
 
     const amount = count * QC_REVIEW_RATE;
@@ -84,7 +93,7 @@ export async function payReviewersForBatch(
         accountId: account.id,
         type: "CREDIT",
         amount,
-        description: `Pago por Porción ${portionId ?? "histórica"} del Lote QC ${batch.batchNumber}: (${count} equipo(s) × RD$${QC_REVIEW_RATE})`,
+        description: `Pago por Lote QC ${batch.batchNumber}: (${count} equipo(s) × RD$${QC_REVIEW_RATE})`,
         externalKey,
         actorId: reviewerId,
         // OJO: NO usar batch_id aquí — el FK wallet_ledger_entry_batch_id_fkey

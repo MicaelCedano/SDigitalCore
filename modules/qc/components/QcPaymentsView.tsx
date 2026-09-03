@@ -122,7 +122,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">Pagos de Control de Calidad</h1>
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              Acepta cada porción enviada por el QC y acredita su pago sin esperar al lote completo.
+              Aprueba cada lote completado y acredita el pago una sola vez.
             </p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
       {/* Resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
-              <span className="text-xs text-slate-500 block font-medium">Porciones por aceptar</span>
+              <span className="text-xs text-slate-500 block font-medium">Lotes por aceptar</span>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-bold text-violet-600">
               {pending.length}
@@ -174,7 +174,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
           </div>
         </div>
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
-              <span className="text-xs text-slate-500 block font-medium">Porciones pagadas</span>
+              <span className="text-xs text-slate-500 block font-medium">Lotes pagados</span>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-bold text-slate-800">
               {history.length}
@@ -191,10 +191,10 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div>
             <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Send className="w-4 h-4 text-violet-600" /> Porciones enviadas por el QC
+              <Send className="w-4 h-4 text-violet-600" /> Lotes completados por el QC
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Al aceptar una porción se acredita el pago al revisor (RD$ {RATE} por equipo).
+              Al aceptar un lote se acredita el pago a los revisores (RD$ {RATE} por equipo).
             </p>
           </div>
           {pending.length > 0 && (
@@ -209,7 +209,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
             <Inbox className="w-10 h-10 mx-auto text-slate-300" />
             <p className="text-sm font-bold text-slate-700">No hay lotes por aceptar</p>
             <p className="text-xs text-slate-500">
-              Cuando un QC termine su porción y la envíe, aparecerá aquí para que la aceptes y se pague.
+              Cuando un lote termine de revisarse, aparecerá aquí para que lo apruebes y se pague.
             </p>
           </div>
         ) : (
@@ -231,8 +231,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                 {pending.map((b: any) => (
                   <tr key={b.assignmentKey || b.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-4">
-                      <div className="font-mono font-bold text-slate-800">{b.portionId || "Porción histórica"}</div>
-                      <div className="text-[10px] text-slate-500">Lote: {b.batchNumber}</div>
+                      <div className="font-mono font-bold text-slate-800">{b.batchNumber}</div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
                         Enviado: {formatDate(b.submittedAt)}
                       </div>
@@ -297,7 +296,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
               <History className="w-4 h-4 text-slate-500" /> Historial de lotes pagados
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Porciones aceptadas — los pagos quedaron acreditados en la wallet de los revisores.
+              Lotes aceptados — los pagos quedaron acreditados en la wallet de los revisores.
             </p>
           </div>
         </div>
@@ -312,7 +311,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
               <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
                 <tr>
                   <th className="px-5 py-3.5">Revisor QC</th>
-                  <th className="px-5 py-3.5">Porción / lote</th>
+                  <th className="px-5 py-3.5">Lote de compra</th>
                   <th className="px-5 py-3.5 text-center">Funcionales</th>
                   <th className="px-5 py-3.5 text-center">No funcionales</th>
                   <th className="px-5 py-3.5 text-center">Total pagado</th>
@@ -325,8 +324,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
                   <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3.5 font-semibold text-slate-800">{payment.reviewerName}</td>
                     <td className="px-5 py-3.5">
-                      <div className="font-mono font-bold text-slate-800">{payment.portionId || "Porción histórica"}</div>
-                      <div className="text-[10px] text-slate-500">Lote: {payment.batchNumber}</div>
+                      <div className="font-mono font-bold text-slate-800">{payment.batchNumber}</div>
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">

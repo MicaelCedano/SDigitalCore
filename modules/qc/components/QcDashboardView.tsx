@@ -18,7 +18,7 @@ import {
   Search,
   CheckCheck,
 } from "lucide-react";
-import { getQcDashboardAction, submitRevisionBatchAction } from "../actions/revision-batch";
+import { getQcDashboardAction } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { SolicitarImeisModal } from "./SolicitarImeisModal";
 
@@ -31,6 +31,8 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [showSolicitar, setShowSolicitar] = useState(false);
+  // Estados reservados para cerrar compatibilidad con una sesión antigua; no
+  // se activan en el flujo actual de lotes completos.
   const [confirmLote, setConfirmLote] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; title: string; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,31 +52,9 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     setRefreshing(false);
   };
 
-  const handleSubmitLote = async (lote: any) => {
-    setConfirmLote(lote);
-  };
+  const confirmSubmitLote = async () => undefined;
 
-  const confirmSubmitLote = async () => {
-    if (!confirmLote) return;
-    setRefreshing(true);
-    const res = await submitRevisionBatchAction({ id: confirmLote.id });
-    setRefreshing(false);
-    setConfirmLote(null);
-    if (res.success) {
-      setFeedback({
-        type: "success",
-        title: "¡Porción enviada!",
-        message: res.message ?? "Tu porción quedó enviada para aprobación y pago.",
-      });
-      refresh();
-    } else {
-      setFeedback({
-        type: "error",
-        title: "No se pudo enviar",
-        message: res.error || "No se pudo enviar tu porción.",
-      });
-    }
-  };
+
 
   const { devices, myRequests, stats, welcome } = data;
   const requestCount = myRequests?.length || 0;
@@ -102,36 +82,27 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     const map = new Map<string, any>();
     for (const dev of devices || []) {
       const b = dev.batch;
-      // Las compras antiguas que quedaron COMPLETED por el cierre automático
-      // siguen siendo accionables si todavía tienen equipos asignados.
-      if (!b || b.status === "CANCELLED") continue;
+      if (!b || b.status === "CANCELLED" || b.status === "COMPLETED") continue;
       const entry = map.get(b.id) || {
         id: b.id,
         batchNumber: b.batchNumber,
         supplierName: b.supplierName,
         status: b.status,
-        // En el panel del QC el avance es el de su porción, no el del lote global.
+        // El avance corresponde al lote de compra asignado.
         totalDevices: 0,
         reviewedDevices: 0,
         myCount: 0,
         myReviewed: 0,
-        assignmentSubmitted: false,
       };
       entry.myCount += 1;
       const vigente = (dev.lastInspection?.createdAt ?? new Date(0)) >= new Date(b.createdAt);
       if (dev.lastInspection?.status === "COMPLETED" && vigente) entry.myReviewed += 1;
       entry.totalDevices = entry.myCount;
       entry.reviewedDevices = entry.myReviewed;
-      entry.assignmentSubmitted = entry.assignmentSubmitted || Boolean(dev.assignmentSubmitted);
       map.set(b.id, entry);
     }
     return [...map.values()].sort((a, b) => (a.status === "IN_REVIEW" ? -1 : 1) - (b.status === "IN_REVIEW" ? -1 : 1));
   }, [devices]);
-
-  const canSubmitLote = (lote: any) =>
-    (lote.status === "IN_REVIEW" || lote.status === "PENDING_REVIEW" || lote.status === "COMPLETED") &&
-    lote.reviewedDevices >= lote.totalDevices &&
-    lote.totalDevices > 0;
 
   const statusLabel = (s: string) =>
     s === "COMPLETED"
@@ -273,14 +244,13 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                 <Package className="w-4 h-4 text-[#5750f1]" /> Mis lotes en revisión
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Cuando termines tu porción, envíala al administrador para que acepte y acredite tu pago; no tienes que esperar a los demás.
+                Revisa el lote completo. Al terminar todos los equipos, el lote queda listo para aprobación y pago.
               </p>
             </div>
           </div>
           <div className="divide-y divide-slate-100">
             {lotes.map((lote: any) => {
-              const ready = canSubmitLote(lote);
-              const enviado = lote.assignmentSubmitted || lote.status === "SUBMITTED";
+              const ready = lote.reviewedDevices >= lote.totalDevices && lote.totalDevices > 0;
               return (
                 <div key={lote.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -291,19 +261,15 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                       )}
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                          enviado
-                            ? "bg-violet-50 text-violet-700 border-violet-200"
-                            : ready
+                          ready
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : lote.status === "COMPLETED"
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : "bg-blue-50 text-blue-700 border-blue-200"
                         }`}
                       >
-                        {enviado
-                          ? "ENVIADO A APROBACIÓN"
-                          : ready
-                          ? "LISTO PARA ENVIAR"
+                        {ready
+                          ? "LISTO PARA APROBACIÓN"
                           : lote.status === "COMPLETED"
                           ? "COMPLETADO"
                           : "EN REVISIÓN"}
@@ -319,32 +285,15 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                         />
                       </div>
                       <span className="text-[11px] font-bold text-slate-600">
-                        {lote.reviewedDevices}/{lote.totalDevices} de tu porción revisados
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        · tuyos: {lote.myReviewed}/{lote.myCount}
+                        {lote.reviewedDevices}/{lote.totalDevices} equipos revisados
                       </span>
                     </div>
                   </div>
                   <div className="shrink-0">
-                    {enviado ? (
-                      <span className="px-3 py-2 bg-violet-50 text-violet-700 font-bold text-xs rounded-xl border border-violet-200 inline-flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" /> Porción enviada · esperando pago
+                    {ready ? (
+                      <span className="px-3 py-2 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 inline-flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Listo para aprobación
                       </span>
-                    ) : ready ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSubmitLote(lote)}
-                        disabled={refreshing}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {refreshing ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Send className="w-3.5 h-3.5" />
-                        )}
-                        Enviar Lote
-                      </button>
                     ) : (
                       <span className="px-3 py-2 bg-slate-50 text-slate-500 font-bold text-xs rounded-xl border border-slate-200 inline-flex items-center gap-1.5">
                         <ClipboardCheck className="w-3.5 h-3.5" /> Falta revisar equipos
