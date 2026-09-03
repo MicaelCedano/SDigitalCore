@@ -1578,7 +1578,9 @@ export async function getQcPaymentsAction(): Promise<
     const [pending, history, audits, paymentEntries] = await Promise.all([
       // Lotes enviados esperando aceptación
       prisma.qcRevisionBatch.findMany({
-        where: { status: { in: ["COMPLETED", "SUBMITTED"] } },
+        // COMPLETED es historial; solo SUBMITTED representa una solicitud
+        // vigente de aprobación y pago.
+        where: { status: "SUBMITTED" },
         orderBy: { updatedAt: "desc" },
         take: 50,
         select: {
