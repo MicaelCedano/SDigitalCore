@@ -19,6 +19,7 @@ import {
 import {
   getQcPaymentsAction,
   approveRevisionBatchAction,
+  repairAndPayDuplicatedQcBatchAction,
 } from "../actions/revision-batch";
 import { ConfirmBatchModal } from "./ConfirmBatchModal";
 
@@ -75,6 +76,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
   });
   const history = data?.history || [];
   const payments = data?.payments || [];
+  const repairCandidates = data?.repairCandidates || [];
 
   const totalPendingAmount = (data?.pending || []).reduce(
     (acc: number, b: any) => acc + (b.estimatedAmount || 0),
@@ -94,12 +96,14 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
 
     const actionId = batch.assignmentKey || batch.id;
     setProcessingId(actionId);
-    const res = await approveRevisionBatchAction({
-      id: batch.id,
-      reviewerId: batch.reviewerId || undefined,
-      portionId: batch.portionId || undefined,
-      reject,
-    });
+    const res = batch.repairCandidate
+      ? await repairAndPayDuplicatedQcBatchAction({ id: batch.id })
+      : await approveRevisionBatchAction({
+          id: batch.id,
+          reviewerId: batch.reviewerId || undefined,
+          portionId: batch.portionId || undefined,
+          reject,
+        });
     setProcessingId(null);
     setConfirmTarget(null);
     if (res.success) {
@@ -287,6 +291,37 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
           </div>
         )}
       </div>
+
+      {repairCandidates.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+          <h2 className="text-sm font-bold text-amber-900">Corrección pendiente de lote duplicado</h2>
+          <p className="mt-1 text-xs text-amber-800">
+            Este lote terminó, pero sus equipos quedaron en un duplicado histórico. La corrección conserva la auditoría y acredita un solo pago.
+          </p>
+          <div className="mt-3 space-y-2">
+            {repairCandidates.map((candidate: any) => {
+              const actionId = `repair-${candidate.id}`;
+              return (
+                <div key={candidate.id} className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs text-slate-700">
+                    <span className="font-mono font-bold">{candidate.batchNumber}</span> · {candidate.totalDevices} equipos · {money(candidate.estimatedAmount)}
+                    <div className="text-[10px] text-slate-500">Duplicado: {candidate.duplicateBatchNumber}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmTarget({ batch: { ...candidate, repairCandidate: true }, reject: false })}
+                    disabled={processingId === actionId}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {processingId === actionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+                    Corregir y pagar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Historial de pagos */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">

@@ -737,6 +737,87 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
 }
 
 /**
+ * Repara el caso puntual de una migración de porciones que dejó los equipos
+ * en un lote de trabajo duplicado. Conserva ambos registros y toda la
+ * auditoría, mueve los equipos al lote de compra original y paga una sola vez.
+ */
+export async function repairAndPayDuplicatedQcBatchAction(input: { id: string }): Promise<Result<{ id: string; batchNumber: string; amount: number }>> {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede corregir y pagar este lote." };
+    }
+
+    const parsed = z.object({ id: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Lote inválido." };
+
+    let result: { id: string; batchNumber: string; amount: number } | null = null;
+    let auditData: Record<string, unknown> | null = null;
+    await prisma.$transaction(async (tx) => {
+      const original = await tx.qcRevisionBatch.findUnique({ where: { id: parsed.data.id } });
+      if (!original || isLegacyWorkLot(original.batchNumber)) throw new Error("El lote original no existe.");
+      if (original.status !== "COMPLETED") throw new Error("El lote no está completado.");
+
+      const originalDeviceCount = await tx.deviceUnit.count({ where: { batchId: original.id } });
+      if (originalDeviceCount > 0) throw new Error("El lote original ya tiene equipos; no se hizo ninguna corrección.");
+
+      const duplicate = await tx.qcRevisionBatch.findFirst({
+        where: {
+          batchNumber: { startsWith: `${original.batchNumber}-R-` },
+          notes: { contains: `Lote de origen: ${original.batchNumber}` },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (!duplicate || !isLegacyWorkLot(duplicate.batchNumber)) throw new Error("No se encontró un lote duplicado verificable.");
+
+      const devices = await tx.deviceUnit.findMany({
+        where: { batchId: duplicate.id },
+        select: {
+          id: true,
+          inspections: {
+            where: { createdAt: { gte: original.createdAt } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { reviewerId: true, status: true },
+          },
+        },
+      });
+      if (devices.length !== original.reviewedDevices || devices.length !== original.totalDevices) {
+        throw new Error(`La cantidad no coincide: se esperaban ${original.totalDevices} equipos y se encontraron ${devices.length}.`);
+      }
+      const reviewerIds = [...new Set(devices.map((device) => device.inspections[0]?.reviewerId).filter((id): id is string => Boolean(id)))];
+      if (reviewerIds.length !== 1 || devices.some((device) => device.inspections[0]?.status !== "COMPLETED")) {
+        throw new Error("Las revisiones no pertenecen a un solo revisor completado; no se hizo ningún pago.");
+      }
+
+      await tx.deviceUnit.updateMany({ where: { batchId: duplicate.id }, data: { batchId: original.id, assignedToId: null } });
+      const paidReviewers = await payReviewersForBatch(original.id, tx);
+      if (paidReviewers !== 1) throw new Error("El pago no fue acreditado; no se confirmó la corrección.");
+      const amount = devices.length * QC_REVIEW_RATE;
+      await tx.qcRevisionBatch.update({
+        where: { id: original.id },
+        data: { status: "COMPLETED", reviewedDevices: devices.length, completedAt: original.completedAt ?? new Date() },
+      });
+      await tx.qcRevisionBatch.update({ where: { id: duplicate.id }, data: { status: "COMPLETED", assignedToId: null } });
+      result = { id: original.id, batchNumber: original.batchNumber, amount };
+      auditData = { batchNumber: original.batchNumber, duplicateBatchId: duplicate.id, duplicateBatchNumber: duplicate.batchNumber, devicesMoved: devices.length, reviewerId: reviewerIds[0], amount, paidReviewers };
+    });
+    if (!result || !auditData) return { success: false, error: "No se pudo completar la corrección." };
+    const completed = result as { id: string; batchNumber: string; amount: number };
+    await logAudit({ userId: persisted.id, action: "qc_batch.duplicate_repaired_and_paid", module: "qc", entityType: "qc_revision_batch", entityId: completed.id, afterData: auditData });
+    revalidatePath("/qc/pagos");
+    revalidatePath("/qc");
+    revalidatePath(`/qc/lotes/${completed.id}`);
+    revalidatePath("/dashboard");
+    return { success: true, data: completed, message: `Lote ${completed.batchNumber} corregido y pagado por RD$ ${completed.amount.toLocaleString("es-DO")}.` };
+  } catch (error: any) {
+    console.error("Error al corregir y pagar lote duplicado:", error);
+    return { success: false, error: error.message || "No se pudo corregir el lote duplicado." };
+  }
+}
+
+/**
  * Elimina una compra (Lote de Revisión) por completo. Solo ADMIN.
  * - Equipos creados en este lote (sin historial previo): se borran con sus
  *   inspecciones y fotos.
@@ -1566,6 +1647,17 @@ export async function getQcPaymentsAction(): Promise<
       description: string | null;
       portionId: string | null;
     }>;
+    repairCandidates: Array<{
+      id: string;
+      batchNumber: string;
+      supplierName: string;
+      totalDevices: number;
+      reviewedDevices: number;
+      functionalCount: number;
+      nonFunctionalCount: number;
+      duplicateBatchNumber: string;
+      estimatedAmount: number;
+    }>;
   }>
 > {
   try {
@@ -1765,6 +1857,23 @@ export async function getQcPaymentsAction(): Promise<
       ...b,
       estimatedAmount: b.reviewedDevices * RATE,
     }));
+    const repairCandidates = [];
+    const completedWithoutDevices = await prisma.qcRevisionBatch.findMany({
+      where: { status: "COMPLETED", totalDevices: { gt: 0 }, devices: { none: {} } },
+      select: { id: true, batchNumber: true, supplierName: true, totalDevices: true, reviewedDevices: true, functionalCount: true, nonFunctionalCount: true },
+      take: 50,
+    });
+    for (const original of completedWithoutDevices) {
+      if (isLegacyWorkLot(original.batchNumber)) continue;
+      const duplicate = await prisma.qcRevisionBatch.findFirst({
+        where: { batchNumber: { startsWith: `${original.batchNumber}-R-` }, notes: { contains: `Lote de origen: ${original.batchNumber}` } },
+        select: { id: true, batchNumber: true, totalDevices: true },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (duplicate && duplicate.totalDevices === original.totalDevices) {
+        repairCandidates.push({ id: original.id, batchNumber: original.batchNumber, supplierName: original.supplierName, totalDevices: original.totalDevices, reviewedDevices: original.reviewedDevices, functionalCount: original.functionalCount, nonFunctionalCount: original.nonFunctionalCount, duplicateBatchNumber: duplicate.batchNumber, estimatedAmount: original.reviewedDevices * RATE });
+      }
+    }
     const paymentBatchIds = paymentEntries
       .map((entry) => entry.externalKey.split(":")[1])
       .filter((id): id is string => Boolean(id));
@@ -1835,7 +1944,7 @@ export async function getQcPaymentsAction(): Promise<
 
     return {
       success: true,
-      data: { pending: mapPending, history: mapHistory, payments },
+      data: { pending: mapPending, history: mapHistory, payments, repairCandidates },
     };
   } catch (error: any) {
     console.error("Error al cargar pagos QC:", error);
