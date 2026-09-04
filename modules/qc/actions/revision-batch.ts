@@ -185,6 +185,7 @@ export async function createRevisionBatchAction(input: CreateRevisionBatchInput)
           data: {
             batchId: batch.id,
             status: "PENDING_QC",
+            assignedToId: null,
             brand: re.brand,
             model: re.model,
             storageGb: re.storageGb ?? undefined,
