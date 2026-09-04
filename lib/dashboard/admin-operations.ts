@@ -234,23 +234,27 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     });
   }
   const assignmentBatchIds = [...new Set([...latestAssignments.values()].map((item) => item.batchId))];
-  const assignmentPaymentKeys = [...latestAssignments.values()].map((item) => `qc-payment:${item.batchId}:${item.reviewerId}`);
   const [assignmentBatches, paidAssignments] = await Promise.all([
     prisma.qcRevisionBatch.findMany({
       where: { id: { in: assignmentBatchIds } },
       select: { id: true, batchNumber: true, supplierName: true },
     }),
     prisma.walletLedgerEntry.findMany({
-      where: { externalKey: { in: assignmentPaymentKeys }, type: "CREDIT", status: "POSTED" },
-      select: { externalKey: true },
+      where: { externalKey: { startsWith: "qc-payment:" }, actorId: { in: [...new Set(latestAssignments.values().map((item) => item.reviewerId))] }, type: "CREDIT", status: "POSTED" },
+      select: { externalKey: true, actorId: true },
     }),
   ]);
   const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
-  const paidAssignmentKeys = new Set(paidAssignments.map((entry) => entry.externalKey));
+  const paidAssignmentKeys = new Set(
+    paidAssignments.map((entry) => {
+      const [, batchId] = entry.externalKey.split(":");
+      return `${batchId}:${entry.actorId}`;
+    }),
+  );
   const partialQcBatches: any[] = [];
   for (const assignment of latestAssignments.values()) {
     const batch = assignmentBatchById.get(assignment.batchId);
-    if (!batch || paidAssignmentKeys.has(`qc-payment:${assignment.batchId}:${assignment.reviewerId}`)) continue;
+    if (!batch || /-R-[^-]+-/i.test(batch.batchNumber) || paidAssignmentKeys.has(`${assignment.batchId}:${assignment.reviewerId}`)) continue;
     partialQcBatches.push({
       id: assignment.batchId,
       assignmentKey: `qc-payment:${assignment.batchId}:${assignment.reviewerId}`,
