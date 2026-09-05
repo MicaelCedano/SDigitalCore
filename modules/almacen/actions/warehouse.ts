@@ -17,6 +17,7 @@ import {
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 const legacyWarehouseProductSelect = {
   id: true,
@@ -74,6 +75,7 @@ async function applyStockDelta(
   productId: string,
   type: "ENTRY" | "EXIT",
   line: { measure: "BOXES" | "UNITS"; quantity: number; unitsCount: number },
+  returnProduct = true,
 ) {
   const direction = type === "ENTRY" ? 1 : -1;
   if (type === "EXIT" && line.measure === "UNITS") {
@@ -105,7 +107,7 @@ async function applyStockDelta(
     },
   });
   if (changed.count !== 1) throw new Error("El producto ya no está activo o su stock disponible cambió. Actualiza e intenta de nuevo.");
-  return tx.warehouseProduct.findUniqueOrThrow({ where: { id: productId } });
+  if (returnProduct) return tx.warehouseProduct.findUniqueOrThrow({ where: { id: productId } });
 }
 
 function parseRequestLine(details: string | null | undefined, productId: string, unitsCount: number) {
@@ -492,23 +494,31 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
   try {
     const actor = await requireWarehouseAdmin();
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    ({ id, status } = z.object({ id: z.string().min(1), status: z.enum(["APPROVED", "REJECTED"]) }).parse({ id, status }));
     const updated = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.warehouseRequest.updateMany({ where: { id, status: "PENDING" }, data: { status } });
+      if (claimed.count !== 1) throw new Error("La solicitud no existe o ya fue procesada. Actualiza la lista.");
       const request = await tx.warehouseRequest.findUnique({ where: { id }, include: { items: true } });
       if (!request) throw new Error("Solicitud no encontrada.");
-      if (request.status !== "PENDING") throw new Error("Esta solicitud ya fue procesada.");
-      if (status === "REJECTED") return tx.warehouseRequest.update({ where: { id }, data: { status } });
+      await tx.auditLog.create({ data: { userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: id, beforeData: { status: "PENDING" }, afterData: { status } } });
+      if (status === "REJECTED") return request;
+      const movements: Prisma.WarehouseMovementCreateManyInput[] = [];
       const products = await tx.warehouseProduct.findMany({ where: { id: { in: request.items.map((item) => item.productId) }, status: "ACTIVE" } });
-      for (const item of request.items) {
+      for (const item of [...request.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
         const product = products.find((candidate) => candidate.id === item.productId);
         if (!product) throw new Error("Uno de los productos de la solicitud ya no existe.");
         const savedLine = parseRequestLine(request.details, item.productId, item.unitsCount);
         const line = resolveMovementLine({ unitsCount: item.unitsCount, ...savedLine }, product.unitsPerBox);
-        await applyStockDelta(tx, product.id, request.type, line);
-        await tx.warehouseMovement.create({ data: { productId: product.id, type: request.type, boxesCount: line.boxesCount, totalUnits: line.unitsCount, reason: `Solicitud ${request.requestCode}: ${request.title}`, createdBy: actor.id } });
+        if (request.type === "EXIT" && (availableQuantity(product, line.measure) < line.quantity || product.totalUnits < line.unitsCount)) {
+          throw new Error(`Stock insuficiente para ${product.code} · ${product.name} ${product.color || ""}: solicita ${line.quantity} ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"}; disponibles ${availableQuantity(product, line.measure)}.`);
+        }
+        await applyStockDelta(tx, product.id, request.type, line, false);
+        movements.push({ productId: product.id, type: request.type, boxesCount: line.boxesCount, totalUnits: line.unitsCount, reason: `Solicitud ${request.requestCode}: ${request.title}`, createdBy: actor.id });
       }
-      return tx.warehouseRequest.update({ where: { id }, data: { status } });
-    });
-    await logAudit({ userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: updated.id, afterData: { status: updated.status } });
+      await tx.warehouseMovement.createMany({ data: movements });
+      return request;
+    }, { maxWait: 10_000, timeout: 30_000 });
+    try {
     const requesterIdentity = await prisma.warehouseRequest.findUnique({ where: { id }, select: { requestedBy: true } });
     const requesterMatches = requesterIdentity?.requestedBy
       ? await prisma.user.findMany({
@@ -535,6 +545,11 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
       });
     }
 
+    } catch (notificationError) {
+      console.error("Solicitud procesada; no se pudo notificar al solicitante", notificationError);
+    }
+    revalidatePath("/almacen");
+    revalidatePath("/almacen/movimientos");
     revalidatePath("/almacen/transferencias");
     revalidatePath("/dashboard");
     revalidatePath("/", "layout");
@@ -544,7 +559,10 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
       message: `Solicitud ${status === "APPROVED" ? "Aprobada" : "Rechazada"}`,
     };
   } catch (error: any) {
-    return { success: false, error: "Error al actualizar la solicitud" };
+    console.error("Error al actualizar la solicitud de almacén", error);
+    if (error?.code === "P2028") return { success: false, error: "La operación tardó demasiado y se revirtió. La solicitud no fue procesada; vuelve a intentarlo." };
+    if (error instanceof z.ZodError) return { success: false, error: "La solicitud o el estado indicado no es válido." };
+    return { success: false, error: error instanceof Error && !("code" in error) ? error.message : "No se pudo procesar la solicitud. Actualiza la lista e inténtalo nuevamente." };
   }
 }
 
