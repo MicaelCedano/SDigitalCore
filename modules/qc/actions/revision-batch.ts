@@ -23,6 +23,7 @@ import type { QcBatchStatus } from "@prisma/client";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { normalizeModelName } from "../lib/model-name";
+import { isReconciledSubmission } from "../lib/reconciled-submission";
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
@@ -666,6 +667,13 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
         return audit.action === "qc_batch.assignment_submit" && data.reviewerId === reviewerId && auditPortionId === portionId;
       });
       if (!latestSubmission) return { success: false, error: "La porción enviada no existe o ya fue procesada." };
+      const repairs = await prisma.auditLog.findMany({
+        where: { action: "qc_batch.duplicate_repaired_and_paid", createdAt: { gt: latestSubmission.createdAt } },
+        select: { entityId: true, createdAt: true, afterData: true },
+      });
+      if (isReconciledSubmission({ ...latestSubmission, entityId: batch.id }, repairs)) {
+        return { success: false, error: "Estos equipos ya fueron pagados al corregir el lote duplicado." };
+      }
       const processedAfter = assignmentAudits.find((audit) => {
         if (audit.createdAt <= latestSubmission.createdAt || !["qc_batch.assignment_reject", "qc_batch.assignment_approve"].includes(audit.action)) return false;
         const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
@@ -1756,7 +1764,12 @@ export async function getQcPaymentsAction(): Promise<
     });
     const assignmentSubmissions: Array<{ portionId: string; batchId: string; reviewerId: string; reviewerName: string; assignedDevices: number; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number; submittedAt: Date }> = [];
     const submissionAudits = assignmentAudits.filter((audit) => audit.action === "qc_batch.assignment_submit");
+    const paidRepairs = await prisma.auditLog.findMany({
+      where: { action: "qc_batch.duplicate_repaired_and_paid" },
+      select: { entityId: true, createdAt: true, afterData: true },
+    });
     for (const [index, audit] of submissionAudits.entries()) {
+      if (isReconciledSubmission(audit, paidRepairs)) continue;
       const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
       const reviewerId = typeof data.reviewerId === "string" ? data.reviewerId : null;
       if (!audit.entityId || !reviewerId) continue;
