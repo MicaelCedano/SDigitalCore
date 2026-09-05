@@ -558,12 +558,14 @@ export async function submitRevisionBatchAction(input: { id: string }): Promise<
     await sendPushToRole("ADMIN", {
       title: `Porción ${portionId} lista`,
       body: `${reviewerName} terminó ${assignedDevices.length} equipo(s) y espera su pago.`,
-      route: `/qc/lotes/${batch.id}`,
+      route: `/qc/pagos`,
       type: "qc_batch.assignment_submitted",
     });
 
     revalidatePath("/qc/lotes");
     revalidatePath(`/qc/lotes/${batch.id}`);
+    revalidatePath("/qc");
+    revalidatePath("/qc/pagos");
     revalidatePath("/dashboard");
 
     return {
@@ -1837,8 +1839,8 @@ export async function getQcPaymentsAction(): Promise<
         .map((entry) => entry.externalKey.split(":")[1])
         .filter((id): id is string => Boolean(id)),
     );
-    mapPending = pending
-      .filter((batch) => !paidBatchIds.has(batch.id) && !isLegacyWorkLot(batch.batchNumber))
+    mapPending.push(...pending
+      .filter((batch) => !assignmentBatchIds.includes(batch.id) && !paidBatchIds.has(batch.id) && !isLegacyWorkLot(batch.batchNumber))
       .map((batch) => {
         const submitter = submitterByBatch.get(batch.id);
         return {
@@ -1853,7 +1855,7 @@ export async function getQcPaymentsAction(): Promise<
           submittedAt: submitter?.submittedAt ?? batch.updatedAt,
           estimatedAmount: batch.reviewedDevices * RATE,
         };
-      });
+      }));
     const mapHistory = history.map((b) => ({
       ...b,
       estimatedAmount: b.reviewedDevices * RATE,

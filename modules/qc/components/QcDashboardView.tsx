@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Package,
   Clock,
@@ -18,7 +18,7 @@ import {
   Search,
   CheckCheck,
 } from "lucide-react";
-import { getQcDashboardAction } from "../actions/revision-batch";
+import { getQcDashboardAction, submitRevisionBatchAction } from "../actions/revision-batch";
 import { ReviewDeviceModal } from "./ReviewDeviceModal";
 import { SolicitarImeisModal } from "./SolicitarImeisModal";
 
@@ -31,8 +31,6 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [reviewDevice, setReviewDevice] = useState<any>(null);
   const [showSolicitar, setShowSolicitar] = useState(false);
-  // Estados reservados para cerrar compatibilidad con una sesión antigua; no
-  // se activan en el flujo actual de lotes completos.
   const [confirmLote, setConfirmLote] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; title: string; message: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,7 +50,30 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     setRefreshing(false);
   };
 
-  const confirmSubmitLote = async () => undefined;
+  const confirmSubmitLote = async () => {
+    if (!confirmLote || refreshing) return;
+    setRefreshing(true);
+    try {
+      const res = await submitRevisionBatchAction({ id: confirmLote.id });
+      if (!res.success) {
+        setFeedback({ type: "error", title: "No se pudo enviar", message: res.error });
+        return;
+      }
+      const batchId = confirmLote.id;
+      setData((current: any) => ({
+        ...current,
+        devices: current.devices.map((device: any) => device.batch?.id === batchId
+          ? { ...device, assignmentSubmitted: true }
+          : device),
+      }));
+      setConfirmLote(null);
+      setFeedback({ type: "success", title: "Enviado para pago", message: res.message || "El administrador ya puede aprobar tu pago." });
+    } catch {
+      setFeedback({ type: "error", title: "No se pudo confirmar el envío", message: "Actualiza el panel para comprobar el estado antes de intentarlo nuevamente." });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
 
 
@@ -78,7 +99,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
   });
 
   // Agrupar por lote para mostrar el avance y el botón de envío
-  const lotes = useMemo(() => {
+  const lotes = (() => {
     const map = new Map<string, any>();
     for (const dev of devices || []) {
       const b = dev.batch;
@@ -88,6 +109,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
         batchNumber: b.batchNumber,
         supplierName: b.supplierName,
         status: b.status,
+        assignmentSubmitted: dev.assignmentSubmitted === true,
         // El avance corresponde al lote de compra asignado.
         totalDevices: 0,
         reviewedDevices: 0,
@@ -95,14 +117,14 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
         myReviewed: 0,
       };
       entry.myCount += 1;
-      const vigente = (dev.lastInspection?.createdAt ?? new Date(0)) >= new Date(b.createdAt);
+      const vigente = new Date(dev.lastInspection?.createdAt ?? 0) >= new Date(b.createdAt);
       if (dev.lastInspection?.status === "COMPLETED" && vigente) entry.myReviewed += 1;
       entry.totalDevices = entry.myCount;
       entry.reviewedDevices = entry.myReviewed;
       map.set(b.id, entry);
     }
     return [...map.values()].sort((a, b) => (a.status === "IN_REVIEW" ? -1 : 1) - (b.status === "IN_REVIEW" ? -1 : 1));
-  }, [devices]);
+  })();
 
   const statusLabel = (s: string) =>
     s === "COMPLETED"
@@ -244,7 +266,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                 <Package className="w-4 h-4 text-[#5750f1]" /> Mis lotes en revisión
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Revisa el lote completo. Al terminar todos los equipos, el lote queda listo para aprobación y pago.
+                Revisa tus equipos asignados y envíalos al administrador para aprobación y pago.
               </p>
             </div>
           </div>
@@ -268,7 +290,9 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                             : "bg-blue-50 text-blue-700 border-blue-200"
                         }`}
                       >
-                        {ready
+                        {lote.assignmentSubmitted
+                          ? "ENVIADO PARA PAGO"
+                          : ready
                           ? "LISTO PARA APROBACIÓN"
                           : lote.status === "COMPLETED"
                           ? "COMPLETADO"
@@ -290,10 +314,15 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
                     </div>
                   </div>
                   <div className="shrink-0">
-                    {ready ? (
+                    {lote.assignmentSubmitted ? (
                       <span className="px-3 py-2 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 inline-flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Listo para aprobación
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Esperando aprobación y pago
                       </span>
+                    ) : ready ? (
+                      <button type="button" onClick={() => setConfirmLote(lote)} disabled={refreshing}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl inline-flex items-center gap-1.5 disabled:opacity-50">
+                        <Send className="w-3.5 h-3.5" /> Enviar para pago
+                      </button>
                     ) : (
                       <span className="px-3 py-2 bg-slate-50 text-slate-500 font-bold text-xs rounded-xl border border-slate-200 inline-flex items-center gap-1.5">
                         <ClipboardCheck className="w-3.5 h-3.5" /> Falta revisar equipos
