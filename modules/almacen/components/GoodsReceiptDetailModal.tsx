@@ -502,7 +502,7 @@ export function GoodsReceiptDetailModal({
             {receipt.status === "COMPLETED" && receipt.warehouseImportedAt && (
               <span className="max-w-[230px] text-right text-[11px] leading-4 text-slate-500">Para corregir este recibo, primero cancela su entrada al almacén.</span>
             )}
-            {receipt.status === "DRAFT" && onEdit && (
+            {(receipt.status === "DRAFT" || (receipt.status === "COMPLETED" && !receipt.warehouseImportedAt)) && onEdit && (
               <button
                 type="button"
                 onClick={() => {
@@ -511,7 +511,7 @@ export function GoodsReceiptDetailModal({
                 }}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-amber-700"
               >
-                <Pencil className="h-4 w-4" /> Editar / finalizar borrador
+                <Pencil className="h-4 w-4" /> {receipt.status === "COMPLETED" ? "Editar recibo" : "Editar / finalizar borrador"}
               </button>
             )}
           </div>

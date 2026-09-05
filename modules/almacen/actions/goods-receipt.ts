@@ -172,24 +172,30 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
     if (validated.id) {
       const existing = await prisma.goodsReceipt.findUnique({
         where: { id: validated.id },
+        include: { items: true },
       });
 
       if (existing) {
-        if (existing.status !== "DRAFT") {
-          return { success: false, error: "Solo los recibos en borrador pueden modificarse." };
+        if (existing.status === "CANCELLED" || existing.warehouseImportedAt) {
+          return { success: false, error: "No puedes editar un recibo cancelado o ingresado al almacén. Primero cancela la entrada al almacén." };
         }
         const updated = await prisma.$transaction(async (tx) => {
+          const claimed = await tx.goodsReceipt.updateMany({
+            where: { id: existing.id, status: existing.status, warehouseImportedAt: null, updatedAt: existing.updatedAt, warehouseImports: { none: { status: "ACTIVE" } } },
+            data: { updatedAt: new Date() },
+          });
+          if (claimed.count !== 1) throw new Error("El recibo cambió o ya fue ingresado al almacén. Recarga antes de editar.");
           await tx.goodsReceiptItem.deleteMany({
             where: { receiptId: validated.id },
           });
 
-          return tx.goodsReceipt.update({
+          const saved = await tx.goodsReceipt.update({
             where: { id: validated.id },
             data: {
               supplierName: validated.supplierName,
               branch: validated.branch,
-              receivedBy: receivedBy,
-              status: validated.status,
+              receivedBy: existing.receivedBy,
+              status: existing.status === "COMPLETED" ? "COMPLETED" : validated.status,
               notes: validated.notes,
               items: { create: validated.items.map(persistItem) },
             },
@@ -197,9 +203,13 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
               items: true,
             },
           });
+          await tx.auditLog.create({ data: {
+            userId: user.id, action: "goods_receipt.update", module: "almacen", entityType: "goods_receipt", entityId: saved.id,
+            beforeData: JSON.parse(JSON.stringify(existing)), afterData: JSON.parse(JSON.stringify(saved)),
+          } });
+          return saved;
         });
-        await logAudit({ userId: user.id, action: "goods_receipt.update", module: "almacen", entityType: "goods_receipt", entityId: updated.id, afterData: { receiptNumber: updated.receiptNumber, status: updated.status, itemCount: updated.items.length } });
-        if (updated.status === "COMPLETED") {
+        if (existing.status === "DRAFT" && updated.status === "COMPLETED") {
           await sendPushToRole("ADMIN", {
             title: `Recibo ${updated.receiptNumber} completado`,
             body: `${updated.supplierName} · ${updated.items.length} línea(s) recibida(s).`,
@@ -213,6 +223,7 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
         revalidatePath("/", "layout");
         return { success: true, data: updated, message: "Recibo actualizado exitosamente" };
       }
+      return { success: false, error: "Recibo no encontrado. Recarga la lista." };
     }
 
     // Crear nuevo recibo

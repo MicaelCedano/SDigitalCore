@@ -89,7 +89,7 @@ export function GoodsReceiptForm({
                   ...variant,
                   withoutIdentifier: variant.withoutIdentifier ?? !variant.imeis,
                 }))
-              : [{ ...emptyColorVariant, imeis: item.imeiOrSerial || "", withoutIdentifier: !item.imeiOrSerial }],
+              : [{ ...emptyColorVariant, quantity: item.quantity || 1, imeis: item.imeiOrSerial || "", withoutIdentifier: !item.imeiOrSerial }],
         }))
       : [{ ...emptyItem }]
   );
@@ -400,7 +400,7 @@ export function GoodsReceiptForm({
             // identidad operativa queda en marca/modelo/capacidad y variantes.
             description: null,
             quantity: Math.max(1, totalQty || Number(i.quantity) || 1),
-            unitPrice: null,
+            unitPrice: i.unitPrice == null ? null : Number(i.unitPrice),
             condition: i.condition || "Nuevo",
             imeiOrSerial: allImeis || i.imeiOrSerial || null,
             colorVariants: (i.colorVariants || []).map((v: any) => {
@@ -411,7 +411,7 @@ export function GoodsReceiptForm({
                 capacity: i.capacity ? String(i.capacity).trim() : null,
                 color: v.color && v.color.trim() ? v.color.trim() : null,
                 quantity: vImeiCount > 0 ? vImeiCount : Number(v.quantity) || 1,
-                unitPrice: null,
+                unitPrice: v.unitPrice == null ? null : Number(v.unitPrice),
                 imeis: v.imeis || null,
               };
             }),
@@ -972,7 +972,8 @@ export function GoodsReceiptForm({
 
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || initialData?.status === "COMPLETED"}
+              hidden={initialData?.status === "COMPLETED"}
               onClick={() => handleSubmit("DRAFT")}
               className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
@@ -990,7 +991,7 @@ export function GoodsReceiptForm({
               ) : (
                 <CheckCircle2 className="w-4 h-4" />
               )}
-              Finalizar Recibo
+              {initialData?.status === "COMPLETED" ? "Guardar cambios" : "Finalizar Recibo"}
             </button>
           </div>
         </div>
