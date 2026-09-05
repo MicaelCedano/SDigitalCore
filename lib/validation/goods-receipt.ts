@@ -45,6 +45,7 @@ export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;
 
 export const goodsReceiptWarehouseImportLineSchema = z.object({
   itemId: z.string().min(1),
+  variantIndex: z.number().int().min(0),
   code: z.string().trim().min(1, "El código Kaptas es requerido"),
   name: z.string().trim().min(1, "El modelo es requerido"),
   brand: z.string().trim().optional().default(""),
@@ -60,4 +61,27 @@ export const goodsReceiptWarehouseImportSchema = z.object({
 });
 
 export type GoodsReceiptWarehouseImportInput = z.infer<typeof goodsReceiptWarehouseImportSchema>;
+
+export function validateWarehouseSelection(
+  items: Array<{ id: string; quantity: number; colorVariants: unknown }>,
+  lines: GoodsReceiptWarehouseImportInput["lines"],
+) {
+  const seen = new Set<string>();
+  const totals = new Map<string, number>();
+  for (const line of lines) {
+    const item = items.find((candidate) => candidate.id === line.itemId);
+    if (!item) throw new Error("Una de las líneas no pertenece a este recibo.");
+    const key = `${line.itemId}:${line.variantIndex}`;
+    if (seen.has(key)) throw new Error("Un modelo/color está seleccionado más de una vez.");
+    seen.add(key);
+    const variants = Array.isArray(item.colorVariants) && item.colorVariants.length ? item.colorVariants : [{ quantity: item.quantity }];
+    const variant = variants[line.variantIndex];
+    const available = variant && typeof variant === "object" ? Number(variant.quantity) : 0;
+    const total = (totals.get(item.id) || 0) + line.quantity;
+    if (!Number.isInteger(line.quantity) || line.quantity < 1 || !Number.isFinite(available) || line.quantity > available || total > item.quantity) {
+      throw new Error("La cantidad a ingresar no puede superar lo recibido para ese modelo/color.");
+    }
+    totals.set(item.id, total);
+  }
+}
 

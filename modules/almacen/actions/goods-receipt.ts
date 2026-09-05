@@ -1,5 +1,7 @@
 "use server";
 
+import { validateWarehouseSelection } from "@/lib/validation/goods-receipt";
+
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
@@ -578,6 +580,8 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
       });
       if (claimed.count !== 1) throw new Error(`El recibo ${receipt.receiptNumber} ya fue enviado al almacén y no puede enviarse otra vez.`);
 
+      const currentItems = await tx.goodsReceiptItem.findMany({ where: { receiptId: receipt.id } });
+      validateWarehouseSelection(currentItems, validated.lines);
       const importNumber = await nextOperationalNumber(tx, "WAREHOUSE_RECEIPT_IMPORT", "ENT");
       const products = [];
       const importLines: Array<{
@@ -619,7 +623,7 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
       return { products, voucher };
     });
 
-    await logAudit({ userId: actor.id, action: "goods_receipt.import_to_warehouse", module: "almacen", entityType: "goods_receipt", entityId: receipt.id, afterData: { receiptNumber: receipt.receiptNumber, importNumber: created.voucher.importNumber, productIds: created.products.map((product) => product.id), lineCount: created.products.length } });
+    await logAudit({ userId: actor.id, action: "goods_receipt.import_to_warehouse", module: "almacen", entityType: "goods_receipt", entityId: receipt.id, afterData: { receiptNumber: receipt.receiptNumber, importNumber: created.voucher.importNumber, productIds: created.products.map((product) => product.id), lineCount: created.products.length, selectedUnits: validated.lines.reduce((sum, line) => sum + line.quantity, 0), selection: validated.lines.map(({ itemId, variantIndex, quantity }) => ({ itemId, variantIndex, quantity })) } });
     revalidatePath("/almacen");
     revalidatePath("/almacen/recibos");
     revalidatePath("/dashboard");
