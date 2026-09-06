@@ -1155,7 +1155,8 @@ export async function getRevisionBatchFormDataAction() {
  * Registra la revisión QC de un equipo dentro de un Lote de Revisión.
  * Crea una inspección COMPLETED, actualiza el estado operativo del equipo
  * y recalcula los contadores del lote. Si con esta revisión quedan todos
- * los equipos revisados, el lote pasa automáticamente a COMPLETED.
+ * los equipos revisados, el lote queda listo para que el QC lo envíe
+ * explícitamente a aprobación y pago.
  */
 export async function reviewDeviceAction(input: ReviewDeviceInput) {
   try {
@@ -1241,10 +1242,11 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
         }
       }
 
-      // Igual que SDigitalSystem: completar el último equipo cierra el lote.
-      // El pago se confirma después, desde la bandeja administrativa del lote.
+      // Completar el último equipo no debe cerrar ni enviar el lote por sí
+      // solo: el QC debe pulsar "Enviar para pago". Así el administrador
+      // recibe una solicitud explícita antes de acreditar la wallet.
       const allReviewed = batchDevices.length > 0 && reviewed >= batchDevices.length;
-      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "COMPLETED" : batch.status;
+      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "IN_REVIEW" : batch.status;
 
       const updatedBatch = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
@@ -1253,7 +1255,7 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
           status: nextStatus as QcBatchStatus,
-          completedAt: nextStatus === "COMPLETED" ? new Date() : batch.completedAt,
+          completedAt: nextStatus === "COMPLETED" ? new Date() : null,
         },
       });
 
@@ -1383,7 +1385,7 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
         }
       }
       const allReviewed = batchDevices.length > 0 && reviewed >= batchDevices.length;
-      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "COMPLETED" : batch.status;
+      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "IN_REVIEW" : batch.status;
 
       const updated = await tx.qcRevisionBatch.update({
         where: { id: batch.id },
@@ -1392,7 +1394,7 @@ export async function markDeviceFunctionalAction(input: { deviceId: string }): P
           functionalCount: functional,
           nonFunctionalCount: nonFunctional,
           status: nextStatus as QcBatchStatus,
-          completedAt: nextStatus === "COMPLETED" ? new Date() : batch.completedAt,
+          completedAt: nextStatus === "COMPLETED" ? new Date() : null,
         },
       });
 
