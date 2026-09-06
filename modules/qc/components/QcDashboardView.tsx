@@ -103,7 +103,7 @@ export function QcDashboardView({ initialData }: QcDashboardProps) {
     const map = new Map<string, any>();
     for (const dev of devices || []) {
       const b = dev.batch;
-      if (!b || b.status === "CANCELLED" || b.status === "COMPLETED") continue;
+      if (!b || b.status === "CANCELLED") continue;
       const entry = map.get(b.id) || {
         id: b.id,
         batchNumber: b.batchNumber,

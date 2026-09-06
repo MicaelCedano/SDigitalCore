@@ -1482,9 +1482,10 @@ export async function getQcDashboardAction() {
 
     const [devices, hoyInspecciones, myRequests, wallet, availableDevices] = await Promise.all([
       prisma.deviceUnit.findMany({
-        // Compatibilidad con compras que quedaron COMPLETED por el cierre
-        // automático anterior pero todavía tienen una porción sin enviar.
-        where: { assignedToId: persisted.id, batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } } },
+        // Mantener visibles los lotes COMPLETED por el cierre automático
+        // anterior: mientras sus equipos sigan asignados al QC y no exista
+        // envío de la porción, todavía debe poder solicitar el pago.
+        where: { assignedToId: persisted.id, batch: { status: { not: "CANCELLED" } } },
         orderBy: { updatedAt: "desc" },
         take: 100,
         include: {
