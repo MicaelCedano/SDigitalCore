@@ -84,3 +84,26 @@ export async function createManualWalletCreditAction(input: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "No se pudo acreditar el pago manual." };
   }
 }
+
+/** Revierte un pago QC acreditado por error a una cuenta ADMIN, sin borrar evidencia. */
+export async function reverseAdminQcPayment(input: unknown) {
+  try {
+    const actor = await getPersistedCurrentUser();
+    if (!actor || actor.status !== "ACTIVE" || actor.roleCode !== "ADMIN") return { success: false, error: "Solo un administrador activo puede revertir este pago." };
+    const parsed = z.object({ entryId: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Movimiento inválido." };
+    await prisma.$transaction(async (tx) => {
+      const entry = await tx.walletLedgerEntry.findUnique({ where: { id: parsed.data.entryId }, include: { wallet: { include: { user: { select: { roleCode: true } } } } } });
+      if (!entry || entry.type !== "CREDIT" || entry.status === "VOID" || !entry.externalKey.startsWith("qc-payment:")) throw new Error("Solo se puede revertir un pago QC válido.");
+      if (entry.wallet.user.roleCode !== "ADMIN") throw new Error("Este movimiento no pertenece a una cuenta ADMIN.");
+      await tx.walletAccount.update({ where: { id: entry.accountId }, data: { balance: { decrement: entry.amount } } });
+      await tx.wallet.update({ where: { id: entry.walletId }, data: { balance: { decrement: entry.amount } } });
+      await tx.walletLedgerEntry.create({ data: { walletId: entry.walletId, accountId: entry.accountId, type: "DEBIT", amount: entry.amount, description: `Reversión de pago QC acreditado por error: ${entry.description ?? ""}`, externalKey: `qc-payment-reversal:${entry.id}:${randomUUID()}`, reversalOfId: entry.id, actorId: actor.id } });
+      await tx.walletLedgerEntry.update({ where: { id: entry.id }, data: { status: "VOID" } });
+    });
+    await logAudit({ userId: actor.id, action: "wallet.qc_payment.reverse_admin_credit", module: "wallet", entityType: "WalletLedgerEntry", entityId: parsed.data.entryId, afterData: { reason: "Cuenta ADMIN no pagable por revisiones QC" } });
+    revalidatePath("/wallet");
+    revalidatePath("/dashboard");
+    return { success: true, message: "Pago QC revertido y registrado en auditoría." };
+  } catch (error) { return { success: false, error: error instanceof Error ? error.message : "No se pudo revertir el pago." }; }
+}

@@ -25,6 +25,9 @@ export async function payReviewersForBatch(
   });
   if (!batch) return 0;
 
+  const eligibleReviewers = await tx.user.findMany({ where: { roleCode: { not: "ADMIN" } }, select: { id: true } });
+  const eligibleReviewerIds = new Set(eligibleReviewers.map((user) => user.id));
+
   // Contar la inspección MÁS RECIENTE DE ESTE LOTE de cada equipo (igual que
   // los contadores del lote: una re-revisión reemplaza, no suma). Solo pagan
   // las revisiones hechas en este lote (createdAt >= lote.createdAt) — el
@@ -49,7 +52,7 @@ export async function payReviewersForBatch(
   const perReviewer = new Map<string, number>();
   for (const d of devices) {
     const last = d.inspections[0];
-    if (last && last.status === "COMPLETED" && last.reviewerId) {
+    if (last && last.status === "COMPLETED" && last.reviewerId && eligibleReviewerIds.has(last.reviewerId)) {
       perReviewer.set(last.reviewerId, (perReviewer.get(last.reviewerId) ?? 0) + 1);
     }
   }
