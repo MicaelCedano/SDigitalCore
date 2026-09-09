@@ -107,3 +107,37 @@ export async function reverseAdminQcPayment(input: unknown) {
     return { success: true, message: "Pago QC revertido y registrado en auditoría." };
   } catch (error) { return { success: false, error: error instanceof Error ? error.message : "No se pudo revertir el pago." }; }
 }
+
+/** Corrige el caso histórico de un pago QC dividido entre ADMIN y su revisor. */
+export async function correctSplitQcPayment(input: unknown) {
+  try {
+    const actor = await getPersistedCurrentUser();
+    if (!actor || actor.status !== "ACTIVE" || actor.roleCode !== "ADMIN") return { success: false, error: "Solo un administrador activo puede corregir pagos." };
+    const parsed = z.object({ adminEntryId: z.string().min(1), recipientUserId: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Datos de corrección inválidos." };
+    const result = await prisma.$transaction(async (tx) => {
+      const entry = await tx.walletLedgerEntry.findUnique({ where: { id: parsed.data.adminEntryId }, include: { wallet: { include: { user: { select: { roleCode: true } } } } } });
+      const recipient = await tx.user.findUnique({ where: { id: parsed.data.recipientUserId }, select: { id: true, name: true, username: true, roleCode: true, status: true } });
+      if (!entry || entry.type !== "CREDIT" || entry.status === "VOID" || !entry.externalKey.startsWith("qc-payment:")) throw new Error("El movimiento no es un pago QC válido.");
+      if (entry.wallet.user.roleCode !== "ADMIN") throw new Error("El movimiento seleccionado no pertenece a ADMIN.");
+      if (!recipient || recipient.roleCode === "ADMIN" || !["ACTIVE", "INACTIVE"].includes(recipient.status)) throw new Error("El destinatario no es un técnico válido.");
+      const key = `qc-payment-correction:${entry.id}`;
+      if (await tx.walletLedgerEntry.findUnique({ where: { externalKey: key } })) throw new Error("Este pago ya fue corregido.");
+      let wallet = await tx.wallet.findUnique({ where: { userId: recipient.id }, include: { accounts: { where: { kind: "PRIMARY" } } } });
+      if (!wallet) wallet = await tx.wallet.create({ data: { userId: recipient.id, balance: 0 }, include: { accounts: { where: { kind: "PRIMARY" } } } });
+      let account = wallet.accounts[0];
+      if (!account) account = await tx.walletAccount.create({ data: { walletId: wallet.id, name: "Principal", kind: "PRIMARY", balance: 0 } });
+      await tx.walletAccount.update({ where: { id: entry.accountId }, data: { balance: { decrement: entry.amount } } });
+      await tx.wallet.update({ where: { id: entry.walletId }, data: { balance: { decrement: entry.amount } } });
+      await tx.walletLedgerEntry.create({ data: { walletId: entry.walletId, accountId: entry.accountId, type: "DEBIT", amount: entry.amount, description: `Corrección: reversión del pago QC acreditado por error a ADMIN (${entry.description ?? ""})`, externalKey: `qc-payment-reversal:${entry.id}`, reversalOfId: entry.id, actorId: actor.id } });
+      await tx.walletLedgerEntry.update({ where: { id: entry.id }, data: { status: "VOID" } });
+      await tx.walletLedgerEntry.create({ data: { walletId: wallet.id, accountId: account.id, type: "CREDIT", amount: entry.amount, description: `Corrección de pago QC LOT-122 transferida desde ADMIN`, externalKey: key, actorId: actor.id } });
+      await tx.walletAccount.update({ where: { id: account.id }, data: { balance: { increment: entry.amount } } });
+      await tx.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: entry.amount } } });
+      return { amount: entry.amount.toString(), recipient: recipient.name ?? recipient.username ?? recipient.id };
+    });
+    await logAudit({ userId: actor.id, action: "wallet.qc_payment.correct_split", module: "wallet", entityType: "WalletLedgerEntry", entityId: parsed.data.adminEntryId, afterData: result });
+    revalidatePath("/wallet"); revalidatePath("/dashboard");
+    return { success: true, message: `Se transfirieron RD$${result.amount} a ${result.recipient} y se anuló el crédito ADMIN.` };
+  } catch (error) { return { success: false, error: error instanceof Error ? error.message : "No se pudo corregir el pago." }; }
+}
