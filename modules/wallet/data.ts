@@ -214,8 +214,12 @@ export async function getAdminTeamWalletBalances() {
 
   const users = await prisma.user.findMany({
     where: {
-      roleCode: { in: ["QC", "TECNICO"] },
-      status: { in: ["ACTIVE", "INACTIVE"] },
+      roleCode: { not: "ADMIN" },
+      status: { in: ["ACTIVE", "INACTIVE", "BLOCKED"] },
+      OR: [
+        { roleCode: { in: ["QC", "TECNICO"] } },
+        { allowedModules: { has: "wallet" } },
+      ],
     },
     orderBy: [{ roleCode: "asc" }, { name: "asc" }],
     select: {
@@ -245,7 +249,7 @@ export async function getAdminTeamWalletBalances() {
     id: user.id,
     name: user.name ?? user.username ?? user.email,
     username: user.username,
-    role: user.roleCode as "QC" | "TECNICO",
+    role: (user.roleCode === "QC" ? "QC" : "TECNICO") as "QC" | "TECNICO",
     userStatus: user.status,
     walletStatus: user.wallet?.status ?? null,
     currency: user.wallet?.currency ?? "DOP",
