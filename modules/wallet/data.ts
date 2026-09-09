@@ -225,7 +225,19 @@ export async function getAdminTeamWalletBalances() {
       email: true,
       roleCode: true,
       status: true,
-      wallet: { select: { balance: true, status: true, currency: true } },
+      wallet: {
+        select: {
+          balance: true,
+          status: true,
+          currency: true,
+          entries: {
+            where: { status: "POSTED" },
+            orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+            take: 100,
+            select: { id: true, type: true, amount: true, description: true, occurredAt: true },
+          },
+        },
+      },
     },
   });
 
@@ -238,6 +250,13 @@ export async function getAdminTeamWalletBalances() {
     walletStatus: user.wallet?.status ?? null,
     currency: user.wallet?.currency ?? "DOP",
     balance: Number(user.wallet?.balance ?? 0),
+    entries: user.wallet?.entries.map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      amount: Number(entry.amount),
+      description: entry.description,
+      occurredAt: entry.occurredAt.toISOString(),
+    })) ?? [],
   }));
   const qc = rows.filter((row) => row.role === "QC");
   const technicians = rows.filter((row) => row.role === "TECNICO");
