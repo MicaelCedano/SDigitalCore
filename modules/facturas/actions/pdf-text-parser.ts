@@ -44,9 +44,20 @@ const COLORS = [
 
 const IMEI_PATTERN = /(?<!\d)\d(?:[\s-]?\d){14}(?!\d)/g;
 const AMAZON_SERIAL_PATTERN = /(?<![A-Z0-9])YTAMZ\d{4}(?![A-Z0-9])/gi;
+const MOTOROLA_CAPACITY_PATTERN = /\b(?:\d+\s*\+\s*)?\d+\s*GB\b/gi;
+
+function truncateMotorolaAfterCapacity(value: string): string {
+  if (!/\bMOTOROLA\b/i.test(value)) return value;
+
+  const capacities = Array.from(value.matchAll(MOTOROLA_CAPACITY_PATTERN));
+  const lastCapacity = capacities.at(-1);
+  if (lastCapacity?.index === undefined) return value;
+
+  return value.slice(0, lastCapacity.index + lastCapacity[0].length);
+}
 
 function cleanModelName(value: string): string {
-  const model = value
+  const model = truncateMotorolaAfterCapacity(value)
     .replace(/\s*5g\b/gi, "")
     .replace(/\bSM-[A-Z0-9\/]+\b/gi, "")
     .replace(new RegExp(`\\b(${COLORS.join("|")})\\b`, "gi"), "")
