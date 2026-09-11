@@ -27,7 +27,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { formatDateRD, formatDateTimeRD } from "@/lib/utils/format";
+import { civilDateKey, formatCivilDateRD, formatDateTimeRD } from "@/lib/utils/format";
 import { WARRANTY_DOCUMENT_LABELS } from "@/modules/garantias/lib/status-machine";
 import { WarrantyDocumentPreviewModal } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
 import type { WarrantyDocumentData } from "@/modules/garantias/actions/warranty";
@@ -189,6 +189,12 @@ export function WarrantyDocumentsList({ initialDocuments }: WarrantyDocumentsLis
   const filteredDocuments = useMemo(() => {
     const q = search.trim().toLowerCase();
     const now = new Date();
+    const todayRD = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Santo_Domingo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
 
     return documents.filter((doc) => {
       // Category filter
@@ -200,16 +206,13 @@ export function WarrantyDocumentsList({ initialDocuments }: WarrantyDocumentsLis
 
       // Date filter
       if (dateFilter !== "ALL") {
-        const docDate = new Date(doc.createdAt || doc.documentDate);
-        const diffMs = now.getTime() - docDate.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        const documentDay = civilDateKey(doc.documentDate);
+        const diffDays =
+          (Date.parse(`${todayRD}T00:00:00.000Z`) - Date.parse(`${documentDay}T00:00:00.000Z`)) /
+          (1000 * 60 * 60 * 24);
 
         if (dateFilter === "TODAY") {
-          const isToday =
-            docDate.getDate() === now.getDate() &&
-            docDate.getMonth() === now.getMonth() &&
-            docDate.getFullYear() === now.getFullYear();
-          if (!isToday) return false;
+          if (documentDay !== todayRD) return false;
         } else if (dateFilter === "WEEK" && diffDays > 7) {
           return false;
         } else if (dateFilter === "MONTH" && diffDays > 30) {
@@ -606,7 +609,7 @@ export function WarrantyDocumentsList({ initialDocuments }: WarrantyDocumentsLis
                           </div>
                           <div className="flex items-center gap-1 text-[11px] text-slate-400">
                             <Clock size={11} />
-                            <span>{formatDateRD(doc.documentDate || doc.createdAt)}</span>
+                            <span>{formatCivilDateRD(doc.documentDate)}</span>
                           </div>
                         </div>
                       </div>

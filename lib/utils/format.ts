@@ -14,6 +14,31 @@ export function formatDateRD(
 }
 
 /**
+ * Formatear una fecha civil almacenada como medianoche UTC sin desplazar el día.
+ * Úsese para campos DATE (por ejemplo, documentDate), no para timestamps.
+ */
+export function formatCivilDateRD(
+  date: Date | string,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("es-DO", {
+    timeZone: "UTC",
+    ...options,
+  });
+}
+
+export function civilDateKey(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/**
  * Formatear fecha y hora completa en zona RD.
  */
 export function formatDateTimeRD(date: Date | string): string {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Building2, Calendar, FileText, Printer, ShieldCheck, X } from "lucide-react";
-import { formatDateRD } from "@/lib/utils/format";
+import { formatCivilDateRD as formatDateRD } from "@/lib/utils/format";
 import { WARRANTY_DOCUMENT_LABELS } from "@/modules/garantias/lib/status-machine";
 
 export type WarrantyDocument = { documentCode: string; type: string; documentDate: string | Date; counterpartyName: string; notes?: string | null; createdBy?: { name: string | null } | null; items: Array<{ id: string; case: { caseCode: string; imei: string; model: string; color?: string | null; clientName: string; problem: string } }> };

@@ -16,7 +16,7 @@ import {
   Tag,
   User,
 } from "lucide-react";
-import { formatDateRD } from "@/lib/utils/format";
+import { formatCivilDateRD } from "@/lib/utils/format";
 import { WarrantyDocumentPreviewModal } from "@/modules/garantias/components/WarrantyDocumentPreviewModal";
 import { WarrantyDocumentActions } from "@/modules/garantias/components/WarrantyDocumentActions";
 import { WARRANTY_DOCUMENT_LABELS } from "@/modules/garantias/lib/status-machine";
@@ -77,7 +77,7 @@ export function WarrantyDocumentPageView({ doc }: { doc: any }) {
             </div>
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-300">
               <Calendar size={13} />
-              {formatDateRD(doc.documentDate)}
+              {formatCivilDateRD(doc.documentDate)}
             </p>
           </div>
         </header>
