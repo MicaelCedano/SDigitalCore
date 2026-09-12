@@ -277,6 +277,7 @@ export function GoodsReceiptsList() {
                     day: "2-digit",
                     month: "short",
                     year: "numeric",
+                    timeZone: "America/Santo_Domingo",
                   });
 
                   const isDraft = receipt.status === "DRAFT";

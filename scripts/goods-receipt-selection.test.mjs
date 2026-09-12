@@ -18,4 +18,6 @@ for (const lines of [[{ ...line, quantity: 7 }], [line, line], [{ ...line, itemI
 }
 assert.equal(goodsReceiptWarehouseImportSchema.safeParse({ receiptId: "r", lines: [] }).success, false);
 assert.equal(goodsReceiptWarehouseImportSchema.safeParse({ receiptId: "r", lines: [line] }).success, true);
+assert.equal(mod.exports.goodsReceiptSchema.safeParse({ supplierName: "Proveedor", branch: "Principal", receivedDate: "2026-09-12", items: [{ model: "A16", quantity: 1 }] }).success, true);
+assert.equal(mod.exports.goodsReceiptSchema.safeParse({ supplierName: "Proveedor", branch: "Principal", receivedDate: "2026-02-30", items: [{ model: "A16", quantity: 1 }] }).success, false);
 console.log("Goods receipt selection tests passed");

@@ -151,7 +151,7 @@ const THIN_BORDER: Partial<ExcelJS.Borders> = {
 export async function exportSingleReceiptToExcel(data: GoodsReceiptExportData) {
   const formattedDate = new Date(data.receivedAt).toLocaleString("es-DO", {
     dateStyle: "medium",
-    timeStyle: "short",
+    timeZone: "America/Santo_Domingo",
   });
 
   const sortedItems = sortGoodsReceiptItemsByModel(data.items);
@@ -590,7 +590,9 @@ export async function exportReceiptListToExcel(receipts: GoodsReceiptExportData[
   let totalGlobalImeis = 0;
 
   receipts.forEach((r, index) => {
-    const formattedDate = new Date(r.receivedAt).toLocaleDateString("es-DO");
+    const formattedDate = new Date(r.receivedAt).toLocaleDateString("es-DO", {
+      timeZone: "America/Santo_Domingo",
+    });
     const totalQty = r.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
     const detailedImeis = extractDetailedImeis(r.items);
     const totalIMEIs = detailedImeis.length;

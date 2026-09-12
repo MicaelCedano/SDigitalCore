@@ -14,6 +14,10 @@ import {
   GoodsReceiptWarehouseImportInput,
 } from "@/lib/validation/goods-receipt";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import {
+  businessDateInputToDate,
+  formatBusinessDateInput,
+} from "@/lib/utils/business-date";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
@@ -135,6 +139,10 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
     const user = await requirePermission("warehouse.write");
     if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     const validated = goodsReceiptSchema.parse(input);
+    const today = formatBusinessDateInput();
+    if (validated.receivedDate && validated.receivedDate > today) {
+      return { success: false, error: "La fecha del recibo no puede ser futura." };
+    }
     const branchExists = await prisma.branch.findFirst({ where: { name: validated.branch, status: "ACTIVE" }, select: { id: true } });
     if (!branchExists) return { success: false, error: "La sucursal seleccionada no existe o está inactiva." };
     const receivedBy = user.name || user.email || user.id;
@@ -195,6 +203,9 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
               supplierName: validated.supplierName,
               branch: validated.branch,
               receivedBy: existing.receivedBy,
+              receivedAt: validated.receivedDate
+                ? businessDateInputToDate(validated.receivedDate)
+                : existing.receivedAt,
               status: existing.status === "COMPLETED" ? "COMPLETED" : validated.status,
               notes: validated.notes,
               items: { create: validated.items.map(persistItem) },
@@ -234,6 +245,7 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
         supplierName: validated.supplierName,
         branch: validated.branch,
         receivedBy: receivedBy,
+        receivedAt: businessDateInputToDate(validated.receivedDate || today),
         status: validated.status,
         notes: validated.notes,
         items: { create: validated.items.map(persistItem) },
@@ -241,7 +253,7 @@ export async function saveGoodsReceiptAction(input: GoodsReceiptInput) {
       include: { items: true },
       });
     });
-    await logAudit({ userId: user.id, action: "goods_receipt.create", module: "almacen", entityType: "goods_receipt", entityId: created.id, afterData: { receiptNumber: created.receiptNumber, status: created.status, itemCount: created.items.length } });
+    await logAudit({ userId: user.id, action: "goods_receipt.create", module: "almacen", entityType: "goods_receipt", entityId: created.id, afterData: { receiptNumber: created.receiptNumber, receivedAt: created.receivedAt, status: created.status, itemCount: created.items.length } });
     if (created.status === "COMPLETED") {
       await sendPushToRole("ADMIN", {
         title: `Recibo ${created.receiptNumber} completado`,

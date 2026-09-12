@@ -11,6 +11,10 @@ import { GoodsReceiptInput } from "@/lib/validation/goods-receipt";
 import { useGoodsReceiptDraft } from "../hooks/useGoodsReceiptDraft";
 import { exportSingleReceiptToExcel } from "@/lib/utils/excel-export";
 import {
+  businessDateInputToDate,
+  formatBusinessDateInput,
+} from "@/lib/utils/business-date";
+import {
   Plus,
   Trash2,
   Save,
@@ -32,7 +36,10 @@ import {
 } from "lucide-react";
 
 interface GoodsReceiptFormProps {
-  initialData?: GoodsReceiptInput | null;
+  initialData?: (GoodsReceiptInput & {
+    receivedAt?: string | Date;
+    createdAt?: string | Date;
+  }) | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
@@ -72,6 +79,10 @@ export function GoodsReceiptForm({
   );
   const [branch, setBranch] = useState(initialData?.branch || "");
   const [receivedBy, setReceivedBy] = useState(initialData?.receivedBy || "");
+  const [receivedDate, setReceivedDate] = useState(() =>
+    initialData?.receivedDate ||
+    formatBusinessDateInput(initialData?.receivedAt || initialData?.createdAt || new Date())
+  );
   const [notes, setNotes] = useState(initialData?.notes || "");
   const [items, setItems] = useState<any[]>(
     initialData?.items && initialData.items.length > 0
@@ -190,6 +201,7 @@ export function GoodsReceiptForm({
         supplierName,
         branch,
         receivedBy,
+        receivedDate,
         notes,
         status: "DRAFT",
         items: items.map((i) => ({
@@ -201,7 +213,7 @@ export function GoodsReceiptForm({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [supplierName, branch, receivedBy, notes, items, saveDraft, initialData]);
+  }, [supplierName, branch, receivedBy, receivedDate, notes, items, saveDraft, initialData]);
 
   // Restaurar borrador guardado localmente
   const handleRestoreDraft = () => {
@@ -209,6 +221,7 @@ export function GoodsReceiptForm({
       setSupplierName(savedDraftData.supplierName || "");
       setBranch(savedDraftData.branch || "");
       setReceivedBy(savedDraftData.receivedBy || "");
+      setReceivedDate(savedDraftData.receivedDate || formatBusinessDateInput());
       setNotes(savedDraftData.notes || "");
       if (savedDraftData.items && savedDraftData.items.length > 0) {
         setItems(
@@ -358,6 +371,16 @@ export function GoodsReceiptForm({
       return;
     }
 
+    if (!receivedDate) {
+      setErrorMessage("Selecciona la fecha del recibo");
+      return;
+    }
+
+    if (receivedDate > formatBusinessDateInput()) {
+      setErrorMessage("La fecha del recibo no puede ser futura");
+      return;
+    }
+
     const invalidItem = items.find((i) => !i.model || !i.model.trim());
     if (invalidItem) {
       setErrorMessage("Todos los ítems deben tener un Modelo");
@@ -377,6 +400,7 @@ export function GoodsReceiptForm({
         supplierName,
         branch,
         receivedBy: receivedBy.trim() || undefined,
+        receivedDate,
         notes: generalNotes || undefined,
         status,
         items: items.map((i) => {
@@ -437,6 +461,16 @@ export function GoodsReceiptForm({
 
   // Vista previa a Excel
   const handleExportExcelPreview = () => {
+    if (!receivedDate) {
+      setErrorMessage("Selecciona la fecha del recibo antes de exportar");
+      return;
+    }
+
+    if (receivedDate > formatBusinessDateInput()) {
+      setErrorMessage("La fecha del recibo no puede ser futura");
+      return;
+    }
+
     exportSingleReceiptToExcel({
       receiptNumber: initialData?.id ? "BORRADOR" : "PREVIO",
       supplierName: supplierName || "Sin Proveedor",
@@ -444,7 +478,7 @@ export function GoodsReceiptForm({
       receivedBy: receivedBy || "Usuario",
       status: "BORRADOR",
       notes,
-      receivedAt: new Date(),
+      receivedAt: businessDateInputToDate(receivedDate),
       items: items.map((i) => ({
         code: i.code,
         description: getItemExportDescription(i),
@@ -544,7 +578,7 @@ export function GoodsReceiptForm({
           )}
 
           {/* General Metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Proveedor <span className="text-red-500">*</span>
@@ -586,6 +620,21 @@ export function GoodsReceiptForm({
                 Recibido / Registrado Por
               </label>
               <p className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-600">Se asignará automáticamente desde la sesión activa.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Fecha del recibo <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={receivedDate}
+                max={formatBusinessDateInput()}
+                onChange={(event) => setReceivedDate(event.target.value)}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10 transition-colors"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">Puedes elegir el día real en que llegó la mercancía.</p>
             </div>
           </div>
 

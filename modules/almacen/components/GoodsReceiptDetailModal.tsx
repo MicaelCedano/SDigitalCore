@@ -205,7 +205,6 @@ export function GoodsReceiptDetailModal({
     receipt.receivedAt || receipt.createdAt || new Date(),
   ).toLocaleString("es-DO", {
     dateStyle: "medium",
-    timeStyle: "short",
     timeZone: "America/Santo_Domingo",
   });
 
