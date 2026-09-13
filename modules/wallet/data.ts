@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser, requirePermission, requireUser } from "@/lib/auth/helpers";
+import { WALLET_ELIGIBLE_USER_FILTER } from "@/lib/wallet/eligibility";
 
 export async function getLegacyMigrationDashboard() {
   await requirePermission("settings.read");
@@ -214,12 +215,8 @@ export async function getAdminTeamWalletBalances() {
 
   const users = await prisma.user.findMany({
     where: {
-      roleCode: { not: "ADMIN" },
+      ...WALLET_ELIGIBLE_USER_FILTER,
       status: { in: ["ACTIVE", "INACTIVE", "BLOCKED"] },
-      OR: [
-        { roleCode: { in: ["QC", "TECNICO"] } },
-        { allowedModules: { has: "wallet" } },
-      ],
     },
     orderBy: [{ roleCode: "asc" }, { name: "asc" }],
     select: {

@@ -82,7 +82,11 @@ function WalletMemberRow({ row }: { row: WalletRow }) {
                   {row.walletStatus === "FROZEN" ? "CONGELADA" : row.walletStatus === null ? "SIN WALLET" : "ACTIVA"}
                 </span>
                 <span className="font-mono text-base font-black text-slate-900">{money(row.balance, row.currency)}</span>
-                <ManualWalletCreditModal userId={row.id} recipientName={row.name} />
+                {row.userStatus === "BLOCKED" ? (
+                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">Pago bloqueado</span>
+                ) : (
+                  <ManualWalletCreditModal userId={row.id} recipientName={row.name} />
+                )}
                 <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" title="Ver historial">
                   <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
                 </button>

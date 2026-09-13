@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db/prisma";
+import { WALLET_ELIGIBLE_USER_FILTER } from "@/lib/wallet/eligibility";
 
 const manualCreditSchema = z.object({
   userId: z.string().min(1),
@@ -28,7 +29,11 @@ export async function createManualWalletCreditAction(input: unknown) {
 
     const { userId, amount, reason, reference } = parsed.data;
     const recipient = await prisma.user.findFirst({
-      where: { id: userId, roleCode: { in: ["QC", "TECNICO"] }, status: { in: ["ACTIVE", "INACTIVE"] } },
+      where: {
+        id: userId,
+        ...WALLET_ELIGIBLE_USER_FILTER,
+        status: { in: ["ACTIVE", "INACTIVE"] },
+      },
       select: { id: true, name: true, username: true, email: true },
     });
     if (!recipient) return { success: false, error: "El destinatario no es un integrante válido de QC o técnico." };
