@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { X, Plus, Loader2, AlertTriangle, CheckCircle2, Smartphone } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { X, Plus, Loader2, AlertTriangle, CheckCircle2, Smartphone, FileSpreadsheet } from "lucide-react";
 import { addDevicesToBatchAction } from "../actions/revision-batch";
+
+type DeviceRow = { model: string; brand: string; imei: string; storageGb: string };
+
+const EMPTY_DEVICE_ROW: DeviceRow = { model: "", brand: "", imei: "", storageGb: "" };
 
 interface AddDevicesModalProps {
   batchId: string;
@@ -17,12 +21,13 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
   const [devicesText, setDevicesText] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
   const [defaultBrand, setDefaultBrand] = useState("");
-  const [rows, setRows] = useState<{ model: string; brand: string; imei: string }[]>([
-    { model: "", brand: "", imei: "" },
-  ]);
+  const [rows, setRows] = useState<DeviceRow[]>([{ ...EMPTY_DEVICE_ROW }]);
   const [loading, setLoading] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const bulkCount = useMemo(() => {
     return devicesText
@@ -30,6 +35,56 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
       .map((s) => s.trim())
       .filter(Boolean).length;
   }, [devicesText]);
+
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setImportingExcel(true);
+    setError(null);
+    setSuccess(null);
+    setImportNotice(null);
+
+    try {
+      const { readPurchaseExcel } = await import("../lib/excel-parser");
+      const result = await readPurchaseExcel(file);
+
+      if (result.rows.length === 0 && result.errors.length === 0) {
+        setError("No se encontraron datos en el Excel.");
+        return;
+      }
+
+      if (result.rows.length > 0) {
+        setRows(
+          result.rows.map((row) => ({
+            model: row.modelName,
+            brand: row.brand,
+            imei: row.imei,
+            storageGb: row.storageGb ? String(row.storageGb) : "",
+          })),
+        );
+        setEntryMode("MANUAL");
+        setImportNotice(
+          `${result.rows.length} equipo(s) importado(s) del Excel. Revisa la tabla antes de agregarlos a la compra.`,
+        );
+      }
+
+      if (result.errors.length > 0) {
+        const sample = result.errors
+          .slice(0, 5)
+          .map((item) => `Fila ${item.row}: ${item.reason}`)
+          .join(" · ");
+        setError(
+          `${result.errors.length} fila(s) omitida(s) del Excel: ${sample}${result.errors.length > 5 ? " ..." : ""}`,
+        );
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al procesar el Excel.");
+    } finally {
+      setImportingExcel(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -54,7 +109,12 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
         entryMode === "MANUAL"
           ? rows
               .filter((r) => r.imei || r.model)
-              .map((r) => ({ model: r.model, brand: r.brand, imei: r.imei || null }))
+              .map((r) => ({
+                model: r.model,
+                brand: r.brand,
+                imei: r.imei || null,
+                storageGb: r.storageGb ? Number(r.storageGb) : undefined,
+              }))
           : [],
     });
     setLoading(false);
@@ -62,7 +122,8 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
     if (res.success) {
       setSuccess(res.message ?? "Equipos agregados.");
       setDevicesText("");
-      setRows([{ model: "", brand: "", imei: "" }]);
+      setRows([{ ...EMPTY_DEVICE_ROW }]);
+      setImportNotice(null);
       onChanged();
     } else {
       setError(res.error ?? "Error al agregar equipos.");
@@ -78,7 +139,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[95vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+      <div className="flex max-h-[95vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#5750f1] text-white">
@@ -107,6 +168,33 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
               <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {success}
             </p>
           ) : null}
+          {importNotice ? (
+            <p role="status" className="mb-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-700">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {importNotice}
+            </p>
+          ) : null}
+
+          <div className="mb-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx"
+              onChange={handleExcelUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importingExcel || loading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#5750f1]/30 bg-[#5750f1]/5 px-3 py-2 text-xs font-bold text-[#5750f1] transition hover:bg-[#5750f1]/10 disabled:opacity-50 sm:w-auto"
+            >
+              {importingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+              {importingExcel ? "Procesando Excel..." : "Importar Excel"}
+            </button>
+            <p className="mt-1.5 text-[11px] text-slate-500">
+              El archivo .xlsx debe incluir las columnas IMEI y Modelo. La columna Marca es opcional.
+            </p>
+          </div>
 
           {/* Modo de ingreso */}
           <div className="mb-4 flex items-center gap-1 rounded-xl bg-slate-100 p-1">
@@ -164,13 +252,14 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="min-w-[620px] w-full text-left text-xs">
                   <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
                     <tr>
                       <th className="px-3 py-2">Marca</th>
                       <th className="px-3 py-2">Modelo</th>
                       <th className="px-3 py-2">IMEI / Serie</th>
+                      <th className="w-20 px-3 py-2">GB</th>
                       <th className="px-3 py-2 w-20 text-right"></th>
                     </tr>
                   </thead>
@@ -217,6 +306,20 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
                             className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-xs focus:border-[#5750f1] focus:outline-none"
                           />
                         </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={row.storageGb}
+                            onChange={(e) => {
+                              const next = [...rows];
+                              next[idx].storageGb = e.target.value;
+                              setRows(next);
+                            }}
+                            placeholder="128"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs focus:border-[#5750f1] focus:outline-none"
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right">
                           {rows.length > 1 ? (
                             <button
@@ -235,7 +338,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
               </div>
               <button
                 type="button"
-                onClick={() => setRows((prev) => [...prev, { model: "", brand: "", imei: "" }])}
+                onClick={() => setRows((prev) => [...prev, { ...EMPTY_DEVICE_ROW }])}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
               >
                 <Plus className="h-3.5 w-3.5" /> Añadir Fila
@@ -258,7 +361,7 @@ export function AddDevicesModal({ batchId, batchNumber, existingModels, onClose,
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || importingExcel}
               className="inline-flex items-center gap-2 rounded-xl bg-[#5750f1] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 transition hover:bg-[#463ec5] disabled:opacity-50"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />} Agregar a la Compra
