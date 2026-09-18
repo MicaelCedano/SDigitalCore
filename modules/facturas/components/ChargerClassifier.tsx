@@ -2,10 +2,10 @@
 
 import { useState, type ChangeEvent } from "react";
 import { FileUp, LoaderCircle, Zap } from "lucide-react";
-import { classifyChargersFromPDF, type ChargerCategory, type ChargerClassificationItem } from "../actions/charger-classification";
+import { classifyChargersFromPDF, type ChargerClassificationItem } from "../actions/charger-classification";
+import type { ChargerCategory } from "../lib/charger-classification";
 
 const labels: Record<ChargerCategory, { title: string; color: string }> = {
-  USB_LIGHTNING_10W: { title: "USB-Lightning · 10W", color: "text-amber-700 bg-amber-50 border-amber-200" },
   TPC_LIGHTNING_20W: { title: "TPC-Lightning · 20W", color: "text-blue-700 bg-blue-50 border-blue-200" },
   TPC_LIGHTNING_33W: { title: "TPC-Lightning · 33W", color: "text-purple-700 bg-purple-50 border-purple-200" },
   TPC_TPC_33W: { title: "TPC-TPC · 33W", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
