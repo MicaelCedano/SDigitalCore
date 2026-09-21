@@ -5,7 +5,7 @@ import { saveStockCountAction } from "../actions/stock-count";
 import { getWarehouseProductsAction } from "../actions/warehouse";
 import { getBranchesAction } from "@/modules/configuracion/actions/branch";
 import { StockCountInput } from "@/lib/validation/stock-count";
-import { useStockCountDraft } from "../hooks/useStockCountDraft";
+import { useStockCountDraft, getStoredStockCountDraft } from "../hooks/useStockCountDraft";
 import { exportStockCountToExcel } from "@/lib/utils/excel-export-stock-count";
 import {
   Plus,
@@ -68,9 +68,8 @@ export function StockCountForm({
   const [loading, setLoading] = useState(false);
   const [loadingWarehouse, setLoadingWarehouse] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showDraftBanner, setShowDraftBanner] = useState(
-    !initialData && hasSavedDraft
-  );
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [resumedNotice, setResumedNotice] = useState<string | null>(null);
 
   const [branchesList, setBranchesList] = useState<any[]>([]);
 
@@ -137,12 +136,30 @@ export function StockCountForm({
     }
   };
 
-  // Cargar automáticamente el inventario al iniciar si es nuevo conteo sin borrador
+  // Inicialización: Si el usuario cerró sin querer, recupera de inmediato su progreso
   useEffect(() => {
-    if (!initialData && !hasSavedDraft && items.length === 0) {
-      handleLoadWarehouseProducts();
+    if (initialData) {
+      setIsInitialized(true);
+      return;
     }
-  }, [initialData, hasSavedDraft]);
+
+    const saved = getStoredStockCountDraft();
+    if (saved && saved.formData && Array.isArray(saved.formData.items) && saved.formData.items.length > 0) {
+      setTitle(saved.formData.title || "Auditoría de Almacén General");
+      if (saved.formData.branch) setBranch(saved.formData.branch);
+      if (saved.formData.notes) setNotes(saved.formData.notes);
+      setItems(saved.formData.items);
+      const savedTime = saved.savedAt
+        ? new Date(saved.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "";
+      setResumedNotice(`Progreso recuperado automáticamente${savedTime ? ` (guardado a las ${savedTime})` : ""}`);
+      setIsInitialized(true);
+    } else {
+      handleLoadWarehouseProducts().finally(() => {
+        setIsInitialized(true);
+      });
+    }
+  }, [initialData]);
 
   // Modificar cantidad contada de un producto
   const handleSetItemQty = (index: number, newQty: number | string) => {
@@ -183,9 +200,9 @@ export function StockCountForm({
     }
   };
 
-  // Auto-guardado local debounced
+  // Auto-guardado local debounced inmediato (solo después de haber inicializado)
   useEffect(() => {
-    if (initialData) return;
+    if (initialData || !isInitialized || items.length === 0) return;
 
     const timer = setTimeout(() => {
       saveDraft({
@@ -205,10 +222,53 @@ export function StockCountForm({
           };
         }),
       });
-    }, 1000);
+    }, 400);
 
     return () => clearTimeout(timer);
-  }, [title, branch, performedBy, notes, items, saveDraft, initialData]);
+  }, [title, branch, performedBy, notes, items, saveDraft, initialData, isInitialized]);
+
+  // Protección si el usuario intenta recargar o cerrar el navegador con cantidades contadas
+  useEffect(() => {
+    const hasProgress = items.some((i) => (Number(i.countedQty) || 0) > 0);
+    if (!hasProgress) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [items]);
+
+  // Cierre seguro con confirmación y auto-guardado
+  const handleSafeClose = () => {
+    const hasProgress = items.some((i) => (Number(i.countedQty) || 0) > 0);
+    if (hasProgress) {
+      if (
+        confirm(
+          "Tu progreso ha quedado guardado en tu teléfono/dispositivo. Puedes salir tranquilo y continuar cuando vuelvas a abrir la auditoría. ¿Deseas salir ahora?"
+        )
+      ) {
+        onCancel();
+      }
+    } else {
+      onCancel();
+    }
+  };
+
+  // Reiniciar la auditoría de cero descartando el progreso previo
+  const handleResetAudit = () => {
+    if (
+      confirm(
+        "¿Deseas descartar los cambios en progreso y empezar una auditoría nueva desde cero con todos los productos en 0?"
+      )
+    ) {
+      clearDraft();
+      setResumedNotice(null);
+      handleLoadWarehouseProducts();
+    }
+  };
 
   // Escaneo rápido opcional de código de barra
   const handleScanSubmit = (e: React.FormEvent) => {
@@ -246,24 +306,7 @@ export function StockCountForm({
     if (scanInputRef.current) scanInputRef.current.focus();
   };
 
-  const handleRestoreDraft = () => {
-    if (savedDraftData) {
-      setTitle(savedDraftData.title || "Auditoría de Almacén General");
-      setBranch(savedDraftData.branch || "");
-      setPerformedBy(savedDraftData.performedBy || "");
-      setNotes(savedDraftData.notes || "");
-      if (savedDraftData.items && savedDraftData.items.length > 0) {
-        setItems(savedDraftData.items);
-      }
-      setShowDraftBanner(false);
-    }
-  };
 
-  const handleDiscardDraft = () => {
-    clearDraft();
-    setShowDraftBanner(false);
-    handleLoadWarehouseProducts();
-  };
 
   const handleAddItem = () => {
     setItems((prev) => [{ ...emptyItem }, ...prev]);
@@ -440,7 +483,7 @@ export function StockCountForm({
             </button>
 
             <button
-              onClick={onCancel}
+              onClick={handleSafeClose}
               className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
               aria-label="Cerrar ventana"
             >
@@ -449,29 +492,20 @@ export function StockCountForm({
           </div>
         </div>
 
-        {/* Draft Restore Alert Banner */}
-        {showDraftBanner && savedDraftData && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between text-amber-800 text-xs shrink-0">
+        {/* Resumed Progress Notice Banner */}
+        {resumedNotice && (
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 flex items-center justify-between text-emerald-900 text-xs shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="truncate font-medium">
-                Hay un borrador del <strong>{lastSavedAt ? lastSavedAt.toLocaleTimeString() : "reciente"}</strong>.
-              </span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="truncate font-semibold">{resumedNotice}</span>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={handleRestoreDraft}
-                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-xs"
-              >
-                Restaurar
-              </button>
-              <button
-                onClick={handleDiscardDraft}
-                className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs"
-              >
-                Descartar
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleResetAudit}
+              className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-bold transition-colors shrink-0 shadow-2xs"
+            >
+              Reiniciar de cero
+            </button>
           </div>
         )}
 

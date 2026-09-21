@@ -5,6 +5,21 @@ import { StockCountInput } from "@/lib/validation/stock-count";
 
 const DRAFT_KEY = "sd_stock_count_draft_v1";
 
+export function getStoredStockCountDraft(): { formData: StockCountInput; savedAt: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(DRAFT_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    if (parsed && parsed.formData && Array.isArray(parsed.formData.items) && parsed.formData.items.length > 0) {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function useStockCountDraft() {
   const [draft, setDraft] = useState<StockCountInput | null>(null);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
