@@ -115,8 +115,8 @@ export function StockCountForm({
             code: p.code || "",
             description: fullName,
             expectedQty: expectedUnits,
-            countedQty: 0,
-            difference: -expectedUnits,
+            countedQty: expectedUnits,
+            difference: 0,
             scannedImeis: "",
             notes: p.boxes > 0 ? `${p.boxes} cajas (${p.unitsPerBox} c/u) + ${p.looseUnits || 0} sueltas` : "",
           };
