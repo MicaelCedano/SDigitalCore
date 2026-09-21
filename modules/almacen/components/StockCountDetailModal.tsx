@@ -52,10 +52,10 @@ export function StockCountDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-hidden">
+      <div className="bg-white border-0 sm:border sm:border-slate-200 text-slate-800 rounded-none sm:rounded-2xl w-full h-full sm:h-auto sm:max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-full sm:max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-[#5750f1]/10 text-[#5750f1] rounded-xl border border-[#5750f1]/20">
               <ClipboardList className="w-6 h-6" />
@@ -158,7 +158,46 @@ export function StockCountDetailModal({
               <Layers className="w-4 h-4 text-[#5750f1]" /> Resultado de Modelos Auditados
             </h3>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            {/* Mobile Cards View */}
+            <div className="block sm:hidden space-y-2">
+              {count.items?.map((item: any, idx: number) => {
+                const exp = item.expectedQty || 0;
+                const cnt = item.countedQty || 0;
+                const diff = cnt - exp;
+
+                return (
+                  <div key={item.id || idx} className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-slate-800 leading-tight">{item.description}</h4>
+                        {item.code && (
+                          <span className="font-mono text-[10px] text-slate-500 block mt-0.5">{item.code}</span>
+                        )}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md border shrink-0 ${
+                          diff === 0
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : diff > 0
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                        }`}
+                      >
+                        {diff === 0 ? "OK (0)" : diff > 0 ? `+${diff}` : diff}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200/60">
+                      <span className="text-slate-500 text-[11px]">Sistema: <strong className="text-slate-700">{exp}</strong> uds</span>
+                      <span className="text-slate-500 text-[11px]">Físico: <strong className="text-[#5750f1]">{cnt}</strong> uds</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block border border-slate-200 rounded-xl overflow-hidden bg-white">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
@@ -169,7 +208,6 @@ export function StockCountDetailModal({
                       <th className="px-3 py-2.5 text-center">Esperado</th>
                       <th className="px-3 py-2.5 text-center">Contado</th>
                       <th className="px-3 py-2.5 text-center">Diferencia</th>
-                      <th className="px-3 py-2.5">IMEIs Escaneados</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -177,9 +215,6 @@ export function StockCountDetailModal({
                       const exp = item.expectedQty || 0;
                       const cnt = item.countedQty || 0;
                       const diff = cnt - exp;
-                      const imeis = item.scannedImeis
-                        ? item.scannedImeis.split("\n").filter((s: string) => s.trim() !== "")
-                        : [];
 
                       return (
                         <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
@@ -206,22 +241,6 @@ export function StockCountDetailModal({
                             >
                               {diff === 0 ? "0" : diff > 0 ? `+${diff}` : diff}
                             </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            {imeis.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 font-mono text-[10px]">
-                                {imeis.map((imei: string, i: number) => (
-                                  <span
-                                    key={i}
-                                    className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded"
-                                  >
-                                    {imei.trim()}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 italic text-[11px]">-</span>
-                            )}
                           </td>
                         </tr>
                       );
