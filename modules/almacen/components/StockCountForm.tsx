@@ -96,13 +96,19 @@ export function StockCountForm({
     loadBranches();
   }, []);
 
-  // Cargar productos de almacén directamente en la auditoría
+  // Cargar productos de almacén directamente en la auditoría (solo los que tienen stock > 0)
   const handleLoadWarehouseProducts = async () => {
     try {
       setLoadingWarehouse(true);
       const res = await getWarehouseProductsAction();
       if (res.success && res.data && res.data.length > 0) {
-        const warehouseItems = res.data.map((p: any) => {
+        // Excluir productos agotados o con 0 existencias en almacén
+        const productsWithStock = res.data.filter((p: any) => {
+          const totalUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
+          return totalUnits > 0;
+        });
+
+        const warehouseItems = productsWithStock.map((p: any) => {
           const brand = p.brand ? `${p.brand} ` : "";
           const name = p.name || "";
           const color = p.color ? ` ${p.color}` : "";
@@ -115,8 +121,8 @@ export function StockCountForm({
             code: p.code || "",
             description: fullName,
             expectedQty: expectedUnits,
-            countedQty: expectedUnits,
-            difference: 0,
+            countedQty: 0,
+            difference: -expectedUnits,
             scannedImeis: "",
             notes: p.boxes > 0 ? `${p.boxes} cajas (${p.unitsPerBox} c/u) + ${p.looseUnits || 0} sueltas` : "",
           };
