@@ -8,6 +8,7 @@ import {
 import { StockCountForm } from "./StockCountForm";
 import { StockCountDetailModal } from "./StockCountDetailModal";
 import { exportStockCountListToExcel } from "@/lib/utils/excel-export-stock-count";
+import Link from "next/link";
 import {
   Plus,
   Search,
@@ -24,6 +25,7 @@ import {
   ClipboardList,
   ScanLine,
   Pencil,
+  Boxes,
 } from "lucide-react";
 
 export function StockCountsList() {
@@ -93,15 +95,21 @@ export function StockCountsList() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-              Conteos de Stock & Auditorías de Inventario
+              Auditorías de Almacén & Conteos de Stock
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Control de inventario físico de celulares, escáner rápido de IMEIs y comparación esperado vs. contado
+              Control físico de existencias en almacén, comparación de esperado vs. contado y detección de discrepancias
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto flex-wrap justify-end">
+          <Link
+            href="/almacen"
+            className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
+          >
+            <Boxes className="w-4 h-4 text-slate-600" /> Ir a Productos
+          </Link>
           <button
             onClick={handleExportAllExcel}
             disabled={counts.length === 0}

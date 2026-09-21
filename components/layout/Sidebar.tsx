@@ -53,6 +53,7 @@ const navItems: NavItem[] = [
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
     { label: "Movimientos", href: "/almacen/movimientos", adminOnly: true },
     { label: "Solicitudes de almacén", href: "/almacen/transferencias" },
+    { label: "Auditorías de stock", href: "/almacen/conteos" },
   ] },
   { label: "Control de Calidad", href: "/qc", adminHref: "/qc/lotes", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
     { label: "Panel QC", href: "/qc", nonAdminOnly: true },

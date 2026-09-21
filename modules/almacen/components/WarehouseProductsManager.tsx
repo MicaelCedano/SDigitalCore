@@ -7,6 +7,7 @@ import {
   deleteWarehouseProductAction,
 } from "../actions/warehouse";
 import { WarehouseProductInput } from "@/lib/validation/warehouse";
+import Link from "next/link";
 import {
   Package,
   Plus,
@@ -24,6 +25,7 @@ import {
   Palette,
   Eye,
   EyeOff,
+  ClipboardList,
 } from "lucide-react";
 
 function getDisplayedTotalUnits(product: { boxes?: number | null; unitsPerBox?: number | null; looseUnits?: number | null }) {
@@ -175,12 +177,22 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
           </div>
         </div>
 
-        {roleCode === "ADMIN" && <button
-          onClick={handleOpenCreate}
-          className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> Registrar Producto
-        </button>}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Link
+            href="/almacen/conteos"
+            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-2xs"
+          >
+            <ClipboardList className="w-4 h-4 text-[#5750f1]" /> Auditorías de Stock
+          </Link>
+          {roleCode === "ADMIN" && (
+            <button
+              onClick={handleOpenCreate}
+              className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Registrar Producto
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Metrics Bar */}

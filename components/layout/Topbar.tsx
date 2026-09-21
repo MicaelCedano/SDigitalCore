@@ -30,6 +30,7 @@ interface TopbarProps {
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Resumen general",
+  "/almacen/conteos": "Auditorías de almacén",
   "/almacen": "Almacén y solicitudes",
   "/garantias": "Gestión de Garantías",
   "/precios": "Lista de precios",

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { saveStockCountAction } from "../actions/stock-count";
 import { getCatalogModelsAction } from "../actions/goods-receipt";
+import { getWarehouseProductsAction } from "../actions/warehouse";
 import { getBranchesAction } from "@/modules/configuracion/actions/branch";
 import { StockCountInput } from "@/lib/validation/stock-count";
 import { useStockCountDraft } from "../hooks/useStockCountDraft";
@@ -22,6 +23,8 @@ import {
   Zap,
   ClipboardList,
   ScanLine,
+  Boxes,
+  CheckCheck,
 } from "lucide-react";
 
 interface StockCountFormProps {
@@ -112,6 +115,64 @@ export function StockCountForm({
     handleItemChange(index, "description", modelName);
     setCatalogSuggestions([]);
     setActiveSuggestionIndex(null);
+  };
+
+  const [loadingWarehouse, setLoadingWarehouse] = useState(false);
+
+  // Cargar productos de almacén directamente en la auditoría
+  const handleLoadWarehouseProducts = async () => {
+    try {
+      setLoadingWarehouse(true);
+      const res = await getWarehouseProductsAction();
+      if (res.success && res.data && res.data.length > 0) {
+        const warehouseItems = res.data.map((p: any) => {
+          const brand = p.brand ? `${p.brand} ` : "";
+          const name = p.name || "";
+          const color = p.color ? ` ${p.color}` : "";
+          const capacity = p.capacity ? ` ${p.capacity}` : "";
+          const fullName = `${brand}${name}${color}${capacity}`.trim();
+
+          const expectedUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
+
+          return {
+            code: p.code || "",
+            description: fullName,
+            expectedQty: expectedUnits,
+            countedQty: 0,
+            difference: -expectedUnits,
+            scannedImeis: "",
+            notes: p.boxes > 0 ? `${p.boxes} cajas (${p.unitsPerBox} c/u) + ${p.looseUnits || 0} sueltas` : "",
+          };
+        });
+
+        setItems(warehouseItems);
+        if (!initialData && (!title || title.includes("Celulares"))) {
+          setTitle("Auditoría General de Almacén");
+        }
+      } else {
+        alert("No se encontraron productos activos en el almacén.");
+      }
+    } catch (err: any) {
+      console.error("Error al cargar productos de almacén:", err);
+    } finally {
+      setLoadingWarehouse(false);
+    }
+  };
+
+  // Marcar todo como contado igual al esperado (para auditoría por excepción)
+  const handleMatchAllAsCounted = () => {
+    if (confirm("¿Deseas marcar todas las cantidades contadas iguales al stock esperado del sistema? Luego podrás ajustar solo los modelos con diferencias.")) {
+      setItems((prev) =>
+        prev.map((item) => {
+          const exp = Number(item.expectedQty) || 0;
+          return {
+            ...item,
+            countedQty: exp,
+            difference: 0,
+          };
+        })
+      );
+    }
   };
 
   // Auto-guardado local debounced
@@ -324,6 +385,11 @@ export function StockCountForm({
   const totalCounted = items.reduce((acc, item) => acc + (Number(item.countedQty) || 0), 0);
   const totalDifference = totalCounted - totalExpected;
 
+  const validItems = items.filter((i) => i.description && i.description.trim());
+  const inOrderCount = validItems.filter((i) => (Number(i.countedQty) || 0) === (Number(i.expectedQty) || 0)).length;
+  const missingCount = validItems.filter((i) => (Number(i.countedQty) || 0) < (Number(i.expectedQty) || 0)).length;
+  const excessCount = validItems.filter((i) => (Number(i.countedQty) || 0) > (Number(i.expectedQty) || 0)).length;
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -336,10 +402,10 @@ export function StockCountForm({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">
-                {initialData ? "Editar Conteo de Stock" : "Nuevo Conteo de Stock de Celulares"}
+                {initialData ? "Editar Conteo de Stock" : "Auditoría & Conteo Físico de Stock"}
               </h2>
               <p className="text-xs text-slate-500">
-                Auditoría física, escaneo rápido de IMEIs y comparación esperado vs. contado
+                Auditoría física de inventario de almacén, verificación de existencias y escaneo de códigos/IMEIs
               </p>
             </div>
           </div>
@@ -487,17 +553,74 @@ export function StockCountForm({
 
           {/* Items Table */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between pt-2">
+            {/* Live Health Indicator Bar */}
+            {validItems.length > 0 && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700">Estado del Almacén:</span>
+                  {missingCount === 0 && excessCount === 0 ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Todo en orden (100% cuadrado)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Discrepancias detectadas
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    En orden: <strong>{inOrderCount}</strong>
+                  </span>
+                  {missingCount > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold bg-red-50 text-red-700 border border-red-200">
+                      Faltantes: <strong>{missingCount}</strong>
+                    </span>
+                  )}
+                  {excessCount > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      Sobrantes: <strong>{excessCount}</strong>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                 <Layers className="w-4 h-4 text-[#5750f1]" /> Detalle de Modelos & Cantidades Auditadas ({items.length})
               </h3>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="px-3 py-1.5 bg-[#5750f1]/10 hover:bg-[#5750f1]/20 text-[#5750f1] border border-[#5750f1]/20 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" /> Agregar Modelo
-              </button>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleLoadWarehouseProducts}
+                  disabled={loadingWarehouse}
+                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  title="Cargar catálogo completo de productos de Almacén y su stock esperado"
+                >
+                  <Boxes className={`w-4 h-4 text-indigo-600 ${loadingWarehouse ? "animate-spin" : ""}`} />
+                  {loadingWarehouse ? "Cargando..." : "Cargar productos de almacén"}
+                </button>
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleMatchAllAsCounted}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                    title="Establecer lo contado igual a lo esperado en todas las filas"
+                  >
+                    <CheckCheck className="w-4 h-4 text-slate-600" /> Marcar todo en orden
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleAddItem}
+                  className="px-3 py-1.5 bg-[#5750f1]/10 hover:bg-[#5750f1]/20 text-[#5750f1] border border-[#5750f1]/20 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Agregar Modelo
+                </button>
+              </div>
             </div>
 
             <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
@@ -544,6 +667,11 @@ export function StockCountForm({
                               placeholder="Ej. iPhone 15 Pro Max 256GB"
                               className="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#5750f1]"
                             />
+                            {item.notes && (
+                              <span className="text-[10px] text-slate-400 block mt-0.5 italic truncate max-w-xs" title={item.notes}>
+                                {item.notes}
+                              </span>
+                            )}
 
                             {/* Dropdown Suggestions */}
                             {activeSuggestionIndex === idx && catalogSuggestions.length > 0 && (
