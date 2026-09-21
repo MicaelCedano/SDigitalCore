@@ -139,14 +139,19 @@ export function StockCountForm({
   }, [initialData, hasSavedDraft]);
 
   // Modificar cantidad contada de un producto
-  const handleSetItemQty = (index: number, newQty: number) => {
+  const handleSetItemQty = (index: number, newQty: number | string) => {
     setItems((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
       const exp = Number(item.expectedQty) || 0;
-      const countVal = Math.max(0, newQty);
-      item.countedQty = countVal;
-      item.difference = countVal - exp;
+      if (newQty === "") {
+        item.countedQty = "";
+        item.difference = 0 - exp;
+      } else {
+        const countVal = Math.max(0, Number(newQty) || 0);
+        item.countedQty = countVal;
+        item.difference = countVal - exp;
+      }
       updated[index] = item;
       return updated;
     });
@@ -723,14 +728,25 @@ export function StockCountForm({
                         <input
                           type="number"
                           min={0}
-                          value={cnt}
-                          onChange={(e) =>
-                            handleSetItemQty(
-                              originalIndex,
-                              Math.max(0, Number(e.target.value) || 0)
-                            )
-                          }
-                          className="w-14 h-10 text-center text-base font-black text-[#5750f1] bg-transparent border-x border-slate-200 focus:outline-none focus:bg-indigo-50/30"
+                          inputMode="numeric"
+                          value={item.countedQty === "" ? "" : item.countedQty ?? ""}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "") {
+                              handleSetItemQty(originalIndex, "");
+                            } else {
+                              const parsed = parseInt(val, 10);
+                              handleSetItemQty(originalIndex, isNaN(parsed) ? "" : Math.max(0, parsed));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value === "") {
+                              handleSetItemQty(originalIndex, 0);
+                            }
+                          }}
+                          className="w-14 h-10 text-center text-base font-black text-[#5750f1] placeholder:text-slate-300 bg-transparent border-x border-slate-200 focus:outline-none focus:bg-indigo-50/30"
                         />
 
                         <button
