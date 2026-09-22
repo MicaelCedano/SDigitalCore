@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   getStockCountsAction,
   deleteStockCountAction,
+  syncStockCountWithWarehouseAction,
 } from "../actions/stock-count";
 import { StockCountForm } from "./StockCountForm";
 import { StockCountDetailModal } from "./StockCountDetailModal";
@@ -59,6 +60,34 @@ export function StockCountsList() {
     if (confirm("¿Deseas anular este conteo? Se conservará en el historial.")) {
       await deleteStockCountAction(id);
       fetchCounts();
+    }
+  };
+
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleSyncCount = async (id: string, countNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (
+      !confirm(
+        `¿Deseas sincronizar el conteo ${countNumber} con las existencias actuales de almacén? Se actualizarán las cantidades esperadas y se añadirán nuevos modelos sin alterar los conteos físicos que ya ingresaste.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setSyncingId(id);
+      const res = await syncStockCountWithWarehouseAction(id);
+      if (res.success) {
+        alert(res.message || "Conteo sincronizado exitosamente con almacén.");
+        fetchCounts();
+      } else {
+        alert(res.error || "No se pudo sincronizar el conteo con almacén.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al sincronizar");
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -346,17 +375,27 @@ export function StockCountsList() {
                             <Eye className="w-4 h-4" />
                           </button>
                           {c.status === "IN_PROGRESS" && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedCountForEdit(c);
-                                setShowFormModal(true);
-                              }}
-                              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors"
-                              title="Continuar / Editar borrador"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={(e) => handleSyncCount(c.id, c.countNumber, e)}
+                                disabled={syncingId === c.id}
+                                className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-[#5750f1] rounded-lg transition-colors"
+                                title="Sincronizar existencias esperadas y agregar modelos nuevos desde Almacén"
+                              >
+                                <RefreshCw className={`w-4 h-4 ${syncingId === c.id ? "animate-spin" : ""}`} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCountForEdit(c);
+                                  setShowFormModal(true);
+                                }}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors"
+                                title="Continuar / Editar borrador"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                           {c.status !== "CANCELLED" ? <button
                             onClick={(e) => handleDelete(c.id, e)}

@@ -70,6 +70,7 @@ export function StockCountForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   const [branchesList, setBranchesList] = useState<any[]>([]);
 
@@ -95,13 +96,12 @@ export function StockCountForm({
     loadBranches();
   }, []);
 
-  // Cargar productos de almacén directamente en la auditoría (solo los que tienen stock > 0)
+  // Cargar productos de almacén inicialmente para una auditoría nueva desde cero
   const handleLoadWarehouseProducts = async () => {
     try {
       setLoadingWarehouse(true);
       const res = await getWarehouseProductsAction();
       if (res.success && res.data && res.data.length > 0) {
-        // Excluir productos agotados o con 0 existencias en almacén
         const productsWithStock = res.data.filter((p: any) => {
           const totalUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
           return totalUnits > 0;
@@ -112,7 +112,7 @@ export function StockCountForm({
           const name = p.name || "";
           const color = p.color ? ` ${p.color}` : "";
           const capacity = p.capacity ? ` ${p.capacity}` : "";
-          const fullName = `${brand}${name}${color}${capacity}`.trim();
+          const fullName = `${brand}${name}${color}${capacity}`.replace(/\s+/g, " ").trim();
 
           const expectedUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
 
@@ -131,6 +131,99 @@ export function StockCountForm({
       }
     } catch (err: any) {
       console.error("Error al cargar productos de almacén:", err);
+    } finally {
+      setLoadingWarehouse(false);
+    }
+  };
+
+  // Sincronizar existencias de almacén sin perder cantidades ya contadas ni IMEIs
+  const handleSyncWithWarehouse = async () => {
+    try {
+      setLoadingWarehouse(true);
+      setSyncNotice(null);
+      setErrorMessage(null);
+      const res = await getWarehouseProductsAction();
+      if (res.success && res.data) {
+        const warehouseProducts = res.data;
+        const warehouseInfoList = warehouseProducts.map((p: any) => {
+          const brand = p.brand ? `${p.brand} ` : "";
+          const name = p.name || "";
+          const color = p.color ? ` ${p.color}` : "";
+          const capacity = p.capacity ? ` ${p.capacity}` : "";
+          const fullName = `${brand}${name}${color}${capacity}`.replace(/\s+/g, " ").trim();
+          const expectedUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
+          const notes = p.boxes > 0 ? `${p.boxes} cajas (${p.unitsPerBox} c/u) + ${p.looseUnits || 0} sueltas` : "";
+
+          return {
+            product: p,
+            code: (p.code || "").trim(),
+            codeUpper: (p.code || "").trim().toUpperCase(),
+            fullName,
+            normalizedDesc: fullName.toLowerCase().replace(/\s+/g, " "),
+            expectedUnits,
+            notes,
+          };
+        });
+
+        const matchedCodes = new Set<string>();
+        const matchedIds = new Set<string>();
+        let updatedCount = 0;
+
+        // 1. Actualizar existencias esperadas de los items existentes conservando el conteo
+        const updatedItems = items.map((item) => {
+          const itemCode = (item.code || "").trim().toUpperCase();
+          const itemDesc = (item.description || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+          const matched = warehouseInfoList.find((w) => {
+            if (itemCode && w.codeUpper === itemCode) return true;
+            if (itemDesc && w.normalizedDesc === itemDesc) return true;
+            return false;
+          });
+
+          if (matched) {
+            matchedCodes.add(matched.codeUpper);
+            matchedIds.add(matched.product.id);
+            const exp = matched.expectedUnits;
+            const cnt = Number(item.countedQty) || 0;
+            updatedCount++;
+            return {
+              ...item,
+              code: item.code || matched.code,
+              description: item.description || matched.fullName,
+              expectedQty: exp,
+              difference: cnt - exp,
+              notes: matched.notes || item.notes,
+            };
+          }
+
+          return item;
+        });
+
+        // 2. Incorporar nuevos modelos creados en almacén que tengan stock > 0
+        let addedCount = 0;
+        for (const w of warehouseInfoList) {
+          if (!matchedCodes.has(w.codeUpper) && !matchedIds.has(w.product.id)) {
+            if (w.expectedUnits > 0) {
+              updatedItems.push({
+                code: w.code,
+                description: w.fullName,
+                expectedQty: w.expectedUnits,
+                countedQty: 0,
+                difference: -w.expectedUnits,
+                scannedImeis: "",
+                notes: w.notes,
+              });
+              addedCount++;
+            }
+          }
+        }
+
+        setItems(updatedItems);
+        setSyncNotice(`Sincronización completada: existencias actualizadas (${updatedCount} modelos) y ${addedCount} modelos nuevos incorporados. Tus conteos se mantuvieron intactos.`);
+      }
+    } catch (err: any) {
+      console.error("Error al sincronizar con almacén:", err);
+      setErrorMessage("Error al sincronizar existencias de almacén");
     } finally {
       setLoadingWarehouse(false);
     }
@@ -509,6 +602,24 @@ export function StockCountForm({
           </div>
         )}
 
+        {/* Sync Warehouse Notice Banner */}
+        {syncNotice && (
+          <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-2 flex items-center justify-between text-indigo-950 text-xs shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <CheckCircle2 className="w-4 h-4 text-[#5750f1] shrink-0" />
+              <span className="truncate font-semibold">{syncNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSyncNotice(null)}
+              className="p-1 text-indigo-600 hover:text-indigo-800 rounded-lg"
+              title="Cerrar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Quick Scanner (Opcional colapsable) */}
         {showScanner && (
           <div className="bg-[#5750f1]/5 border-b border-[#5750f1]/20 p-3 shrink-0">
@@ -575,12 +686,13 @@ export function StockCountForm({
 
             <button
               type="button"
-              onClick={handleLoadWarehouseProducts}
+              onClick={handleSyncWithWarehouse}
               disabled={loadingWarehouse}
-              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl border border-slate-200 transition-colors shrink-0"
-              title="Recargar productos de almacén"
+              className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-[#5750f1] border border-indigo-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0"
+              title="Sincronizar stock esperado con Almacén e incorporar modelos nuevos sin perder lo contado"
             >
               <RefreshCw className={`w-4 h-4 ${loadingWarehouse ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Sincronizar Almacén</span>
             </button>
           </div>
 

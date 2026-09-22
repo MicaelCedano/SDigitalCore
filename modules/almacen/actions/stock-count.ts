@@ -213,3 +213,158 @@ export async function deleteStockCountAction(id: string) {
     return { success: false, error: "Error al anular el conteo" };
   }
 }
+
+/**
+ * Sincroniza un conteo en progreso con las existencias actuales de almacén,
+ * actualizando el stock esperado, recalculando diferencias y agregando nuevos modelos
+ * sin perder las cantidades ya contadas ni los IMEIs escaneados.
+ */
+export async function syncStockCountWithWarehouseAction(countId: string) {
+  try {
+    const user = await requirePermission("warehouse.write");
+    if (!user.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+
+    const count = await prisma.stockCount.findUnique({
+      where: { id: countId },
+      include: { items: true },
+    });
+
+    if (!count) return { success: false, error: "Conteo no encontrado" };
+    if (count.status !== "IN_PROGRESS") {
+      return { success: false, error: "Solo se pueden sincronizar conteos en progreso." };
+    }
+
+    // Obtener todos los productos activos de almacén
+    const warehouseProducts = await prisma.warehouseProduct.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const warehouseInfoList = warehouseProducts.map((p) => {
+      const brand = p.brand ? `${p.brand} ` : "";
+      const name = p.name || "";
+      const color = p.color ? ` ${p.color}` : "";
+      const capacity = p.capacity ? ` ${p.capacity}` : "";
+      const fullName = `${brand}${name}${color}${capacity}`.replace(/\s+/g, " ").trim();
+      const expectedUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
+      const notes = p.boxes > 0 ? `${p.boxes} cajas (${p.unitsPerBox} c/u) + ${p.looseUnits || 0} sueltas` : "";
+
+      return {
+        product: p,
+        code: (p.code || "").trim(),
+        codeUpper: (p.code || "").trim().toUpperCase(),
+        fullName,
+        normalizedDesc: fullName.toLowerCase().replace(/\s+/g, " "),
+        expectedUnits,
+        notes,
+      };
+    });
+
+    const matchedProductCodes = new Set<string>();
+    const matchedProductIds = new Set<string>();
+
+    // 1. Actualizar items existentes
+    const updatedItems = count.items.map((item) => {
+      const itemCode = (item.code || "").trim().toUpperCase();
+      const itemDesc = (item.description || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+      // Buscar por código exacto o descripción normalizada
+      const matched = warehouseInfoList.find((w) => {
+        if (itemCode && w.codeUpper === itemCode) return true;
+        if (itemDesc && w.normalizedDesc === itemDesc) return true;
+        return false;
+      });
+
+      if (matched) {
+        matchedProductCodes.add(matched.codeUpper);
+        matchedProductIds.add(matched.product.id);
+        const expected = matched.expectedUnits;
+        const counted = Number(item.countedQty) || 0;
+        return {
+          code: item.code || matched.code || null,
+          description: item.description || matched.fullName,
+          expectedQty: expected,
+          countedQty: counted,
+          difference: counted - expected,
+          scannedImeis: item.scannedImeis || null,
+          notes: matched.notes || item.notes || null,
+        };
+      }
+
+      // Si no hace match con almacén, conservar el item tal cual
+      const exp = Number(item.expectedQty) || 0;
+      const cnt = Number(item.countedQty) || 0;
+      return {
+        code: item.code || null,
+        description: item.description,
+        expectedQty: exp,
+        countedQty: cnt,
+        difference: cnt - exp,
+        scannedImeis: item.scannedImeis || null,
+        notes: item.notes || null,
+      };
+    });
+
+    // 2. Agregar modelos nuevos del almacén con stock > 0 que no estaban en el conteo
+    let addedCount = 0;
+    for (const w of warehouseInfoList) {
+      if (!matchedProductCodes.has(w.codeUpper) && !matchedProductIds.has(w.product.id)) {
+        if (w.expectedUnits > 0) {
+          updatedItems.push({
+            code: w.code || null,
+            description: w.fullName,
+            expectedQty: w.expectedUnits,
+            countedQty: 0,
+            difference: -w.expectedUnits,
+            scannedImeis: null,
+            notes: w.notes || null,
+          });
+          addedCount++;
+        }
+      }
+    }
+
+    // 3. Guardar en transacción
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.stockCountItem.deleteMany({
+        where: { countId: count.id },
+      });
+
+      return tx.stockCount.update({
+        where: { id: count.id },
+        data: {
+          items: {
+            create: updatedItems,
+          },
+        },
+        include: {
+          items: true,
+        },
+      });
+    });
+
+    await logAudit({
+      userId: user.id,
+      action: "stock_count.sync_warehouse",
+      module: "almacen",
+      entityType: "stock_count",
+      entityId: updated.id,
+      afterData: {
+        countNumber: updated.countNumber,
+        status: updated.status,
+        itemCount: updated.items.length,
+        addedNewModels: addedCount,
+      },
+    });
+
+    revalidatePath("/almacen/conteos");
+    return {
+      success: true,
+      data: updated,
+      message: `Conteo sincronizado: se actualizaron las existencias esperadas y se agregaron ${addedCount} modelos nuevos sin perder lo contado.`,
+    };
+  } catch (error: any) {
+    console.error("Error al sincronizar conteo con almacén:", error);
+    return { success: false, error: error.message || "Error al sincronizar con almacén" };
+  }
+}
