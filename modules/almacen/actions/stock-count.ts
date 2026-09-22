@@ -68,6 +68,10 @@ export async function saveStockCountAction(input: StockCountInput) {
               items: true,
             },
           });
+        },
+        {
+          maxWait: 10000,
+          timeout: 30000,
         });
         await logAudit({ userId: user.id, action: "stock_count.update", module: "almacen", entityType: "stock_count", entityId: updated.id, afterData: { countNumber: updated.countNumber, status: updated.status, itemCount: updated.items.length } });
 
@@ -105,8 +109,12 @@ export async function saveStockCountAction(input: StockCountInput) {
           }),
         },
       },
-      include: { items: true },
+        include: { items: true },
       });
+    },
+    {
+      maxWait: 10000,
+      timeout: 30000,
     });
     await logAudit({ userId: user.id, action: "stock_count.create", module: "almacen", entityType: "stock_count", entityId: created.id, afterData: { countNumber: created.countNumber, status: created.status, itemCount: created.items.length } });
 
@@ -345,6 +353,10 @@ export async function syncStockCountWithWarehouseAction(countId: string) {
           items: true,
         },
       });
+    },
+    {
+      maxWait: 10000,
+      timeout: 30000,
     });
 
     await logAudit({
@@ -487,62 +499,76 @@ export async function applyStockCountToWarehouseAction(countId: string) {
 
     const createdByName = persisted.name || persisted.email || actor.id;
 
-    await prisma.$transaction(async (tx) => {
-      for (const adj of adjustments) {
-        await tx.warehouseProduct.update({
-          where: { id: adj.productId },
-          data: {
-            boxes: adj.newBoxes,
-            looseUnits: adj.newLoose,
-            totalUnits: adj.newStock,
-          },
-        });
+    const movementsData = adjustments.map((adj) => ({
+      productId: adj.productId,
+      type: (adj.diff > 0 ? "ENTRY" : "EXIT") as "ENTRY" | "EXIT",
+      boxesCount: Math.abs(Math.floor(adj.diff / adj.unitsPerBox)),
+      totalUnits: Math.abs(adj.diff),
+      reason: `Ajuste por auditoría física ${count.countNumber} (${adj.diff > 0 ? "+" : ""}${adj.diff} uds)`,
+      createdBy: createdByName,
+    }));
 
-        await tx.warehouseMovement.create({
-          data: {
-            productId: adj.productId,
-            type: adj.diff > 0 ? "ENTRY" : "EXIT",
-            boxesCount: Math.abs(Math.floor(adj.diff / adj.unitsPerBox)),
-            totalUnits: Math.abs(adj.diff),
-            reason: `Ajuste por auditoría física ${count.countNumber} (${adj.diff > 0 ? "+" : ""}${adj.diff} uds)`,
-            createdBy: createdByName,
-          },
-        });
+    await prisma.$transaction(
+      async (tx) => {
+        // 1. Inserción de todos los movimientos en lote (batch) para alta velocidad
+        if (movementsData.length > 0) {
+          await tx.warehouseMovement.createMany({
+            data: movementsData,
+          });
+        }
 
-        await tx.stockCountItem.update({
-          where: { id: adj.countItemId },
+        // 2. Actualizar existencias de los productos de almacén y líneas del conteo
+        for (const adj of adjustments) {
+          await tx.warehouseProduct.update({
+            where: { id: adj.productId },
+            data: {
+              boxes: adj.newBoxes,
+              looseUnits: adj.newLoose,
+              totalUnits: adj.newStock,
+            },
+          });
+
+          await tx.stockCountItem.update({
+            where: { id: adj.countItemId },
+            data: {
+              expectedQty: adj.newStock,
+              difference: 0,
+              notes: `${adj.newBoxes} cajas (${adj.unitsPerBox} c/u) + ${adj.newLoose} sueltas · Almacén ajustado al físico`,
+            },
+          });
+        }
+
+        // 3. Marcar auditoría como COMPLETED
+        await tx.stockCount.update({
+          where: { id: count.id },
           data: {
-            expectedQty: adj.newStock,
-            difference: 0,
-            notes: `${adj.newBoxes} cajas (${adj.unitsPerBox} c/u) + ${adj.newLoose} sueltas · Almacén ajustado al físico`,
+            status: "COMPLETED",
+            completedAt: count.completedAt || new Date(),
           },
         });
+      },
+      {
+        maxWait: 15000,
+        timeout: 60000,
       }
+    );
 
-      await tx.stockCount.update({
-        where: { id: count.id },
-        data: {
-          status: "COMPLETED",
-          completedAt: count.completedAt || new Date(),
-        },
-      });
-
-      await logAudit({
-        userId: actor.id,
-        action: "stock_count.reconcile_warehouse",
-        module: "almacen",
-        entityType: "stock_count",
-        entityId: count.id,
-        afterData: {
-          countNumber: count.countNumber,
-          adjustedCount: adjustments.length,
-          adjustments: adjustments.map((a) => ({
-            product: a.productName,
-            diff: a.diff,
-            newStock: a.newStock,
-          })),
-        },
-      });
+    // 4. Registro de auditoría fuera de la transacción para no retener la conexión
+    await logAudit({
+      userId: actor.id,
+      action: "stock_count.reconcile_warehouse",
+      module: "almacen",
+      entityType: "stock_count",
+      entityId: count.id,
+      afterData: {
+        countNumber: count.countNumber,
+        adjustedCount: adjustments.length,
+        adjustments: adjustments.map((a) => ({
+          product: a.productName,
+          diff: a.diff,
+          newStock: a.newStock,
+        })),
+      },
     });
 
     revalidatePath("/almacen");
