@@ -157,7 +157,9 @@ export async function getStockCountsAction(query?: string, status?: string) {
     const counts = await prisma.stockCount.findMany({
       where,
       include: {
-        items: true,
+        items: {
+          orderBy: { description: "asc" },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -180,7 +182,9 @@ export async function getStockCountByIdAction(id: string) {
     const count = await prisma.stockCount.findUnique({
       where: { id },
       include: {
-        items: true,
+        items: {
+          orderBy: { description: "asc" },
+        },
       },
     });
 
@@ -366,5 +370,196 @@ export async function syncStockCountWithWarehouseAction(countId: string) {
   } catch (error: any) {
     console.error("Error al sincronizar conteo con almacén:", error);
     return { success: false, error: error.message || "Error al sincronizar con almacén" };
+  }
+}
+
+/**
+ * Reconcilia y actualiza las existencias de Almacén para que coincidan exactamente
+ * con las cantidades físicas contadas en una auditoría (Solo Administradores).
+ * Genera movimientos de entrada o salida por ajuste para cada discrepancia.
+ */
+export async function applyStockCountToWarehouseAction(countId: string) {
+  try {
+    const actor = await requirePermission("warehouse.write");
+    if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
+
+    const persisted = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { roleCode: true, name: true, email: true },
+    });
+
+    if (persisted?.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo un administrador puede aplicar el conteo al inventario de almacén." };
+    }
+
+    const count = await prisma.stockCount.findUnique({
+      where: { id: countId },
+      include: {
+        items: {
+          orderBy: { description: "asc" },
+        },
+      },
+    });
+
+    if (!count) return { success: false, error: "Conteo no encontrado" };
+    if (count.status === "CANCELLED") {
+      return { success: false, error: "No se puede aplicar un conteo que ha sido anulado." };
+    }
+
+    const warehouseProducts = await prisma.warehouseProduct.findMany({
+      where: { status: "ACTIVE" },
+    });
+
+    const warehouseInfoList = warehouseProducts.map((p) => {
+      const brand = p.brand ? `${p.brand} ` : "";
+      const name = p.name || "";
+      const color = p.color ? ` ${p.color}` : "";
+      const capacity = p.capacity ? ` ${p.capacity}` : "";
+      const fullName = `${brand}${name}${color}${capacity}`.replace(/\s+/g, " ").trim();
+      const currentUnits = (p.boxes || 0) * (p.unitsPerBox || 1) + (p.looseUnits || 0);
+
+      return {
+        product: p,
+        codeUpper: (p.code || "").trim().toUpperCase(),
+        fullName,
+        normalizedDesc: fullName.toLowerCase().replace(/\s+/g, " "),
+        currentUnits,
+      };
+    });
+
+    const adjustments: Array<{
+      productId: string;
+      productName: string;
+      oldStock: number;
+      newStock: number;
+      diff: number;
+      newBoxes: number;
+      newLoose: number;
+      unitsPerBox: number;
+      countItemId: string;
+    }> = [];
+
+    for (const item of count.items) {
+      const itemCode = (item.code || "").trim().toUpperCase();
+      const itemDesc = (item.description || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+      const matched = warehouseInfoList.find((w) => {
+        if (itemCode && w.codeUpper === itemCode) return true;
+        if (itemDesc && w.normalizedDesc === itemDesc) return true;
+        return false;
+      });
+
+      if (matched) {
+        const counted = Number(item.countedQty) || 0;
+        const currentStock = matched.currentUnits;
+        const diff = counted - currentStock;
+
+        if (diff !== 0) {
+          const upb = Math.max(1, matched.product.unitsPerBox || 1);
+          const newBoxes = Math.floor(counted / upb);
+          const newLoose = counted % upb;
+
+          adjustments.push({
+            productId: matched.product.id,
+            productName: matched.fullName,
+            oldStock: currentStock,
+            newStock: counted,
+            diff,
+            newBoxes,
+            newLoose,
+            unitsPerBox: upb,
+            countItemId: item.id,
+          });
+        }
+      }
+    }
+
+    if (adjustments.length === 0) {
+      if (count.status === "IN_PROGRESS") {
+        await prisma.stockCount.update({
+          where: { id: count.id },
+          data: { status: "COMPLETED", completedAt: new Date() },
+        });
+        revalidatePath("/almacen/conteos");
+      }
+      return {
+        success: true,
+        message: "El inventario de Almacén ya coincide exactamente con las cantidades contadas físicas. No fue necesario realizar ajustes.",
+        adjustedCount: 0,
+      };
+    }
+
+    const createdByName = persisted.name || persisted.email || actor.id;
+
+    await prisma.$transaction(async (tx) => {
+      for (const adj of adjustments) {
+        await tx.warehouseProduct.update({
+          where: { id: adj.productId },
+          data: {
+            boxes: adj.newBoxes,
+            looseUnits: adj.newLoose,
+            totalUnits: adj.newStock,
+          },
+        });
+
+        await tx.warehouseMovement.create({
+          data: {
+            productId: adj.productId,
+            type: adj.diff > 0 ? "ENTRY" : "EXIT",
+            boxesCount: Math.abs(Math.floor(adj.diff / adj.unitsPerBox)),
+            totalUnits: Math.abs(adj.diff),
+            reason: `Ajuste por auditoría física ${count.countNumber} (${adj.diff > 0 ? "+" : ""}${adj.diff} uds)`,
+            createdBy: createdByName,
+          },
+        });
+
+        await tx.stockCountItem.update({
+          where: { id: adj.countItemId },
+          data: {
+            expectedQty: adj.newStock,
+            difference: 0,
+            notes: `${adj.newBoxes} cajas (${adj.unitsPerBox} c/u) + ${adj.newLoose} sueltas · Almacén ajustado al físico`,
+          },
+        });
+      }
+
+      await tx.stockCount.update({
+        where: { id: count.id },
+        data: {
+          status: "COMPLETED",
+          completedAt: count.completedAt || new Date(),
+        },
+      });
+
+      await logAudit({
+        userId: actor.id,
+        action: "stock_count.reconcile_warehouse",
+        module: "almacen",
+        entityType: "stock_count",
+        entityId: count.id,
+        afterData: {
+          countNumber: count.countNumber,
+          adjustedCount: adjustments.length,
+          adjustments: adjustments.map((a) => ({
+            product: a.productName,
+            diff: a.diff,
+            newStock: a.newStock,
+          })),
+        },
+      });
+    });
+
+    revalidatePath("/almacen");
+    revalidatePath("/almacen/conteos");
+    revalidatePath("/almacen/movimientos");
+
+    return {
+      success: true,
+      data: { adjustedCount: adjustments.length },
+      message: `¡Almacén sincronizado exitosamente! Se ajustó el stock de ${adjustments.length} productos y se registraron sus movimientos en la bitácora.`,
+    };
+  } catch (error: any) {
+    console.error("Error al aplicar conteo al almacén:", error);
+    return { success: false, error: error.message || "Error al sincronizar almacén con el conteo físico" };
   }
 }

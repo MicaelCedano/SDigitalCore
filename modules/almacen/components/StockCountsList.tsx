@@ -5,6 +5,7 @@ import {
   getStockCountsAction,
   deleteStockCountAction,
   syncStockCountWithWarehouseAction,
+  applyStockCountToWarehouseAction,
 } from "../actions/stock-count";
 import { StockCountForm } from "./StockCountForm";
 import { StockCountDetailModal } from "./StockCountDetailModal";
@@ -27,9 +28,10 @@ import {
   ScanLine,
   Pencil,
   Boxes,
+  SlidersHorizontal,
 } from "lucide-react";
 
-export function StockCountsList() {
+export function StockCountsList({ roleCode = "USER" }: { roleCode?: string }) {
   const [counts, setCounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,6 +90,37 @@ export function StockCountsList() {
       alert(err.message || "Error al sincronizar");
     } finally {
       setSyncingId(null);
+    }
+  };
+
+  const [applyingId, setApplyingId] = useState<string | null>(null);
+
+  const handleApplyToWarehouse = async (id: string, countNumber: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (
+      !confirm(
+        `ATENCIÓN ADMINISTRADOR:\n\n¿Deseas sincronizar y ajustar el inventario de Almacén con este conteo físico (${countNumber})?\n\n• Las existencias de cada modelo en Almacén pasarán a ser exactamente iguales a lo contado físicamente.\n• Se generarán los movimientos de ajuste (Entrada o Salida) en la bitácora de almacén.\n• Esta auditoría quedará cuadrada (diferencias = 0).`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setApplyingId(id);
+      const res = await applyStockCountToWarehouseAction(id);
+      if (res.success) {
+        alert(res.message || "Almacén ajustado exitosamente al conteo físico.");
+        fetchCounts();
+        if (selectedCountForDetail && selectedCountForDetail.id === id) {
+          setSelectedCountForDetail(null);
+        }
+      } else {
+        alert(res.error || "No se pudo aplicar el ajuste al almacén.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al procesar el ajuste");
+    } finally {
+      setApplyingId(null);
     }
   };
 
@@ -397,6 +430,16 @@ export function StockCountsList() {
                               </button>
                             </>
                           )}
+                          {roleCode === "ADMIN" && c.status !== "CANCELLED" && (
+                            <button
+                              onClick={(e) => handleApplyToWarehouse(c.id, c.countNumber, e)}
+                              disabled={applyingId === c.id}
+                              className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors"
+                              title="Sincronizar Almacén: Ajustar existencias con este conteo físico (Solo Admin)"
+                            >
+                              <SlidersHorizontal className={`w-4 h-4 ${applyingId === c.id ? "animate-spin" : ""}`} />
+                            </button>
+                          )}
                           {c.status !== "CANCELLED" ? <button
                             onClick={(e) => handleDelete(c.id, e)}
                             className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
@@ -419,6 +462,7 @@ export function StockCountsList() {
       {showFormModal && (
         <StockCountForm
           initialData={selectedCountForEdit}
+          roleCode={roleCode}
           onSuccess={() => {
             setShowFormModal(false);
             fetchCounts();
@@ -431,6 +475,8 @@ export function StockCountsList() {
       {selectedCountForDetail && (
         <StockCountDetailModal
           count={selectedCountForDetail}
+          roleCode={roleCode}
+          onReconciled={() => fetchCounts()}
           onClose={() => setSelectedCountForDetail(null)}
         />
       )}

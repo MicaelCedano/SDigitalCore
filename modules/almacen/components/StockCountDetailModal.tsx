@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { exportStockCountToExcel } from "@/lib/utils/excel-export-stock-count";
+import { applyStockCountToWarehouseAction } from "../actions/stock-count";
 import {
   FileSpreadsheet,
   X,
@@ -8,18 +10,35 @@ import {
   Barcode,
   Layers,
   ClipboardList,
+  SlidersHorizontal,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 
 interface StockCountDetailModalProps {
   count: any;
   onClose: () => void;
+  roleCode?: string;
+  onReconciled?: () => void;
 }
 
 export function StockCountDetailModal({
   count,
   onClose,
+  roleCode = "USER",
+  onReconciled,
 }: StockCountDetailModalProps) {
+  const [applying, setApplying] = useState(false);
+  const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
+
   if (!count) return null;
+
+  const sortedItems = useMemo(() => {
+    return [...(count.items || [])].sort((a: any, b: any) =>
+      (a.description || "").localeCompare(b.description || "", "es", { sensitivity: "base" })
+    );
+  }, [count.items]);
 
   const formattedDate = new Date(count.startedAt || count.createdAt).toLocaleString("es-DO", {
     dateStyle: "medium",
@@ -38,6 +57,33 @@ export function StockCountDetailModal({
 
   const totalDiff = totalCounted - totalExpected;
 
+  const handleApplyToWarehouse = async () => {
+    if (
+      !confirm(
+        `ATENCIÓN ADMINISTRADOR:\n\n¿Estás seguro de sincronizar el inventario de Almacén con este conteo físico?\n\n• Las existencias de cada producto en Almacén pasarán a ser exactamente iguales a lo contado físicamente.\n• Se generarán los movimientos de ajuste (Entrada o Salida) en la bitácora de almacén.\n• Esta auditoría quedará cuadrada (diferencias = 0).`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setApplying(true);
+      setReconcileMessage(null);
+      setReconcileError(null);
+      const res = await applyStockCountToWarehouseAction(count.id);
+      if (res.success) {
+        setReconcileMessage(res.message || "Almacén ajustado exitosamente al conteo físico.");
+        if (onReconciled) onReconciled();
+      } else {
+        setReconcileError(res.error || "No se pudo ajustar el almacén");
+      }
+    } catch (err: any) {
+      setReconcileError(err.message || "Error al procesar el ajuste");
+    } finally {
+      setApplying(false);
+    }
+  };
+
   const handleExportExcel = () => {
     exportStockCountToExcel({
       countNumber: count.countNumber,
@@ -47,7 +93,7 @@ export function StockCountDetailModal({
       status: count.status,
       notes: count.notes,
       startedAt: count.startedAt || count.createdAt,
-      items: count.items || [],
+      items: sortedItems,
     });
   };
 
@@ -88,6 +134,18 @@ export function StockCountDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {roleCode === "ADMIN" && count.status !== "CANCELLED" && (
+              <button
+                type="button"
+                onClick={handleApplyToWarehouse}
+                disabled={applying}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                title="Ajustar inventario de Almacén para que coincida exactamente con este conteo físico"
+              >
+                <SlidersHorizontal className={`w-4 h-4 ${applying ? "animate-spin" : ""}`} />
+                <span>{applying ? "Ajustando..." : "Sincronizar Físico con Almacén"}</span>
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
@@ -152,6 +210,40 @@ export function StockCountDetailModal({
             </div>
           )}
 
+          {/* Banner de Sincronización para Administradores */}
+          {roleCode === "ADMIN" && totalDiff !== 0 && !reconcileMessage && count.status !== "CANCELLED" && (
+            <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-900">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>
+                  Hay una discrepancia de <strong>{totalDiff > 0 ? `+${totalDiff}` : totalDiff} unidades</strong> entre el sistema y el conteo físico. Puedes pulsar <strong>"Sincronizar Físico con Almacén"</strong> para que el Almacén tome los valores contados.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleApplyToWarehouse}
+                disabled={applying}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 transition-colors shadow-2xs text-xs"
+              >
+                {applying ? "Ajustando..." : "Ajustar Almacén Ahora"}
+              </button>
+            </div>
+          )}
+
+          {reconcileMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl flex items-center gap-2 text-xs text-emerald-900">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span className="font-semibold">{reconcileMessage}</span>
+            </div>
+          )}
+
+          {reconcileError && (
+            <div className="bg-red-50 border border-red-200 p-3.5 rounded-xl flex items-center gap-2 text-xs text-red-900">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <span>{reconcileError}</span>
+            </div>
+          )}
+
           {/* Table of Items */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -160,7 +252,7 @@ export function StockCountDetailModal({
 
             {/* Mobile Cards View */}
             <div className="block sm:hidden space-y-2">
-              {count.items?.map((item: any, idx: number) => {
+              {sortedItems.map((item: any, idx: number) => {
                 const exp = item.expectedQty || 0;
                 const cnt = item.countedQty || 0;
                 const diff = cnt - exp;
@@ -211,7 +303,7 @@ export function StockCountDetailModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {count.items?.map((item: any, idx: number) => {
+                    {sortedItems.map((item: any, idx: number) => {
                       const exp = item.expectedQty || 0;
                       const cnt = item.countedQty || 0;
                       const diff = cnt - exp;

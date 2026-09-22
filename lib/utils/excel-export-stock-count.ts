@@ -34,7 +34,11 @@ export function exportStockCountToExcel(data: StockCountExportData) {
   let totalCounted = 0;
   let totalDiff = 0;
 
-  const itemsRows = data.items
+  const sortedItems = [...(data.items || [])].sort((a, b) =>
+    (a.description || "").localeCompare(b.description || "", "es", { sensitivity: "base" })
+  );
+
+  const itemsRows = sortedItems
     .map((item, index) => {
       const expected = item.expectedQty || 0;
       const counted = item.countedQty || 0;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { saveStockCountAction } from "../actions/stock-count";
+import { saveStockCountAction, applyStockCountToWarehouseAction } from "../actions/stock-count";
 import { getWarehouseProductsAction } from "../actions/warehouse";
 import { getBranchesAction } from "@/modules/configuracion/actions/branch";
 import { StockCountInput } from "@/lib/validation/stock-count";
@@ -27,12 +27,14 @@ import {
   Minus,
   Smartphone,
   ChevronDown,
+  SlidersHorizontal,
 } from "lucide-react";
 
 interface StockCountFormProps {
   initialData?: StockCountInput | null;
   onSuccess: () => void;
   onCancel: () => void;
+  roleCode?: string;
 }
 
 const emptyItem = {
@@ -49,6 +51,7 @@ export function StockCountForm({
   initialData,
   onSuccess,
   onCancel,
+  roleCode = "USER",
 }: StockCountFormProps) {
   const { savedDraftData, hasSavedDraft, lastSavedAt, saveDraft, clearDraft } =
     useStockCountDraft();
@@ -61,7 +64,9 @@ export function StockCountForm({
   const [notes, setNotes] = useState(initialData?.notes || "");
   const [items, setItems] = useState<any[]>(
     initialData?.items && initialData.items.length > 0
-      ? initialData.items
+      ? [...initialData.items].sort((a: any, b: any) =>
+          (a.description || "").localeCompare(b.description || "", "es", { sensitivity: "base" })
+        )
       : []
   );
 
@@ -126,6 +131,10 @@ export function StockCountForm({
             notes: p.boxes > 0 ? `${p.boxes} cajas (${p.unitsPerBox} c/u) + ${p.looseUnits || 0} sueltas` : "",
           };
         });
+
+        warehouseItems.sort((a: any, b: any) =>
+          (a.description || "").localeCompare(b.description || "", "es", { sensitivity: "base" })
+        );
 
         setItems(warehouseItems);
       }
@@ -218,6 +227,10 @@ export function StockCountForm({
           }
         }
 
+        updatedItems.sort((a: any, b: any) =>
+          (a.description || "").localeCompare(b.description || "", "es", { sensitivity: "base" })
+        );
+
         setItems(updatedItems);
         setSyncNotice(`Sincronización completada: existencias actualizadas (${updatedCount} modelos) y ${addedCount} modelos nuevos incorporados. Tus conteos se mantuvieron intactos.`);
       }
@@ -241,7 +254,10 @@ export function StockCountForm({
       setTitle(saved.formData.title || "Auditoría de Almacén General");
       if (saved.formData.branch) setBranch(saved.formData.branch);
       if (saved.formData.notes) setNotes(saved.formData.notes);
-      setItems(saved.formData.items);
+      const draftItems = [...saved.formData.items].sort((a: any, b: any) =>
+        (a.description || "").localeCompare(b.description || "", "es", { sensitivity: "base" })
+      );
+      setItems(draftItems);
       const savedTime = saved.savedAt
         ? new Date(saved.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         : "";
@@ -463,6 +479,23 @@ export function StockCountForm({
 
       if (res.success) {
         clearDraft();
+        if (status === "COMPLETED" && roleCode === "ADMIN" && res.data?.id) {
+          const shouldApply = confirm(
+            "Auditoría finalizada exitosamente.\n\n¿Deseas aplicar este conteo físico directamente al inventario de Almacén para que las existencias queden iguales?"
+          );
+          if (shouldApply) {
+            try {
+              const applyRes = await applyStockCountToWarehouseAction(res.data.id);
+              if (applyRes.success) {
+                alert(applyRes.message);
+              } else {
+                alert(`Conteo guardado, pero ocurrió un aviso al ajustar el almacén: ${applyRes.error}`);
+              }
+            } catch (applyErr: any) {
+              alert(applyErr.message || "Error al sincronizar con almacén");
+            }
+          }
+        }
         onSuccess();
       } else {
         setErrorMessage(res.error || "Ocurrió un error al guardar el conteo");
@@ -532,7 +565,10 @@ export function StockCountForm({
         return diff !== 0;
       }
       return true;
-    });
+    })
+    .sort((a, b) =>
+      (a.item.description || "").localeCompare(b.item.description || "", "es", { sensitivity: "base" })
+    );
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-hidden">
