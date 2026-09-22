@@ -552,12 +552,12 @@ export function StockCountsList({ roleCode = "USER" }: { roleCode?: string }) {
                               </button>
                             </>
                           )}
-                          {roleCode === "ADMIN" && c.status !== "CANCELLED" && (
+                          {roleCode === "ADMIN" && c.status === "COMPLETED" && (
                             <button
                               onClick={(e) => handleApplyToWarehouse(c.id, c.countNumber, e)}
                               disabled={applyingId === c.id}
                               className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors"
-                              title="Sincronizar Almacén: Ajustar existencias con este conteo físico (Solo Admin)"
+                              title="Sincronizar Almacén: Ajustar existencias con este conteo físico (Solo Admin en auditorías finalizadas)"
                             >
                               <SlidersHorizontal className={`w-4 h-4 ${applyingId === c.id ? "animate-spin" : ""}`} />
                             </button>

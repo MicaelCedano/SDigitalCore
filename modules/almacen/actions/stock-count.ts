@@ -402,8 +402,11 @@ export async function applyStockCountToWarehouseAction(countId: string) {
     });
 
     if (!count) return { success: false, error: "Conteo no encontrado" };
-    if (count.status === "CANCELLED") {
-      return { success: false, error: "No se puede aplicar un conteo que ha sido anulado." };
+    if (count.status !== "COMPLETED") {
+      return {
+        success: false,
+        error: "La auditoría debe estar finalizada para poder sincronizar y ajustar el inventario de almacén.",
+      };
     }
 
     const warehouseProducts = await prisma.warehouseProduct.findMany({
@@ -475,13 +478,6 @@ export async function applyStockCountToWarehouseAction(countId: string) {
     }
 
     if (adjustments.length === 0) {
-      if (count.status === "IN_PROGRESS") {
-        await prisma.stockCount.update({
-          where: { id: count.id },
-          data: { status: "COMPLETED", completedAt: new Date() },
-        });
-        revalidatePath("/almacen/conteos");
-      }
       return {
         success: true,
         message: "El inventario de Almacén ya coincide exactamente con las cantidades contadas físicas. No fue necesario realizar ajustes.",

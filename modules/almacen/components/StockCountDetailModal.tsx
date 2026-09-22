@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   AlertTriangle,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 
 interface StockCountDetailModalProps {
@@ -205,13 +206,13 @@ export function StockCountDetailModal({
             </div>
           )}
 
-          {/* Banner de Sincronización para Administradores */}
-          {roleCode === "ADMIN" && totalDiff !== 0 && !reconcileMessage && count.status !== "CANCELLED" && (
+          {/* Banner de Sincronización para Administradores: Solo cuando la auditoría esté FINALIZADA */}
+          {roleCode === "ADMIN" && totalDiff !== 0 && !reconcileMessage && count.status === "COMPLETED" && (
             <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-900">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
                 <span>
-                  Hay una discrepancia de <strong>{totalDiff > 0 ? `+${totalDiff}` : totalDiff} unidades</strong> entre el sistema y el conteo físico. Puedes pulsar <strong>"Sincronizar Físico con Almacén"</strong> para que el Almacén tome los valores contados.
+                  Auditoría finalizada con discrepancia de <strong>{totalDiff > 0 ? `+${totalDiff}` : totalDiff} unidades</strong>. Como Administrador puedes pulsar <strong>"Ajustar Almacén Ahora"</strong> para cuadrar las existencias de almacén con lo contado.
                 </span>
               </div>
               <button
@@ -222,6 +223,16 @@ export function StockCountDetailModal({
               >
                 {applying ? "Ajustando..." : "Ajustar Almacén Ahora"}
               </button>
+            </div>
+          )}
+
+          {/* Aviso preventivo si la auditoría sigue en proceso */}
+          {roleCode === "ADMIN" && totalDiff !== 0 && !reconcileMessage && count.status === "IN_PROGRESS" && (
+            <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center gap-2 text-xs text-slate-600">
+              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>
+                Esta auditoría aún está <strong>en proceso</strong>. Para evitar errores prematuros, debe ser finalizada antes de poder sincronizar el inventario de almacén.
+              </span>
             </div>
           )}
 
