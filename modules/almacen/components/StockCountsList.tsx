@@ -29,7 +29,9 @@ import {
   Pencil,
   Boxes,
   SlidersHorizontal,
+  AlertTriangle,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 export function StockCountsList({ roleCode = "USER" }: { roleCode?: string }) {
   const [counts, setCounts] = useState<any[]>([]);
@@ -57,71 +59,191 @@ export function StockCountsList({ roleCode = "USER" }: { roleCode?: string }) {
     return () => clearTimeout(timer);
   }, [searchQuery, statusFilter]);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const [dialogConfig, setDialogConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    children?: React.ReactNode;
+    confirmText?: string;
+    cancelText?: string | null;
+    variant?: "danger" | "warning" | "success" | "info" | "primary";
+    isLoading?: boolean;
+    onConfirm: () => Promise<void> | void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => {},
+  });
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Deseas anular este conteo? Se conservará en el historial.")) {
-      await deleteStockCountAction(id);
-      fetchCounts();
-    }
+    setDialogConfig({
+      isOpen: true,
+      title: "Anular Conteo de Stock",
+      description: "¿Deseas anular este conteo? Se conservará en el historial marcado como cancelado.",
+      confirmText: "Sí, anular",
+      cancelText: "Volver",
+      variant: "danger",
+      onConfirm: async () => {
+        setDialogConfig((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await deleteStockCountAction(id);
+          fetchCounts();
+        } finally {
+          setDialogConfig((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
   };
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
-  const handleSyncCount = async (id: string, countNumber: string, e: React.MouseEvent) => {
+  const handleSyncCount = (id: string, countNumber: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (
-      !confirm(
-        `¿Deseas sincronizar el conteo ${countNumber} con las existencias actuales de almacén? Se actualizarán las cantidades esperadas y se añadirán nuevos modelos sin alterar los conteos físicos que ya ingresaste.`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setSyncingId(id);
-      const res = await syncStockCountWithWarehouseAction(id);
-      if (res.success) {
-        alert(res.message || "Conteo sincronizado exitosamente con almacén.");
-        fetchCounts();
-      } else {
-        alert(res.error || "No se pudo sincronizar el conteo con almacén.");
-      }
-    } catch (err: any) {
-      alert(err.message || "Error al sincronizar");
-    } finally {
-      setSyncingId(null);
-    }
+    setDialogConfig({
+      isOpen: true,
+      title: "Sincronizar existencias de almacén",
+      description: `¿Deseas sincronizar la auditoría ${countNumber} con el stock actual de almacén?`,
+      children: (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 space-y-1.5 mt-2">
+          <p className="flex items-center gap-1.5 font-semibold text-slate-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#5750f1]"></span>
+            Se actualizarán las cantidades esperadas según almacén.
+          </p>
+          <p className="flex items-center gap-1.5 font-semibold text-slate-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#5750f1]"></span>
+            Se añadirán automáticamente nuevos modelos creados.
+          </p>
+          <p className="flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+            ✓ Tus conteos físicos ingresados se mantendrán intactos.
+          </p>
+        </div>
+      ),
+      confirmText: "Sincronizar ahora",
+      cancelText: "Cancelar",
+      variant: "primary",
+      onConfirm: async () => {
+        setDialogConfig((prev) => ({ ...prev, isLoading: true }));
+        setSyncingId(id);
+        try {
+          const res = await syncStockCountWithWarehouseAction(id);
+          if (res.success) {
+            fetchCounts();
+            setDialogConfig({
+              isOpen: true,
+              title: "Sincronización Exitosa",
+              description: res.message || "Conteo sincronizado exitosamente con almacén.",
+              confirmText: "Entendido",
+              cancelText: null,
+              variant: "success",
+              onConfirm: () => setDialogConfig((prev) => ({ ...prev, isOpen: false })),
+            });
+          } else {
+            setDialogConfig({
+              isOpen: true,
+              title: "Aviso de Sincronización",
+              description: res.error || "No se pudo sincronizar el conteo con almacén.",
+              confirmText: "Cerrar",
+              cancelText: null,
+              variant: "warning",
+              onConfirm: () => setDialogConfig((prev) => ({ ...prev, isOpen: false })),
+            });
+          }
+        } catch (err: any) {
+          setDialogConfig({
+            isOpen: true,
+            title: "Error de Sincronización",
+            description: err.message || "Error al sincronizar con almacén.",
+            confirmText: "Cerrar",
+            cancelText: null,
+            variant: "danger",
+            onConfirm: () => setDialogConfig((prev) => ({ ...prev, isOpen: false })),
+          });
+        } finally {
+          setSyncingId(null);
+        }
+      },
+    });
   };
 
   const [applyingId, setApplyingId] = useState<string | null>(null);
 
-  const handleApplyToWarehouse = async (id: string, countNumber: string, e?: React.MouseEvent) => {
+  const handleApplyToWarehouse = (id: string, countNumber: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (
-      !confirm(
-        `ATENCIÓN ADMINISTRADOR:\n\n¿Deseas sincronizar y ajustar el inventario de Almacén con este conteo físico (${countNumber})?\n\n• Las existencias de cada modelo en Almacén pasarán a ser exactamente iguales a lo contado físicamente.\n• Se generarán los movimientos de ajuste (Entrada o Salida) en la bitácora de almacén.\n• Esta auditoría quedará cuadrada (diferencias = 0).`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setApplyingId(id);
-      const res = await applyStockCountToWarehouseAction(id);
-      if (res.success) {
-        alert(res.message || "Almacén ajustado exitosamente al conteo físico.");
-        fetchCounts();
-        if (selectedCountForDetail && selectedCountForDetail.id === id) {
-          setSelectedCountForDetail(null);
+    setDialogConfig({
+      isOpen: true,
+      title: "Sincronizar Físico con Almacén",
+      description: `¿Deseas aplicar el conteo físico de la auditoría ${countNumber} al inventario de Almacén?`,
+      children: (
+        <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-950 space-y-2 mt-2">
+          <div className="font-bold flex items-center gap-1.5 text-amber-900">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            Acción exclusiva de Administrador:
+          </div>
+          <ul className="space-y-1.5 text-slate-700 pl-1">
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 font-bold shrink-0">•</span>
+              <span>Las existencias de cada modelo en Almacén pasarán a ser <strong>exactamente iguales a lo contado físicamente</strong>.</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 font-bold shrink-0">•</span>
+              <span>Se registrarán automáticamente los movimientos de ajuste (<strong>Entrada</strong> o <strong>Salida</strong>) en la bitácora.</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 font-bold shrink-0">•</span>
+              <span>Esta auditoría quedará cuadrada (<strong>diferencias = 0</strong>) y marcada como completada.</span>
+            </li>
+          </ul>
+        </div>
+      ),
+      confirmText: "Sí, ajustar almacén",
+      cancelText: "Cancelar",
+      variant: "primary",
+      onConfirm: async () => {
+        setDialogConfig((prev) => ({ ...prev, isLoading: true }));
+        setApplyingId(id);
+        try {
+          const res = await applyStockCountToWarehouseAction(id);
+          if (res.success) {
+            fetchCounts();
+            if (selectedCountForDetail && selectedCountForDetail.id === id) {
+              setSelectedCountForDetail(null);
+            }
+            setDialogConfig({
+              isOpen: true,
+              title: "Almacén Ajustado Exitosamente",
+              description: res.message || "El inventario de almacén ahora coincide exactamente con el conteo físico.",
+              confirmText: "Excelente",
+              cancelText: null,
+              variant: "success",
+              onConfirm: () => setDialogConfig((prev) => ({ ...prev, isOpen: false })),
+            });
+          } else {
+            setDialogConfig({
+              isOpen: true,
+              title: "Error al Ajustar Almacén",
+              description: res.error || "No se pudo aplicar el ajuste al almacén.",
+              confirmText: "Cerrar",
+              cancelText: null,
+              variant: "danger",
+              onConfirm: () => setDialogConfig((prev) => ({ ...prev, isOpen: false })),
+            });
+          }
+        } catch (err: any) {
+          setDialogConfig({
+            isOpen: true,
+            title: "Error Inesperado",
+            description: err.message || "Error al procesar el ajuste",
+            confirmText: "Cerrar",
+            cancelText: null,
+            variant: "danger",
+            onConfirm: () => setDialogConfig((prev) => ({ ...prev, isOpen: false })),
+          });
+        } finally {
+          setApplyingId(null);
         }
-      } else {
-        alert(res.error || "No se pudo aplicar el ajuste al almacén.");
-      }
-    } catch (err: any) {
-      alert(err.message || "Error al procesar el ajuste");
-    } finally {
-      setApplyingId(null);
-    }
+      },
+    });
   };
 
   const handleExportAllExcel = () => {
@@ -480,6 +602,21 @@ export function StockCountsList({ roleCode = "USER" }: { roleCode?: string }) {
           onClose={() => setSelectedCountForDetail(null)}
         />
       )}
+
+      {/* Modern Confirm & Notification Dialog */}
+      <ConfirmDialog
+        isOpen={dialogConfig.isOpen}
+        onClose={() => setDialogConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={dialogConfig.onConfirm}
+        title={dialogConfig.title}
+        description={dialogConfig.description}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        variant={dialogConfig.variant}
+        isLoading={dialogConfig.isLoading}
+      >
+        {dialogConfig.children}
+      </ConfirmDialog>
     </div>
   );
 }

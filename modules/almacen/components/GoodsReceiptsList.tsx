@@ -30,6 +30,7 @@ import {
   PackageCheck,
   Pencil,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 export function GoodsReceiptsList() {
   const [receipts, setReceipts] = useState<any[]>([]);
@@ -58,12 +59,12 @@ export function GoodsReceiptsList() {
     return () => clearTimeout(timer);
   }, [searchQuery, statusFilter]);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Deseas anular este recibo? Se conservará en el historial.")) {
-      await deleteGoodsReceiptAction(id);
-      fetchReceipts();
-    }
+    setDeleteTargetId(id);
   };
 
   const handleCancelWarehouseImport = async (importId: string) => {
@@ -436,6 +437,30 @@ export function GoodsReceiptsList() {
           }}
         />
       )}
+
+      {/* Modern Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={async () => {
+          if (deleteTargetId) {
+            setIsDeleting(true);
+            try {
+              await deleteGoodsReceiptAction(deleteTargetId);
+              setDeleteTargetId(null);
+              fetchReceipts();
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }}
+        title="Anular Recibo de Mercancía"
+        description="¿Deseas anular este recibo? Se conservará en el historial marcado como cancelado."
+        confirmText="Sí, anular recibo"
+        cancelText="Volver"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   EyeOff,
   ClipboardList,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 function getDisplayedTotalUnits(product: { boxes?: number | null; unitsPerBox?: number | null; looseUnits?: number | null }) {
   return (product.boxes || 0) * (product.unitsPerBox || 1) + (product.looseUnits || 0);
@@ -53,6 +54,8 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -143,12 +146,9 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Estás seguro de eliminar este producto del almacén?")) {
-      await deleteWarehouseProductAction(id);
-      fetchProducts();
-    }
+    setDeleteTargetId(id);
   };
 
   const totalBoxes = products.reduce((acc, p) => acc + (p.boxes || 0), 0);
@@ -626,6 +626,30 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
           </div>
         </div>
       )}
+
+      {/* Modern Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={async () => {
+          if (deleteTargetId) {
+            setIsDeleting(true);
+            try {
+              await deleteWarehouseProductAction(deleteTargetId);
+              setDeleteTargetId(null);
+              fetchProducts();
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }}
+        title="Eliminar producto de almacén"
+        description="¿Estás seguro de eliminar este producto del almacén? Se conservará en la base de datos si tiene historial de movimientos."
+        confirmText="Sí, eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

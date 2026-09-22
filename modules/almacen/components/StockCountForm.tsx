@@ -29,6 +29,7 @@ import {
   ChevronDown,
   SlidersHorizontal,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 interface StockCountFormProps {
   initialData?: StockCountInput | null;
@@ -76,6 +77,23 @@ export function StockCountForm({
   const [isInitialized, setIsInitialized] = useState(false);
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  const [dialogConfig, setDialogConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    children?: React.ReactNode;
+    confirmText?: string;
+    cancelText?: string | null;
+    variant?: "danger" | "warning" | "success" | "info" | "primary";
+    isLoading?: boolean;
+    onClose?: () => void;
+    onConfirm: () => Promise<void> | void;
+  }>({
+    isOpen: false,
+    title: "",
+    onConfirm: () => {},
+  });
 
   const [branchesList, setBranchesList] = useState<any[]>([]);
 
@@ -291,22 +309,27 @@ export function StockCountForm({
 
   // Marcar todo como contado igual al esperado (para auditoría por excepción)
   const handleMatchAllAsCounted = () => {
-    if (
-      confirm(
-        "¿Deseas marcar todas las cantidades contadas iguales al stock esperado del sistema? Luego podrás ajustar solo los que tengan diferencias."
-      )
-    ) {
-      setItems((prev) =>
-        prev.map((item) => {
-          const exp = Number(item.expectedQty) || 0;
-          return {
-            ...item,
-            countedQty: exp,
-            difference: 0,
-          };
-        })
-      );
-    }
+    setDialogConfig({
+      isOpen: true,
+      title: "Marcar todo como contado",
+      description: "¿Deseas marcar todas las cantidades contadas iguales al stock esperado del sistema? Luego podrás ajustar solo los que tengan diferencias.",
+      confirmText: "Sí, marcar todo",
+      cancelText: "Cancelar",
+      variant: "primary",
+      onConfirm: () => {
+        setItems((prev) =>
+          prev.map((item) => {
+            const exp = Number(item.expectedQty) || 0;
+            return {
+              ...item,
+              countedQty: exp,
+              difference: 0,
+            };
+          })
+        );
+        setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   // Auto-guardado local debounced inmediato (solo después de haber inicializado)
@@ -354,13 +377,18 @@ export function StockCountForm({
   const handleSafeClose = () => {
     const hasProgress = items.some((i) => (Number(i.countedQty) || 0) > 0);
     if (hasProgress) {
-      if (
-        confirm(
-          "Tu progreso ha quedado guardado en tu teléfono/dispositivo. Puedes salir tranquilo y continuar cuando vuelvas a abrir la auditoría. ¿Deseas salir ahora?"
-        )
-      ) {
-        onCancel();
-      }
+      setDialogConfig({
+        isOpen: true,
+        title: "Salir de la Auditoría",
+        description: "Tu progreso ha quedado guardado automáticamente en este dispositivo. Puedes salir con tranquilidad y retomar cuando vuelvas a abrir la auditoría.",
+        confirmText: "Salir ahora",
+        cancelText: "Continuar auditando",
+        variant: "info",
+        onConfirm: () => {
+          setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+          onCancel();
+        },
+      });
     } else {
       onCancel();
     }
@@ -368,15 +396,20 @@ export function StockCountForm({
 
   // Reiniciar la auditoría de cero descartando el progreso previo
   const handleResetAudit = () => {
-    if (
-      confirm(
-        "¿Deseas descartar los cambios en progreso y empezar una auditoría nueva desde cero con todos los productos en 0?"
-      )
-    ) {
-      clearDraft();
-      setResumedNotice(null);
-      handleLoadWarehouseProducts();
-    }
+    setDialogConfig({
+      isOpen: true,
+      title: "Reiniciar Auditoría",
+      description: "¿Deseas descartar los cambios en progreso y empezar una auditoría nueva desde cero con todos los productos en 0?",
+      confirmText: "Sí, reiniciar de cero",
+      cancelText: "Cancelar",
+      variant: "danger",
+      onConfirm: () => {
+        clearDraft();
+        setResumedNotice(null);
+        handleLoadWarehouseProducts();
+        setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   // Escaneo rápido opcional de código de barra
@@ -480,21 +513,73 @@ export function StockCountForm({
       if (res.success) {
         clearDraft();
         if (status === "COMPLETED" && roleCode === "ADMIN" && res.data?.id) {
-          const shouldApply = confirm(
-            "Auditoría finalizada exitosamente.\n\n¿Deseas aplicar este conteo físico directamente al inventario de Almacén para que las existencias queden iguales?"
-          );
-          if (shouldApply) {
-            try {
-              const applyRes = await applyStockCountToWarehouseAction(res.data.id);
-              if (applyRes.success) {
-                alert(applyRes.message);
-              } else {
-                alert(`Conteo guardado, pero ocurrió un aviso al ajustar el almacén: ${applyRes.error}`);
+          const savedId = res.data.id;
+          setLoading(false);
+          setDialogConfig({
+            isOpen: true,
+            title: "Auditoría Finalizada con Éxito",
+            description: "¿Deseas aplicar este conteo físico directamente al inventario de Almacén para que las existencias queden iguales?",
+            children: (
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-950 space-y-2 mt-2">
+                <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                  <SlidersHorizontal className="w-4 h-4 text-amber-600 shrink-0" />
+                  Sincronización Inmediata con Almacén:
+                </div>
+                <p className="text-slate-700">
+                  Las existencias de almacén se ajustarán para coincidir con el conteo físico y se registrarán los movimientos de Entrada / Salida correspondientes.
+                </p>
+              </div>
+            ),
+            confirmText: "Sí, ajustar almacén ahora",
+            cancelText: "No, finalizar sin ajustar",
+            variant: "primary",
+            onClose: () => {
+              setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+              onSuccess();
+            },
+            onConfirm: async () => {
+              setDialogConfig((prev) => ({ ...prev, isLoading: true }));
+              try {
+                const applyRes = await applyStockCountToWarehouseAction(savedId);
+                setDialogConfig({
+                  isOpen: true,
+                  title: applyRes.success ? "Almacén Actualizado" : "Aviso al Ajustar",
+                  description: applyRes.success
+                    ? (applyRes.message || "El almacén se ha actualizado según el conteo físico.")
+                    : (applyRes.error || "No se pudo actualizar el almacén."),
+                  confirmText: "Entendido",
+                  cancelText: null,
+                  variant: applyRes.success ? "success" : "warning",
+                  onClose: () => {
+                    setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+                    onSuccess();
+                  },
+                  onConfirm: () => {
+                    setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+                    onSuccess();
+                  },
+                });
+              } catch (applyErr: any) {
+                setDialogConfig({
+                  isOpen: true,
+                  title: "Error de Sincronización",
+                  description: applyErr.message || "Error al sincronizar con almacén",
+                  confirmText: "Aceptar",
+                  cancelText: null,
+                  variant: "danger",
+                  onClose: () => {
+                    setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+                    onSuccess();
+                  },
+                  onConfirm: () => {
+                    setDialogConfig((prev) => ({ ...prev, isOpen: false }));
+                    onSuccess();
+                  },
+                });
               }
-            } catch (applyErr: any) {
-              alert(applyErr.message || "Error al sincronizar con almacén");
-            }
-          }
+            },
+          });
+          return;
         }
         onSuccess();
       } else {
@@ -1028,6 +1113,21 @@ export function StockCountForm({
           </div>
         </div>
       </div>
+
+      {/* Modern Confirm & Feedback Dialog */}
+      <ConfirmDialog
+        isOpen={dialogConfig.isOpen}
+        onClose={dialogConfig.onClose || (() => setDialogConfig((prev) => ({ ...prev, isOpen: false })))}
+        onConfirm={dialogConfig.onConfirm}
+        title={dialogConfig.title}
+        description={dialogConfig.description}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        variant={dialogConfig.variant}
+        isLoading={dialogConfig.isLoading}
+      >
+        {dialogConfig.children}
+      </ConfirmDialog>
     </div>
   );
 }

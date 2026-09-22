@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { exportStockCountToExcel } from "@/lib/utils/excel-export-stock-count";
 import { applyStockCountToWarehouseAction } from "../actions/stock-count";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
   FileSpreadsheet,
   X,
@@ -29,6 +30,7 @@ export function StockCountDetailModal({
   onReconciled,
 }: StockCountDetailModalProps) {
   const [applying, setApplying] = useState(false);
+  const [showConfirmApply, setShowConfirmApply] = useState(false);
   const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
   const [reconcileError, setReconcileError] = useState<string | null>(null);
 
@@ -58,14 +60,6 @@ export function StockCountDetailModal({
   const totalDiff = totalCounted - totalExpected;
 
   const handleApplyToWarehouse = async () => {
-    if (
-      !confirm(
-        `ATENCIÓN ADMINISTRADOR:\n\n¿Estás seguro de sincronizar el inventario de Almacén con este conteo físico?\n\n• Las existencias de cada producto en Almacén pasarán a ser exactamente iguales a lo contado físicamente.\n• Se generarán los movimientos de ajuste (Entrada o Salida) en la bitácora de almacén.\n• Esta auditoría quedará cuadrada (diferencias = 0).`
-      )
-    ) {
-      return;
-    }
-
     try {
       setApplying(true);
       setReconcileMessage(null);
@@ -81,6 +75,7 @@ export function StockCountDetailModal({
       setReconcileError(err.message || "Error al procesar el ajuste");
     } finally {
       setApplying(false);
+      setShowConfirmApply(false);
     }
   };
 
@@ -221,9 +216,9 @@ export function StockCountDetailModal({
               </div>
               <button
                 type="button"
-                onClick={handleApplyToWarehouse}
+                onClick={() => setShowConfirmApply(true)}
                 disabled={applying}
-                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 transition-colors shadow-2xs text-xs"
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shrink-0 transition-colors shadow-2xs text-xs cursor-pointer"
               >
                 {applying ? "Ajustando..." : "Ajustar Almacén Ahora"}
               </button>
@@ -360,6 +355,39 @@ export function StockCountDetailModal({
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showConfirmApply}
+        onClose={() => setShowConfirmApply(false)}
+        onConfirm={handleApplyToWarehouse}
+        title="Sincronizar Físico con Almacén"
+        description={`¿Estás seguro de ajustar el inventario de Almacén con este conteo físico (${count.countNumber})?`}
+        confirmText="Sí, ajustar almacén"
+        cancelText="Cancelar"
+        variant="primary"
+        isLoading={applying}
+      >
+        <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-950 space-y-2 mt-2">
+          <div className="font-bold flex items-center gap-1.5 text-amber-900">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            Acción exclusiva de Administrador:
+          </div>
+          <ul className="space-y-1.5 text-slate-700 pl-1">
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 font-bold shrink-0">•</span>
+              <span>Las existencias de cada producto en Almacén pasarán a ser <strong>exactamente iguales a lo contado físicamente</strong>.</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 font-bold shrink-0">•</span>
+              <span>Se generarán los movimientos de ajuste (<strong>Entrada</strong> o <strong>Salida</strong>) en la bitácora de almacén.</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-amber-600 font-bold shrink-0">•</span>
+              <span>Esta auditoría quedará cuadrada (<strong>diferencias = 0</strong>).</span>
+            </li>
+          </ul>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }
