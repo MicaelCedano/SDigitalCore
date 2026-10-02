@@ -7,7 +7,7 @@ import { markWarrantyReadyByImei } from "@/modules/garantias/actions/warranty";
 type ReadyResult = { caseCode: string; clientName: string; model: string };
 
 export function ReadyForCustomerForm() {
-  const [imei, setImei] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [result, setResult] = useState<ReadyResult | null>(null);
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -18,17 +18,17 @@ export function ReadyForCustomerForm() {
     setBusy(true);
     setMessage(null);
     setResult(null);
-    const response = await markWarrantyReadyByImei({ imei });
+    const response = await markWarrantyReadyByImei({ imei: identifier });
     setBusy(false);
     if (!response.success) {
       setMessage({ type: "error", text: response.error });
-      setImei("");
+      setIdentifier("");
       inputRef.current?.focus();
       return;
     }
     setResult(response.data);
     setMessage({ type: "success", text: "Equipo marcado como listo para entregar al cliente." });
-    setImei("");
+    setIdentifier("");
     inputRef.current?.focus();
   }
 
@@ -37,7 +37,7 @@ export function ReadyForCustomerForm() {
       <header>
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Acceso rápido · Garantías</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Listos para entregar al cliente</h1>
-        <p className="mt-2 text-sm text-slate-500">Escribe o escanea únicamente el IMEI de un equipo reparado.</p>
+        <p className="mt-2 text-sm text-slate-500">Escribe o escanea el IMEI o serial de un equipo reparado.</p>
       </header>
 
       <section className="rounded-3xl border border-emerald-200 bg-white p-5 shadow-sm sm:p-8">
@@ -50,24 +50,22 @@ export function ReadyForCustomerForm() {
         </div>
 
         <form onSubmit={submit} className="mt-8 space-y-4">
-          <label className="block text-sm font-bold text-slate-700" htmlFor="ready-imei">IMEI del equipo</label>
+          <label className="block text-sm font-bold text-slate-700" htmlFor="ready-identifier">IMEI o serial del equipo</label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               ref={inputRef}
-              id="ready-imei"
-              value={imei}
-              onChange={(event) => setImei(event.target.value.replace(/\D/g, "").slice(0, 15))}
-              inputMode="numeric"
-              pattern="[0-9]{15}"
+              id="ready-identifier"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value.replace(/[^a-zA-Z0-9._/-]/g, "").slice(0, 80).toUpperCase())}
               autoComplete="off"
               autoFocus
-              placeholder="Escribe o escanea los 15 dígitos"
+              placeholder="Escribe o escanea el IMEI o serial"
               className="h-14 w-full rounded-2xl border border-slate-300 pl-12 pr-4 text-lg font-bold tracking-[0.12em] outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               required
             />
           </div>
-          <button type="submit" disabled={busy || imei.length !== 15} className="flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="submit" disabled={busy || !identifier.trim()} className="flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
             <PackageCheck size={18} /> {busy ? "Verificando…" : "Marcar listo para entregar"}
           </button>
         </form>

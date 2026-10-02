@@ -4,7 +4,7 @@ import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 
 const searchSchema = z.object({
-  q: z.string().trim().regex(/^\d{6,15}$/, "Escribe entre 6 y 15 dígitos."),
+  q: z.string().trim().min(3, "Escribe al menos 3 caracteres.").max(80, "La búsqueda no puede exceder 80 caracteres.").regex(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/, "Usa letras, números, puntos, guiones o barras."),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   pageSize: z.coerce.number().int().min(5).max(20).default(8),
 });
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
   const [warranties, receiptItems, countItems, invoiceItems, qcInspections, deviceUnits, repairItems, unlockRecords] = await Promise.all([
     canSearchWarranties
       ? prisma.warrantyCase.findMany({
-          where: { imei: { contains: query } },
+          where: { imei: { contains: query, mode: "insensitive" } },
           select: { id: true, caseCode: true, imei: true, model: true, clientName: true, status: true, entryDate: true, archivedAt: true },
           orderBy: { createdAt: "desc" },
           skip,

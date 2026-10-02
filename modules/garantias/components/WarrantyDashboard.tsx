@@ -347,7 +347,7 @@ export function WarrantyDashboard({
                   setSearch(event.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Buscar por IMEI, modelo, cliente o código... (Presiona /)"
+                placeholder="Buscar por IMEI o serial, modelo, cliente o código... (Presiona /)"
                 className="h-11 w-full rounded-xl border border-slate-300 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
               />
             </div>
@@ -457,12 +457,12 @@ export function WarrantyDashboard({
                       <td className="px-5 py-4">
                         <p className="font-medium text-slate-700">{item.model}</p>
                         <div className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-                          <span>IMEI {item.imei}</span>
+                          <span>IMEI / Serial {item.imei}</span>
                           <button
                             type="button"
                             onClick={(e) => copyImei(item.imei, e)}
                             className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 p-0.5 rounded transition"
-                            title="Copiar IMEI"
+                            title="Copiar identificador"
                           >
                             {copiedImei === item.imei ? (
                               <Check size={12} className="text-emerald-600" />

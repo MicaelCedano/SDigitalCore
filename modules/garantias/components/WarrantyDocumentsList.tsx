@@ -365,7 +365,7 @@ export function WarrantyDocumentsList({ initialDocuments }: WarrantyDocumentsLis
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por código (REC-, COND-, TECN-), contraparte, IMEI, modelo, caso..."
+              placeholder="Buscar por código (REC-, COND-, TECN-), contraparte, IMEI o serial, modelo, caso..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-9 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-3 focus:ring-indigo-500/10"
             />
             {search && (

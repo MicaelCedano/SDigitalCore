@@ -300,14 +300,14 @@ export function WarrantyCaseDetailDrawer({
 
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               <div className="hidden grid-cols-[1.15fr_1fr_1fr] bg-slate-50 px-5 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 sm:grid">
-                <span>IMEI</span>
+                <span>IMEI o serial</span>
                 <span>Modelo / equipo</span>
                 <span>Cliente</span>
               </div>
               <div className="grid gap-4 px-5 py-4 sm:grid-cols-[1.15fr_1fr_1fr] sm:items-center sm:gap-0">
                 <div>
                   <p className="mb-1 text-[10px] font-bold uppercase text-slate-400 sm:hidden">
-                    IMEI
+                    IMEI o serial
                   </p>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-bold text-slate-900">{item.imei}</span>
@@ -315,8 +315,8 @@ export function WarrantyCaseDetailDrawer({
                       type="button"
                       onClick={() => copyToClipboard(item.imei, "imei")}
                       className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-700"
-                      aria-label="Copiar IMEI"
-                      title="Copiar IMEI"
+                      aria-label="Copiar IMEI o serial"
+                      title="Copiar IMEI o serial"
                     >
                       {copiedField === "imei" ? (
                         <Check size={15} className="text-emerald-600" />

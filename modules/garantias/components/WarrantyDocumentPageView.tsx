@@ -125,7 +125,7 @@ export function WarrantyDocumentPageView({ doc }: { doc: any }) {
                   <th className="px-4 py-3">#</th>
                   <th className="px-4 py-3">Caso</th>
                   <th className="px-4 py-3">Equipo / Modelo</th>
-                  <th className="px-4 py-3">IMEI</th>
+                  <th className="px-4 py-3">IMEI / Serial</th>
                   <th className="px-4 py-3">Problema Reportado</th>
                 </tr>
               </thead>

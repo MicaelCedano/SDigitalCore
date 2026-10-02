@@ -8,7 +8,7 @@ import {
   flowSchema,
   restoreWarrantySchema,
   updateWarrantySchema,
-  imeiSchema,
+  warrantyIdentifierSchema,
 } from "@/lib/validation/warranty";
 import { civilDate, nextWarrantyNumber, santoDomingoDateString } from "@/modules/garantias/lib/document-number";
 import { getWarrantyStatusLabel } from "@/modules/garantias/lib/status-machine";
@@ -57,7 +57,7 @@ const ok = <T>(data: T): Result<T> => ({ success: true, data });
 function fail(error: unknown): Result<never> {
   if (error instanceof WarrantyActionError) return { success: false, error: error.message };
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    return { success: false, error: "Ya existe un caso abierto con uno de esos IMEIs. Actualiza el panel y revisa el registro existente." };
+    return { success: false, error: "Ya existe un caso abierto con uno de esos IMEI o seriales. Actualiza el panel y revisa el registro existente." };
   }
   console.error("[garantias] Error en operación", error);
   return { success: false, error: "No se pudo completar la operación. Inténtalo nuevamente." };
@@ -198,7 +198,7 @@ export async function listWarrantyCases(input?: {
         ? {
             OR: [
               { caseCode: { contains: search, mode: "insensitive" } },
-              { imei: { contains: search } },
+              { imei: { contains: search, mode: "insensitive" } },
               ...(searchDigits && searchDigits.length >= 4 ? [{ imei: { endsWith: searchDigits } } as const] : []),
               { model: { contains: search, mode: "insensitive" } },
               { clientName: { contains: search, mode: "insensitive" } },
@@ -296,7 +296,7 @@ export async function createWarrantyCases(input: unknown): Promise<Result<{ case
         select: { imei: true, caseCode: true },
       });
       if (existing.length > 0) {
-        throw new WarrantyActionError(`Ya hay casos abiertos para: ${existing.map((item) => `${item.imei} (${item.caseCode})`).join(", ")}.`);
+        throw new WarrantyActionError(`Ya hay casos abiertos para estos identificadores: ${existing.map((item) => `${item.imei} (${item.caseCode})`).join(", ")}.`);
       }
 
       const created = [];
@@ -358,7 +358,7 @@ export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<
           where: { id: { not: current.id }, imei: parsed.data.imei, archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } },
           select: { caseCode: true },
         });
-        if (duplicate) throw new WarrantyActionError(`Ese IMEI ya está abierto en ${duplicate.caseCode}.`);
+        if (duplicate) throw new WarrantyActionError(`Ese IMEI o serial ya está abierto en ${duplicate.caseCode}.`);
       }
       const updated = await tx.warrantyCase.update({
         where: { id: current.id },
@@ -546,8 +546,8 @@ export async function markWarrantyReadyForCustomer(input: unknown) { return flow
 export async function markWarrantyReadyByImei(input: unknown) {
   try {
     const rawImei = (input as { imei?: unknown })?.imei;
-    const parsed = imeiSchema.safeParse(rawImei);
-    if (!parsed.success) return { success: false as const, error: "Escribe un IMEI válido de 15 dígitos." };
+    const parsed = warrantyIdentifierSchema.safeParse(rawImei);
+    if (!parsed.success) return { success: false as const, error: "Escribe un IMEI o serial válido." };
 
     const current = await prisma.warrantyCase.findFirst({
       where: { imei: parsed.data, archivedAt: null, status: { in: ["RECEIVED_FROM_TECHNICIAN", "RECEIVED_FROM_SUPPLIER"] } },
@@ -565,7 +565,7 @@ export async function markWarrantyReadyByImei(input: unknown) {
       orderBy: { updatedAt: "desc" },
       select: { status: true },
     });
-    if (!existing) return { success: false as const, error: "No se encontró una garantía activa con ese IMEI." };
+    if (!existing) return { success: false as const, error: "No se encontró una garantía activa con ese IMEI o serial." };
     if (existing.status === "READY_FOR_CUSTOMER") return { success: false as const, error: "Este equipo ya está listo para entregar al cliente." };
     return { success: false as const, error: "Este equipo no está confirmado como reparado. No se puede pasar a listo para entregar." };
   } catch (error) {
@@ -629,7 +629,7 @@ export async function restoreWarrantyCase(caseCode: string, reason?: string): Pr
           where: { id: { not: current.id }, imei: current.imei, archivedAt: null, status: { notIn: ["DELIVERED", "CREDIT_NOTE"] } },
           select: { caseCode: true },
         });
-        if (duplicate) throw new WarrantyActionError(`No se puede restaurar: el IMEI ya está abierto en ${duplicate.caseCode}.`);
+        if (duplicate) throw new WarrantyActionError(`No se puede restaurar: el IMEI o serial ya está abierto en ${duplicate.caseCode}.`);
       }
       await tx.warrantyCase.update({ where: { id: current.id }, data: { archivedAt: null, archivedById: null, updatedById: actor.id } });
       await createEvent(tx, current.id, actor, "RESTORED", { reason: parsed.data.reason || "Restaurado al panel operativo." });

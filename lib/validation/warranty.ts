@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 export const imeiSchema = z.string().trim().regex(/^\d{15}$/, "El IMEI debe tener exactamente 15 dígitos.");
+export const warrantyIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1, "El IMEI o serial es obligatorio.")
+  .max(80, "El identificador no puede exceder 80 caracteres.")
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/, "Usa solo letras, números, puntos, guiones o barras.")
+  .transform((value) => value.toUpperCase());
 const text = (label: string, max = 180) => z.string().trim().min(1, `${label} es obligatorio.`).max(max, `${label} es demasiado largo.`);
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 
@@ -19,7 +26,7 @@ function todayInSantoDomingo() {
 }
 
 export const warrantyDeviceSchema = z.object({
-  imei: imeiSchema,
+  imei: warrantyIdentifierSchema,
   model: text("El modelo", 120),
   color: optionalText(80),
   problem: text("El problema", 1000),
@@ -35,7 +42,7 @@ export const createWarrantySchema = z.object({
 }).superRefine((input, ctx) => {
   const seen = new Set<string>();
   input.devices.forEach((device, index) => {
-    if (seen.has(device.imei)) ctx.addIssue({ code: "custom", path: ["devices", index, "imei"], message: "El IMEI está repetido en este lote." });
+    if (seen.has(device.imei)) ctx.addIssue({ code: "custom", path: ["devices", index, "imei"], message: "El IMEI o serial está repetido en este lote." });
     seen.add(device.imei);
   });
 });
@@ -44,7 +51,7 @@ export const caseCodesSchema = z.object({ caseCodes: z.array(text("Código", 40)
   if (new Set(input.caseCodes).size !== input.caseCodes.length) ctx.addIssue({ code: "custom", path: ["caseCodes"], message: "Hay casos repetidos." });
 });
 
-export const updateWarrantySchema = z.object({ caseCode: text("El código", 40), clientName: text("El cliente", 160), model: text("El modelo", 120), imei: imeiSchema, problem: text("El problema", 1000) });
+export const updateWarrantySchema = z.object({ caseCode: text("El código", 40), clientName: text("El cliente", 160), model: text("El modelo", 120), imei: warrantyIdentifierSchema, problem: text("El problema", 1000) });
 export const flowSchema = caseCodesSchema.extend({
   counterpartyName: optionalText(160),
   reason: optionalText(1000),

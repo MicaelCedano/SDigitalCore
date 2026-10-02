@@ -341,7 +341,7 @@ export function WarrantyFlow({
 
   function addScannedCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const cleanImei = scanInput.trim();
+    const cleanImei = scanInput.trim().toUpperCase();
     if (operation !== "deliver" && operation !== "credit" && operation !== "markReady" && !counterparty.trim()) {
       setScanMessage(`Indica primero el ${label.toLowerCase()}.`);
       return;
@@ -483,7 +483,7 @@ export function WarrantyFlow({
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
-              <Scan size={15} /> Escáner de Pistola / IMEI
+              <Scan size={15} /> Escáner de Pistola / IMEI o serial
             </button>
             <button
               type="button"
@@ -505,7 +505,7 @@ export function WarrantyFlow({
             <form onSubmit={addScannedCase} className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <label className="min-w-0 flex-1 text-sm font-semibold text-slate-700">
                 <span className="flex items-center gap-2">
-                  <Scan size={16} className="text-[#5750f1]" /> Escanear o escribir IMEI / Código
+                  <Scan size={16} className="text-[#5750f1]" /> Escanear o escribir IMEI, serial o código
                 </span>
                 <input
                   ref={scanInputRef}
@@ -546,7 +546,7 @@ export function WarrantyFlow({
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por IMEI, caso o cliente..."
+              placeholder="Buscar por IMEI o serial, caso o cliente..."
                   className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10"
                 />
               </div>
@@ -620,7 +620,7 @@ export function WarrantyFlow({
                       {item.clientName} · {item.model}
                     </span>
                     <span className="mt-0.5 block font-mono text-xs text-slate-500">
-                      IMEI {item.imei}
+                      IMEI / Serial {item.imei}
                     </span>
                     {operation === "deliver" && (
                       <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
@@ -687,7 +687,7 @@ export function WarrantyFlow({
 
           {selectedCases.length === 0 ? (
             <p className="mt-4 rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
-              Escanea un IMEI o selecciona equipos de la lista para agregarlos al lote.
+              Escanea un IMEI o serial, o selecciona equipos de la lista para agregarlos al lote.
             </p>
           ) : (
             <div className="mt-3 max-h-[260px] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">
@@ -705,7 +705,7 @@ export function WarrantyFlow({
                         </span>
                       </div>
                       <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">
-                        IMEI {item.imei} · {item.clientName}
+                        IMEI / Serial {item.imei} · {item.clientName}
                       </p>
                     </div>
                   </div>

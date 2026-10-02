@@ -54,7 +54,7 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
   const [pasteText, setPasteText] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  // Referencias a los inputs de IMEI para foco automático
+  // Referencias a los inputs de identificador para foco automático
   const imeiRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
@@ -65,10 +65,10 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
   }, []);
 
   async function handleImeiChange(index: number, val: string) {
-    const cleanImei = val.replace(/\D/g, "").slice(0, 15);
+    const cleanImei = val.replace(/[^a-zA-Z0-9._/-]/g, "").slice(0, 80).toUpperCase();
     updateDevice(index, "imei", cleanImei);
 
-    if (cleanImei.length === 15) {
+    if (/^\d{15}$/.test(cleanImei)) {
       setLookupLoading((prev) => ({ ...prev, [index]: true }));
       try {
         const res = await lookupImeiContext(cleanImei);
@@ -134,12 +134,12 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
     }
   }
 
-  // Manejo de tecla Enter en el IMEI para flujo continuo de escaneo
+  // Manejo de tecla Enter en el identificador para flujo continuo de escaneo
   function handleImeiKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
       const currentDev = devices[index];
-      if (currentDev && currentDev.imei.length === 15) {
+      if (currentDev?.imei.trim()) {
         if (index === devices.length - 1 && devices.length < 100) {
           // Agregar nueva fila y enfocarla
           setDevices((current) => [...current, emptyDevice()]);
@@ -349,7 +349,7 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
                 </span>
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
-                Escribe o escanea el IMEI. Presiona Enter para saltar a la siguiente fila.
+                Escribe o escanea el IMEI o serial. Presiona Enter para saltar a la siguiente fila.
               </p>
             </div>
 
@@ -416,17 +416,16 @@ export function WarrantyIntakeForm({ embedded = false }: { embedded?: boolean })
 
                 <div className="grid gap-3 md:grid-cols-[1.1fr_1.2fr_2fr]">
                   <label className="text-xs font-semibold text-slate-500">
-                    IMEI
+                    IMEI o serial
                     <div className="relative">
                       <input
                         ref={(el) => {
                           imeiRefs.current[index] = el;
                         }}
                         required
-                        minLength={15}
-                        maxLength={15}
-                        inputMode="numeric"
-                        placeholder="15 dígitos"
+                        maxLength={80}
+                        autoComplete="off"
+                        placeholder="IMEI de 15 dígitos o serial"
                         value={device.imei}
                         onChange={(event) => handleImeiChange(index, event.target.value)}
                         onKeyDown={(event) => handleImeiKeyDown(index, event)}
