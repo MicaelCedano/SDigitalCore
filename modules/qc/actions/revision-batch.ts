@@ -1681,7 +1681,7 @@ export async function getQcPaymentsAction(): Promise<
       return { success: false, error: "Solo el administrador puede gestionar los pagos de QC." };
     }
 
-    const [pending, history, audits, paymentEntries] = await Promise.all([
+    const [pending, history, audits, paymentEntries, assignmentAudits, paidRepairs, completedWithoutDevices] = await Promise.all([
       // Lotes enviados esperando aceptación
       prisma.qcRevisionBatch.findMany({
         // COMPLETED es historial; solo SUBMITTED representa una solicitud
@@ -1742,6 +1742,21 @@ export async function getQcPaymentsAction(): Promise<
           wallet: { select: { user: { select: { name: true, username: true, email: true } } } },
         },
       }),
+      prisma.auditLog.findMany({
+        where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
+        orderBy: { createdAt: "desc" },
+        take: 300,
+        select: { id: true, entityId: true, action: true, createdAt: true, afterData: true },
+      }),
+      prisma.auditLog.findMany({
+        where: { action: "qc_batch.duplicate_repaired_and_paid" },
+        select: { entityId: true, createdAt: true, afterData: true },
+      }),
+      prisma.qcRevisionBatch.findMany({
+        where: { status: "COMPLETED", totalDevices: { gt: 0 }, devices: { none: {} } },
+        select: { id: true, batchNumber: true, supplierName: true, totalDevices: true, reviewedDevices: true, functionalCount: true, nonFunctionalCount: true },
+        take: 50,
+      }),
     ]);
 
     const submitterByBatch = new Map<string, { name: string | null; submittedAt: Date }>();
@@ -1759,18 +1774,8 @@ export async function getQcPaymentsAction(): Promise<
     // ningún pago asociado. Los pagos históricos por porción no se borran ni
     // se vuelven a presentar como pendientes.
     let mapPending: Array<any> = [];
-    const assignmentAudits = await prisma.auditLog.findMany({
-      where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
-      orderBy: { createdAt: "desc" },
-      take: 300,
-      select: { id: true, entityId: true, action: true, createdAt: true, afterData: true },
-    });
     const assignmentSubmissions: Array<{ portionId: string; batchId: string; reviewerId: string; reviewerName: string; assignedDevices: number; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number; submittedAt: Date }> = [];
     const submissionAudits = assignmentAudits.filter((audit) => audit.action === "qc_batch.assignment_submit");
-    const paidRepairs = await prisma.auditLog.findMany({
-      where: { action: "qc_batch.duplicate_repaired_and_paid" },
-      select: { entityId: true, createdAt: true, afterData: true },
-    });
     for (const [index, audit] of submissionAudits.entries()) {
       if (isReconciledSubmission(audit, paidRepairs)) continue;
       const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
@@ -1822,10 +1827,42 @@ export async function getQcPaymentsAction(): Promise<
         return false;
       });
     const assignmentBatchIds = [...new Set(visibleAssignments.map((item) => item.batchId))];
-    const assignmentBatches = await prisma.qcRevisionBatch.findMany({
-      where: { id: { in: assignmentBatchIds } },
-      select: { id: true, batchNumber: true, supplierName: true },
-    });
+    const paymentBatchIds = paymentEntries
+      .map((entry) => entry.externalKey.split(":")[1])
+      .filter((id): id is string => Boolean(id));
+    const [assignmentBatches, duplicateCandidates, paymentBatches, paidDevices] = await Promise.all([
+      prisma.qcRevisionBatch.findMany({
+        where: { id: { in: assignmentBatchIds } },
+        select: { id: true, batchNumber: true, supplierName: true },
+      }),
+      completedWithoutDevices.length > 0
+        ? prisma.qcRevisionBatch.findMany({
+            where: {
+              OR: completedWithoutDevices.map((original) => ({
+                batchNumber: { startsWith: `${original.batchNumber}-R-` },
+                notes: { contains: `Lote de origen: ${original.batchNumber}` },
+              })),
+            },
+            select: { batchNumber: true, totalDevices: true, notes: true },
+            orderBy: { updatedAt: "desc" },
+          })
+        : Promise.resolve([]),
+      prisma.qcRevisionBatch.findMany({
+        where: { id: { in: paymentBatchIds } },
+        select: { id: true, batchNumber: true, createdAt: true },
+      }),
+      prisma.deviceUnit.findMany({
+        where: { batchId: { in: paymentBatchIds } },
+        select: {
+          batchId: true,
+          inspections: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { createdAt: true, reviewerId: true, status: true, result: true },
+          },
+        },
+      }),
+    ]);
     const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
     const paidAssignmentKeys = new Set(
       paymentEntries.map((entry) => entry.externalKey).filter((key) => key.startsWith("qc-payment:")),
@@ -1877,42 +1914,18 @@ export async function getQcPaymentsAction(): Promise<
       estimatedAmount: b.reviewedDevices * RATE,
     }));
     const repairCandidates = [];
-    const completedWithoutDevices = await prisma.qcRevisionBatch.findMany({
-      where: { status: "COMPLETED", totalDevices: { gt: 0 }, devices: { none: {} } },
-      select: { id: true, batchNumber: true, supplierName: true, totalDevices: true, reviewedDevices: true, functionalCount: true, nonFunctionalCount: true },
-      take: 50,
-    });
     for (const original of completedWithoutDevices) {
       if (isLegacyWorkLot(original.batchNumber)) continue;
-      const duplicate = await prisma.qcRevisionBatch.findFirst({
-        where: { batchNumber: { startsWith: `${original.batchNumber}-R-` }, notes: { contains: `Lote de origen: ${original.batchNumber}` } },
-        select: { id: true, batchNumber: true, totalDevices: true },
-        orderBy: { updatedAt: "desc" },
-      });
+      const duplicate = duplicateCandidates.find((candidate) =>
+        candidate.batchNumber.startsWith(`${original.batchNumber}-R-`) &&
+        candidate.notes?.includes(`Lote de origen: ${original.batchNumber}`),
+      );
       if (duplicate && duplicate.totalDevices === original.totalDevices) {
         repairCandidates.push({ id: original.id, batchNumber: original.batchNumber, supplierName: original.supplierName, totalDevices: original.totalDevices, reviewedDevices: original.reviewedDevices, functionalCount: original.functionalCount, nonFunctionalCount: original.nonFunctionalCount, duplicateBatchNumber: duplicate.batchNumber, estimatedAmount: original.reviewedDevices * RATE });
       }
     }
-    const paymentBatchIds = paymentEntries
-      .map((entry) => entry.externalKey.split(":")[1])
-      .filter((id): id is string => Boolean(id));
-    const paymentBatches = await prisma.qcRevisionBatch.findMany({
-      where: { id: { in: paymentBatchIds } },
-      select: { id: true, batchNumber: true, createdAt: true },
-    });
     const batchNumberById = new Map(paymentBatches.map((batch) => [batch.id, batch.batchNumber]));
     const batchCreatedAtById = new Map(paymentBatches.map((batch) => [batch.id, batch.createdAt]));
-    const paidDevices = await prisma.deviceUnit.findMany({
-      where: { batchId: { in: paymentBatchIds } },
-      select: {
-        batchId: true,
-        inspections: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { createdAt: true, reviewerId: true, status: true, result: true },
-        },
-      },
-    });
     const paymentCounts = new Map<string, { reviewedDevices: number; functionalCount: number; nonFunctionalCount: number }>();
     const portionCounts = new Map<string, { reviewedDevices: number; functionalCount: number; nonFunctionalCount: number }>();
     for (const audit of submissionAudits) {

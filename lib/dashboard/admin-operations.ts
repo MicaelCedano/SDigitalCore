@@ -11,6 +11,35 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
 
   if (admin?.roleCode !== "ADMIN" || admin.status !== "ACTIVE") return null;
 
+  const weekStart = startOfCurrentWeekInSantoDomingo();
+  const now = new Date();
+  const workCenterQueries = Promise.all([
+    prisma.workTask.findMany({
+      where: { status: { in: ["PENDING", "IN_PROGRESS", "IN_REVIEW"] } },
+      include: {
+        assignee: { select: { id: true, name: true, email: true, image: true } },
+        assignees: {
+          include: { user: { select: { id: true, name: true, email: true, image: true } } },
+          orderBy: { assignedAt: "asc" },
+        },
+      },
+      orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+      take: 40,
+    }),
+    prisma.workTask.count({
+      where: { status: "COMPLETED", completedAt: { gte: weekStart } },
+    }),
+    prisma.user.findMany({
+      where: { status: "ACTIVE", allowedModules: { has: "centro-trabajo" } },
+      select: { id: true, name: true, email: true, image: true },
+      orderBy: { name: "asc" },
+      take: 30,
+    }),
+  ]).catch((error) => {
+    console.error("[dashboard] Error loading workCenter data in overview:", error);
+    return null;
+  });
+
   const [
     pendingWarehouseRequestCount,
     pendingWarehouseRequests,
@@ -274,10 +303,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   const qcSubmittedPendingTotal = qcSubmittedBatches.reduce((sum, b) => sum + b.reviewedDevices * 50, 0);
   const redemptionsPendingTotal = walletRedemptionsPending.reduce((sum, e) => sum + Number(e.amount), 0);
 
-  // Consulta de Centro de Trabajo
-  const weekStart = startOfCurrentWeekInSantoDomingo();
-  const now = new Date();
-
+  // Consulta de Centro de Trabajo, iniciada en paralelo con los demás datos.
   let workCenter = {
     totalActive: 0,
     inProgressCount: 0,
@@ -334,74 +360,49 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   };
 
   try {
-    const [activeTasks, completedWeekCount, activeUsers] = await Promise.all([
-      prisma.workTask.findMany({
-        where: {
-          status: { in: ["PENDING", "IN_PROGRESS", "IN_REVIEW"] },
-        },
-        include: {
-          assignee: { select: { id: true, name: true, email: true, image: true } },
-          assignees: {
-            include: { user: { select: { id: true, name: true, email: true, image: true } } },
-            orderBy: { assignedAt: "asc" },
-          },
-        },
-        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
-        take: 40,
-      }),
-      prisma.workTask.count({
-        where: {
-          status: "COMPLETED",
-          completedAt: { gte: weekStart },
-        },
-      }),
-      prisma.user.findMany({
-        where: { status: "ACTIVE", allowedModules: { has: "centro-trabajo" } },
-        select: { id: true, name: true, email: true, image: true },
-        orderBy: { name: "asc" },
-        take: 30,
-      }),
-    ]);
+    const workCenterData = await workCenterQueries;
+    if (workCenterData) {
+      const [activeTasks, completedWeekCount, activeUsers] = workCenterData;
+      const inProgressTasks = activeTasks.filter((t) => t.status === "IN_PROGRESS");
+      const pendingTasks = activeTasks.filter((t) => t.status === "PENDING" || t.status === "IN_REVIEW");
+      const overdueCount = activeTasks.filter((t) => t.dueAt && t.dueAt < now).length;
+      const urgentCount = activeTasks.filter((t) => t.priority === "URGENT" || t.priority === "HIGH").length;
 
-    const inProgressTasks = activeTasks.filter((t) => t.status === "IN_PROGRESS");
-    const pendingTasks = activeTasks.filter((t) => t.status === "PENDING" || t.status === "IN_REVIEW");
-    const overdueCount = activeTasks.filter((t) => t.dueAt && t.dueAt < now).length;
-    const urgentCount = activeTasks.filter((t) => t.priority === "URGENT" || t.priority === "HIGH").length;
+      const teamMembers = activeUsers.map((user) => {
+        const userInProgressTask = inProgressTasks.find(
+          (t) =>
+            t.assignees.some((a) => a.user.id === user.id) ||
+            t.assignee?.id === user.id,
+        );
+        const userActiveTasks = activeTasks.filter(
+          (t) =>
+            t.assignees.some((a) => a.user.id === user.id) ||
+            t.assignee?.id === user.id,
+        );
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          currentTaskTitle: userInProgressTask ? userInProgressTask.title : null,
+          currentTaskModule: userInProgressTask ? userInProgressTask.sourceModule : null,
+          currentTaskCode: userInProgressTask ? userInProgressTask.sourceCode : null,
+          activeCount: userActiveTasks.length,
+        };
+      });
 
-    const teamMembers = activeUsers.map((user) => {
-      const userInProgressTask = inProgressTasks.find(
-        (t) =>
-          t.assignees.some((a) => a.user.id === user.id) ||
-          t.assignee?.id === user.id,
-      );
-      const userActiveTasks = activeTasks.filter(
-        (t) =>
-          t.assignees.some((a) => a.user.id === user.id) ||
-          t.assignee?.id === user.id,
-      );
-      return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        image: user.image,
-        currentTaskTitle: userInProgressTask ? userInProgressTask.title : null,
-        currentTaskModule: userInProgressTask ? userInProgressTask.sourceModule : null,
-        currentTaskCode: userInProgressTask ? userInProgressTask.sourceCode : null,
-        activeCount: userActiveTasks.length,
+      workCenter = {
+        totalActive: activeTasks.length,
+        inProgressCount: inProgressTasks.length,
+        pendingCount: pendingTasks.length,
+        overdueCount,
+        urgentCount,
+        completedWeekCount,
+        inProgressTasks: inProgressTasks.slice(0, 6),
+        pendingTasks: pendingTasks.slice(0, 6),
+        teamMembers,
       };
-    });
-
-    workCenter = {
-      totalActive: activeTasks.length,
-      inProgressCount: inProgressTasks.length,
-      pendingCount: pendingTasks.length,
-      overdueCount,
-      urgentCount,
-      completedWeekCount,
-      inProgressTasks: inProgressTasks.slice(0, 6),
-      pendingTasks: pendingTasks.slice(0, 6),
-      teamMembers,
-    };
+    }
   } catch (error) {
     console.error("[dashboard] Error loading workCenter data in overview:", error);
   }
