@@ -22,7 +22,6 @@ import {
   Lock,
   X,
   Sparkles,
-  Truck,
 } from "lucide-react";
 
 interface SubNavItem {
@@ -45,9 +44,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", moduleKey: "dashboard", icon: LayoutDashboard, section: "Inicio" },
   { label: "Centro de trabajo", href: "/centro-trabajo", moduleKey: "centro-trabajo", icon: BriefcaseBusiness, section: "Inicio" },
-  { label: "Envíos", href: "/envios", moduleKey: "envios", icon: Truck, section: "Operaciones", children: [
-    { label: "Seguimiento", href: "/envios" },
-  ] },
   { label: "Almacén", href: "/almacen", moduleKey: "almacen", icon: Warehouse, section: "Operaciones", children: [
     { label: "Productos", href: "/almacen" },
     { label: "Recibo de mercancía", href: "/almacen/recibos" },
@@ -91,7 +87,6 @@ const navItems: NavItem[] = [
     { label: "Usuarios y permisos", href: "/configuracion" },
     { label: "Prueba de notificaciones", href: "/configuracion/notificaciones", adminOnly: true },
     { label: "Sucursales", href: "/configuracion/sucursales" },
-    { label: "Direcciones de envío", href: "/configuracion/direcciones-envio" },
     { label: "Clientes y proveedores", href: "/configuracion/clientes-proveedores" },
     { label: "Proveedores de control de calidad", href: "/configuracion/proveedores-qc" },
     { label: "Imágenes de QC", href: "/configuracion/imagenes-qc" },

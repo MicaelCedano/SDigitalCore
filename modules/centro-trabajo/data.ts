@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
-import { syncShipmentWorkTasks } from "@/modules/centro-trabajo/integrations/envios";
 import { Prisma, WorkTaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -66,10 +65,7 @@ export async function getWorkCenterData() {
 
   after(async () => {
     try {
-      await Promise.all([
-        syncQcWorkTasks(user.id),
-        syncShipmentWorkTasks(user.id),
-      ]);
+      await syncQcWorkTasks(user.id);
       revalidatePath("/centro-trabajo");
     } catch (error) {
       console.error("[centro-trabajo] No se pudo actualizar la proyección automática:", error);
@@ -141,8 +137,14 @@ export async function getWorkCenterData() {
     ).length;
 
     return {
-      tasks,
-      historyTasks,
+      tasks: tasks.map((task) => ({
+        ...task,
+        sourceUrl: task.sourceModule === "envios" ? null : task.sourceUrl,
+      })),
+      historyTasks: historyTasks.map((task) => ({
+        ...task,
+        sourceUrl: task.sourceModule === "envios" ? null : task.sourceUrl,
+      })),
       activeUsers,
       metrics: {
         action: tasks.filter((task) => ["PENDING", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)).length,
