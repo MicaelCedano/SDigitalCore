@@ -54,6 +54,7 @@ const navItems: NavItem[] = [
   { label: "Control de Calidad", href: "/qc", adminHref: "/qc/lotes", moduleKey: "qc", icon: ScanSearch, section: "Operaciones", children: [
     { label: "Panel QC", href: "/qc", nonAdminOnly: true },
     { label: "Compra de lotes", href: "/qc/lotes", adminOnly: true },
+    { label: "Asignaciones QC", href: "/qc/asignaciones", adminOnly: true },
     { label: "Pagos QC", href: "/qc/pagos", adminOnly: true },
     { label: "Penalidades", href: "/qc/penalidades", adminOnly: true },
     { label: "Solicitudes de IMEIs", href: "/qc/solicitudes", adminOnly: true },
