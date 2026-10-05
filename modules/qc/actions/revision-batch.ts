@@ -34,6 +34,39 @@ function isLegacyWorkLot(batchNumber: string) {
   return /-R-[^-]+-/i.test(batchNumber);
 }
 
+function pendingSubmittedDeviceIds(
+  audits: Array<{ id: string; action: string; afterData: unknown }>,
+  batchId: string,
+  reviewerId: string,
+) {
+  const seenPortions = new Set<string>();
+  const deviceIds = new Set<string>();
+  let includesAllDevices = false;
+
+  for (const audit of audits) {
+    const data = audit.afterData && typeof audit.afterData === "object"
+      ? audit.afterData as Record<string, unknown>
+      : {};
+    if (data.reviewerId !== reviewerId) continue;
+    const portionId = typeof data.portionId === "string" ? data.portionId : `LEGACY-${audit.id}`;
+    const key = `${batchId}:${reviewerId}:${portionId}`;
+    if (seenPortions.has(key)) continue;
+    seenPortions.add(key);
+    if (audit.action !== "qc_batch.assignment_submit") continue;
+
+    const ids = Array.isArray(data.deviceIds) ? data.deviceIds.filter((id): id is string => typeof id === "string") : [];
+    if (ids.length === 0) {
+      // Un envío legado no identifica su conjunto exacto: bloquear la liberación
+      // de la asignación de ese revisor hasta que se procese el envío.
+      includesAllDevices = true;
+    } else {
+      for (const id of ids) deviceIds.add(id);
+    }
+  }
+
+  return { deviceIds, includesAllDevices };
+}
+
 /**
  * Función auxiliar para procesar texto libre de IMEIs / Números de Serie
  */
@@ -306,6 +339,209 @@ export async function getRevisionBatchesAction(query?: string, status?: string) 
   } catch (error: any) {
     console.error("Error al consultar Lotes de Revisión:", error);
     return { success: false, error: "Error al obtener los Lotes de Revisión", data: [] };
+  }
+}
+
+/** Listado administrativo de porciones activas agrupadas por QC y lote. */
+export async function getActiveQcAssignmentsAction() {
+  try {
+    await requirePermission("qc.read");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false as const, error: "Solo el administrador puede ver las asignaciones activas.", data: [] };
+    }
+
+    const devices = await prisma.deviceUnit.findMany({
+      where: {
+        assignedToId: { not: null },
+        batch: { status: { notIn: ["CANCELLED", "COMPLETED"] } },
+      },
+      select: {
+        id: true,
+        assignedToId: true,
+        updatedAt: true,
+        batch: {
+          select: {
+            id: true,
+            batchNumber: true,
+            supplierName: true,
+            status: true,
+            totalDevices: true,
+            reviewedDevices: true,
+            createdAt: true,
+          },
+        },
+        assignedTo: { select: { id: true, name: true, username: true } },
+        inspections: {
+          where: { status: "COMPLETED" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { status: true, createdAt: true },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const batchIds = [...new Set(devices.map((device) => device.batch?.id).filter((id): id is string => Boolean(id)))];
+    const assignmentAudits = batchIds.length > 0
+      ? await prisma.auditLog.findMany({
+          where: {
+            entityId: { in: batchIds },
+            action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, entityId: true, action: true, afterData: true },
+        })
+      : [];
+
+    const grouped = new Map<string, {
+      batchId: string;
+      batchNumber: string;
+      supplierName: string;
+      batchStatus: QcBatchStatus;
+      batchTotalDevices: number;
+      batchReviewedDevices: number;
+      batchCreatedAt: Date;
+      qcId: string;
+      qcName: string;
+      deviceCount: number;
+      reviewedDevices: number;
+      latestUpdatedAt: Date;
+    }>();
+    const submittedByAssignment = new Map<string, ReturnType<typeof pendingSubmittedDeviceIds>>();
+
+    for (const device of devices) {
+      if (!device.batch || !device.assignedTo || !device.assignedToId) continue;
+      const key = `${device.batch.id}:${device.assignedToId}`;
+      let submitted = submittedByAssignment.get(key);
+      if (!submitted) {
+        submitted = pendingSubmittedDeviceIds(assignmentAudits, device.batch.id, device.assignedToId);
+        submittedByAssignment.set(key, submitted);
+      }
+      if (submitted.includesAllDevices || submitted.deviceIds.has(device.id)) continue;
+      let assignment = grouped.get(key);
+      if (!assignment) {
+        assignment = {
+          batchId: device.batch.id,
+          batchNumber: device.batch.batchNumber,
+          supplierName: device.batch.supplierName,
+          batchStatus: device.batch.status,
+          batchTotalDevices: device.batch.totalDevices,
+          batchReviewedDevices: device.batch.reviewedDevices,
+          batchCreatedAt: device.batch.createdAt,
+          qcId: device.assignedTo.id,
+          qcName: device.assignedTo.name || device.assignedTo.username || "QC sin nombre",
+          deviceCount: 0,
+          reviewedDevices: 0,
+          latestUpdatedAt: device.updatedAt,
+        };
+        grouped.set(key, assignment);
+      }
+      assignment.deviceCount++;
+      if (device.inspections[0]?.createdAt && device.inspections[0].createdAt >= assignment.batchCreatedAt) {
+        assignment.reviewedDevices++;
+      }
+      if (device.updatedAt > assignment.latestUpdatedAt) assignment.latestUpdatedAt = device.updatedAt;
+    }
+
+    const data = [...grouped.values()]
+      .map(({ batchCreatedAt: _batchCreatedAt, ...assignment }) => assignment)
+      .sort((a, b) => b.latestUpdatedAt.getTime() - a.latestUpdatedAt.getTime());
+    return { success: true as const, data };
+  } catch (error: any) {
+    console.error("Error al consultar asignaciones activas de QC:", error);
+    return { success: false as const, error: "No se pudieron cargar las asignaciones activas.", data: [] };
+  }
+}
+
+/** Libera todos los equipos de un QC en un lote, sin borrar inspecciones. */
+export async function cancelQcAssignmentAction(input: { batchId: string; qcId: string }) {
+  try {
+    const actor = await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false as const, error: "Solo el administrador puede quitar una asignación." };
+    }
+    const parsed = z.object({ batchId: z.string().min(1), qcId: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false as const, error: "La asignación indicada no es válida." };
+
+    const result = await prisma.$transaction(async (tx) => {
+      const batch = await tx.qcRevisionBatch.findUnique({
+        where: { id: parsed.data.batchId },
+        select: { id: true, batchNumber: true, status: true, createdAt: true },
+      });
+      if (!batch) throw new Error("No se encontró el lote.");
+      if (batch.status === "CANCELLED" || batch.status === "COMPLETED") {
+        throw new Error("No se pueden modificar las asignaciones de un lote cerrado.");
+      }
+
+      const qc = await tx.user.findUnique({ where: { id: parsed.data.qcId }, select: { id: true, name: true, username: true } });
+      if (!qc) throw new Error("No se encontró el QC asignado.");
+      const assignmentAudits = await tx.auditLog.findMany({
+        where: {
+          entityId: batch.id,
+          action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, action: true, afterData: true },
+      });
+      const submitted = pendingSubmittedDeviceIds(assignmentAudits, batch.id, qc.id);
+      if (submitted.includesAllDevices) throw new Error("Hay una porción enviada pendiente de aprobación para este QC. Procesa ese envío antes de quitar la asignación.");
+      const assigned = await tx.deviceUnit.findMany({
+        where: { batchId: batch.id, assignedToId: qc.id },
+        select: {
+          id: true,
+          inspections: {
+            where: { status: "COMPLETED", createdAt: { gte: batch.createdAt } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true },
+          },
+        },
+      });
+      const activeAssigned = assigned.filter((device) => !submitted.deviceIds.has(device.id));
+      if (activeAssigned.length === 0) throw new Error("Esta asignación ya no está activa o tiene una porción pendiente de aprobación.");
+
+      const reviewedIds = activeAssigned.filter((device) => device.inspections.length > 0).map((device) => device.id);
+      const pendingIds = activeAssigned.filter((device) => device.inspections.length === 0).map((device) => device.id);
+      const released = await tx.deviceUnit.updateMany({
+        where: { id: { in: activeAssigned.map((device) => device.id) }, batchId: batch.id, assignedToId: qc.id },
+        data: { assignedToId: null },
+      });
+      if (released.count !== activeAssigned.length) throw new Error("La asignación cambió durante la operación. Recarga e inténtalo de nuevo.");
+      if (pendingIds.length > 0) {
+        await tx.deviceUnit.updateMany({ where: { id: { in: pendingIds }, batchId: batch.id }, data: { status: "PENDING_QC" } });
+      }
+
+      const qcName = qc.name || qc.username || "QC sin nombre";
+      await tx.auditLog.create({
+        data: {
+          userId: persisted.id,
+          action: "qc_batch.assignment_cancel",
+          module: "qc",
+          entityType: "qc_revision_batch",
+          entityId: batch.id,
+          beforeData: { batchNumber: batch.batchNumber, reviewerId: qc.id, assignedDevices: activeAssigned.length, reviewedDevices: reviewedIds.length },
+          afterData: { batchNumber: batch.batchNumber, reviewerId: qc.id, reviewerName: qcName, releasedDevices: released.count, reviewedDevicesPreserved: reviewedIds.length, pendingDevicesReleased: pendingIds.length, deviceIds: activeAssigned.map((device) => device.id) },
+        },
+      });
+      return { batchNumber: batch.batchNumber, qcName, releasedDevices: released.count, reviewedDevicesPreserved: reviewedIds.length, pendingDevicesReleased: pendingIds.length };
+    });
+
+    try {
+      await syncQcWorkTasks(actor.id);
+    } catch (syncError) {
+      console.error("[qc] No se pudieron sincronizar tareas tras liberar una asignación:", syncError);
+    }
+    revalidatePath("/qc/asignaciones");
+    revalidatePath("/qc/lotes");
+    revalidatePath(`/qc/lotes/${parsed.data.batchId}`);
+    revalidatePath("/qc");
+    revalidatePath("/centro-trabajo");
+    return { success: true as const, data: result, message: `Asignación de ${result.qcName} liberada: ${result.releasedDevices} equipo(s).` };
+  } catch (error: any) {
+    console.error("Error al liberar asignación QC:", error);
+    return { success: false as const, error: error.message || "No se pudo liberar la asignación." };
   }
 }
 

@@ -20,6 +20,7 @@ import {
   ScanSearch,
   ArrowRight,
   Sparkles,
+  ClipboardList,
 } from "lucide-react";
 
 export function RevisionBatchesList() {
@@ -69,12 +70,20 @@ export function RevisionBatchesList() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> Nuevo Lote de Revisión
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/qc/asignaciones"
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <ClipboardList className="w-4 h-4" /> Asignaciones QC
+          </Link>
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-5 py-2.5 bg-[#5750f1] hover:bg-[#463ec5] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#5750f1]/20 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Lote de Revisión
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas de Métricas */}
