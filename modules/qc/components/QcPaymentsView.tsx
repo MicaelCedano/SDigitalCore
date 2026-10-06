@@ -20,6 +20,7 @@ import {
   getQcPaymentsAction,
   approveRevisionBatchAction,
   repairAndPayDuplicatedQcBatchAction,
+  reconcileApprovedQcPortionPaymentAction,
 } from "../actions/revision-batch";
 import { ConfirmBatchModal } from "./ConfirmBatchModal";
 
@@ -50,6 +51,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
   const [confirmTarget, setConfirmTarget] = useState<{
     batch: any;
     reject: boolean;
+    reconcileUnpaid?: boolean;
   } | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -77,11 +79,12 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
   const history = data?.history || [];
   const payments = data?.payments || [];
   const repairCandidates = data?.repairCandidates || [];
+  const unpaidApprovedPortions = data?.unpaidApprovedPortions || [];
 
   const totalPendingAmount = (data?.pending || []).reduce(
     (acc: number, b: any) => acc + (b.estimatedAmount || 0),
     0
-  );
+  ) + unpaidApprovedPortions.reduce((acc: number, b: any) => acc + (b.estimatedAmount || 0), 0);
 
   const handleApprove = async (id: string, reject: boolean) => {
     const batch = pending.find((b: any) => (b.assignmentKey || b.id) === id);
@@ -96,7 +99,13 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
 
     const actionId = batch.assignmentKey || batch.id;
     setProcessingId(actionId);
-    const res = batch.repairCandidate
+    const res = batch.reconcileUnpaid
+      ? await reconcileApprovedQcPortionPaymentAction({
+          id: batch.id,
+          reviewerId: batch.reviewerId,
+          portionId: batch.portionId,
+        })
+      : batch.repairCandidate
       ? await repairAndPayDuplicatedQcBatchAction({ id: batch.id })
       : await approveRevisionBatchAction({
           id: batch.id,
@@ -154,7 +163,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
       </div>
 
       {/* Resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
               <span className="text-xs text-slate-500 block font-medium">Lotes por aceptar</span>
           <div className="flex items-baseline justify-between mt-1">
@@ -178,6 +187,13 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
           </div>
         </div>
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
+          <span className="text-xs text-slate-500 block font-medium">Aprobaciones sin pago</span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-bold text-amber-600">{unpaidApprovedPortions.length}</span>
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Banknote className="w-4 h-4" /></div>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs">
               <span className="text-xs text-slate-500 block font-medium">Lotes pagados</span>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl font-bold text-slate-800">
@@ -189,6 +205,84 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
           </div>
         </div>
       </div>
+
+      {unpaidApprovedPortions.length > 0 && (
+        <div className="bg-amber-50/70 border border-amber-200 rounded-2xl shadow-2xs overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-amber-200 px-5 py-4">
+            <div>
+              <h2 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                <Banknote className="w-4 h-4 text-amber-700" /> Aprobaciones sin pago acreditado
+              </h2>
+              <p className="text-[11px] text-amber-900 mt-0.5">
+                Estas porciones ya fueron aceptadas y sus equipos liberados. Acreditar genera solo el pago faltante y deja auditoría.
+              </p>
+            </div>
+            <span className="px-2.5 py-1 text-[11px] font-bold rounded-full bg-white text-amber-800 border border-amber-200">
+              {unpaidApprovedPortions.length} pendiente{unpaidApprovedPortions.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-white/70 text-amber-900 font-bold text-[11px] uppercase border-b border-amber-200">
+                <tr>
+                  <th className="px-5 py-3">Lote y porción</th>
+                  <th className="px-5 py-3">Revisor</th>
+                  <th className="px-5 py-3 text-center">Equipos</th>
+                  <th className="px-5 py-3">Aprobada</th>
+                  <th className="px-5 py-3 text-right">Pago faltante</th>
+                  <th className="px-5 py-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {unpaidApprovedPortions.map((portion: any) => {
+                  const actionId = portion.assignmentKey;
+                  return (
+                    <tr key={portion.assignmentKey} className="bg-white/60">
+                      <td className="px-5 py-3">
+                        <div className="font-mono font-bold text-slate-800">{portion.batchNumber}</div>
+                        <div className="text-[10px] text-slate-500">{portion.portionId}</div>
+                      </td>
+                      <td className="px-5 py-3 font-semibold">{portion.reviewerName}</td>
+                      <td className="px-5 py-3 text-center font-bold">{portion.reviewedDevices}</td>
+                      <td className="px-5 py-3">{formatDate(portion.approvedAt)}</td>
+                      <td className="px-5 py-3 text-right font-black text-amber-800">{money(portion.estimatedAmount)}</td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmTarget({
+                            batch: {
+                              id: portion.id,
+                              assignmentKey: portion.assignmentKey,
+                              batchNumber: portion.batchNumber,
+                              portionId: portion.portionId,
+                              reviewerId: portion.reviewerId,
+                              reviewerName: portion.reviewerName,
+                              supplierName: portion.supplierName,
+                              reviewedDevices: portion.reviewedDevices,
+                              totalDevices: portion.reviewedDevices,
+                              functionalCount: portion.functionalCount,
+                              nonFunctionalCount: portion.nonFunctionalCount,
+                              estimatedAmount: portion.estimatedAmount,
+                              reconcileUnpaid: true,
+                            },
+                            reject: false,
+                            reconcileUnpaid: true,
+                          })}
+                          disabled={processingId === actionId}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+                        >
+                          {processingId === actionId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
+                          Acreditar pago
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Lotes por aceptar */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
@@ -394,6 +488,7 @@ export function QcPaymentsView({ initialData }: QcPaymentsViewProps) {
       <ConfirmBatchModal
         batch={confirmTarget?.batch ?? null}
         reject={confirmTarget?.reject ?? false}
+        recovery={confirmTarget?.reconcileUnpaid ?? false}
         loading={processingId !== null}
         onCancel={() => setConfirmTarget(null)}
         onConfirm={confirmApprove}

@@ -8,9 +8,9 @@ export const QC_REVIEW_RATE = 50; // RD$ por equipo revisado (fórmula SDigitalS
  * Fórmula SDigitalSystem (approveLote): N equipos revisados × RD$50,
  * acreditado al wallet del revisor que hizo la inspección más reciente
  * de cada equipo. Idempotente: cada pago tiene externalKey único
- * `qc-payment:{batchId}:LEGACY-{reviewerId}`. Cada revisor recibe una sola
- * acreditación por lote; las claves antiguas por porción se conservan para
- * lectura histórica y no se vuelven a generar.
+ * `qc-payment:{batchId}:{portionId}:{reviewerId}`. Cada porción se paga de
+ * forma independiente; los pagos globales heredados siguen protegidos contra
+ * un segundo pago si ya existe cualquier pago para ese revisor y lote.
  */
 export async function payReviewersForBatch(
   batchId: string,
@@ -18,6 +18,7 @@ export async function payReviewersForBatch(
   onlyReviewerId?: string,
   portionId?: string,
   onlyDeviceIds?: string[],
+  options?: { includeReleasedDevices?: boolean; inspectionCutoffAt?: Date },
 ) {
   const batch = await tx.qcRevisionBatch.findUnique({
     where: { id: batchId },
@@ -36,12 +37,17 @@ export async function payReviewersForBatch(
   const devices = await tx.deviceUnit.findMany({
     where: {
       batchId: batch.id,
-      ...(onlyReviewerId ? { assignedToId: onlyReviewerId } : {}),
+      ...(onlyReviewerId && !options?.includeReleasedDevices ? { assignedToId: onlyReviewerId } : {}),
       ...(onlyDeviceIds?.length ? { id: { in: onlyDeviceIds } } : {}),
     },
     select: {
       inspections: {
-        where: { createdAt: { gte: batch.createdAt } },
+        where: {
+          createdAt: {
+            gte: batch.createdAt,
+            ...(options?.inspectionCutoffAt ? { lte: options.inspectionCutoffAt } : {}),
+          },
+        },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: { reviewerId: true, status: true },
@@ -52,7 +58,10 @@ export async function payReviewersForBatch(
   const perReviewer = new Map<string, number>();
   for (const d of devices) {
     const last = d.inspections[0];
-    if (last && last.status === "COMPLETED" && last.reviewerId && eligibleReviewerIds.has(last.reviewerId)) {
+    if (
+      last && last.status === "COMPLETED" && last.reviewerId && eligibleReviewerIds.has(last.reviewerId)
+      && (!portionId || !onlyReviewerId || last.reviewerId === onlyReviewerId)
+    ) {
       perReviewer.set(last.reviewerId, (perReviewer.get(last.reviewerId) ?? 0) + 1);
     }
   }
@@ -60,16 +69,36 @@ export async function payReviewersForBatch(
   let paidReviewers = 0;
   for (const [reviewerId, count] of perReviewer) {
     const externalKey = `qc-payment:${batch.id}:${portionId ?? `LEGACY-${reviewerId}`}:${reviewerId}`;
-    // Compatibilidad anti-doble-pago: un lote que ya recibió una clave
-    // histórica por porción no debe volver a pagar al mismo revisor al usar
-    // ahora el flujo global.
-    const existing = await tx.walletLedgerEntry.findFirst({
-      where: {
-        externalKey: { startsWith: `qc-payment:${batch.id}:` },
-        actorId: reviewerId,
-      },
-    });
-    if (existing) continue; // ya pagado (idempotente)
+    // Una porción usa su clave exacta para no bloquear porciones distintas del
+    // mismo revisor. El pago global legado sí debe respetar cualquier crédito
+    // previo del lote para evitar volver a pagar el trabajo ya acreditado.
+    const existing = portionId
+      ? await tx.walletLedgerEntry.findUnique({ where: { externalKey } })
+        ?? await tx.walletLedgerEntry.findFirst({
+          where: {
+            actorId: reviewerId,
+            externalKey: {
+              in: [
+                `qc-payment:${batch.id}:${reviewerId}`,
+                `qc-payment:${batch.id}:LEGACY-${reviewerId}`,
+                `qc-payment:${batch.id}:LEGACY-${reviewerId}:${reviewerId}`,
+              ],
+            },
+          },
+        })
+      : await tx.walletLedgerEntry.findFirst({
+          where: { externalKey: { startsWith: `qc-payment:${batch.id}:` }, actorId: reviewerId },
+        });
+    if (existing) {
+      if (portionId && existing.externalKey === externalKey) {
+        const expectedAmount = count * QC_REVIEW_RATE;
+        if (existing.type !== "CREDIT" || existing.status !== "POSTED" || Number(existing.amount) !== expectedAmount) {
+          throw new Error("La clave de pago de esta porción ya existe con un estado o monto distinto; requiere revisión administrativa.");
+        }
+        paidReviewers++;
+      }
+      continue; // ya pagado (idempotente)
+    }
 
     const amount = count * QC_REVIEW_RATE;
 

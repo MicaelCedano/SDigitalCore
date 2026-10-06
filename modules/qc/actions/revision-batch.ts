@@ -943,9 +943,18 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
           ? latestSubmission.afterData as Record<string, unknown>
           : {};
         const deviceIds = Array.isArray(submissionData.deviceIds)
-          ? submissionData.deviceIds.filter((id): id is string => typeof id === "string")
-          : undefined;
-        paidReviewers = await payReviewersForBatch(batch.id, tx, reviewerId, portionId, deviceIds);
+          ? [...new Set(submissionData.deviceIds.filter((id): id is string => typeof id === "string"))]
+          : [];
+        const submittedDeviceCount = Number(submissionData.reviewedDevices);
+        if (!deviceIds.length || !Number.isInteger(submittedDeviceCount) || submittedDeviceCount <= 0 || deviceIds.length !== submittedDeviceCount) {
+          throw new Error("El envío no conserva una lista exacta de equipos; no se aprobó ni pagó la porción.");
+        }
+        paidReviewers = await payReviewersForBatch(batch.id, tx, reviewerId, portionId, deviceIds, {
+          inspectionCutoffAt: latestSubmission.createdAt,
+        });
+        if (paidReviewers !== 1) {
+          throw new Error("No se pudo acreditar el pago de esta porción; no se aprobó ni liberó el lote.");
+        }
         await tx.deviceUnit.updateMany({
           where: {
             batchId: batch.id,
@@ -954,21 +963,27 @@ export async function approveRevisionBatchAction(input: { id: string; reviewerId
           },
           data: { assignedToId: null },
         });
+        await tx.auditLog.create({
+          data: {
+            userId: persisted.id,
+            action: "qc_batch.assignment_approve",
+            module: "qc",
+            entityType: "qc_revision_batch",
+            entityId: batch.id,
+            afterData: { batchNumber: batch.batchNumber, reviewerId, portionId, paidReviewers },
+          },
+        });
       });
-      await logAudit({
-        userId: persisted.id,
-        action: "qc_batch.assignment_approve",
-        module: "qc",
-        entityType: "qc_revision_batch",
-        entityId: batch.id,
-        afterData: { batchNumber: batch.batchNumber, reviewerId, portionId, paidReviewers },
-      });
-      await sendPushToUsers([reviewerId], {
-        title: `Porción de ${batch.batchNumber} aprobada`,
-        body: "Tu porción fue aprobada y el pago quedó acreditado en tu wallet.",
-        route: `/qc/lotes/${batch.id}`,
-        type: "qc_batch.assignment_approved",
-      });
+      try {
+        await sendPushToUsers([reviewerId], {
+          title: `Porción de ${batch.batchNumber} aprobada`,
+          body: "Tu porción fue aprobada y el pago quedó acreditado en tu wallet.",
+          route: `/qc/lotes/${batch.id}`,
+          type: "qc_batch.assignment_approved",
+        });
+      } catch (notificationError) {
+        console.error("No se pudo notificar la aprobación de la porción QC:", notificationError);
+      }
       revalidatePath("/qc/pagos");
       revalidatePath("/qc");
       revalidatePath(`/qc/lotes/${batch.id}`);
@@ -1852,6 +1867,126 @@ export async function getQcDashboardAction() {
 }
 
 /**
+ * Recupera, con permiso ADMIN y auditoría, una porción que ya fue aprobada
+ * pero cuyo pago anterior quedó omitido. Solo paga las inspecciones exactas
+ * enviadas y conserva la liberación de los equipos.
+ */
+export async function reconcileApprovedQcPortionPaymentAction(input: {
+  id: string;
+  reviewerId: string;
+  portionId: string;
+}): Promise<Result<{ batchNumber: string; reviewerId: string; portionId: string; amount: number; reviewedDevices: number }>> {
+  try {
+    await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede recuperar pagos de QC." };
+    }
+
+    const parsed = z.object({ id: z.string().min(1), reviewerId: z.string().min(1), portionId: z.string().min(1) }).safeParse(input);
+    if (!parsed.success) return { success: false, error: "Porción inválida." };
+    const { id: batchId, reviewerId, portionId } = parsed.data;
+    let result: { batchNumber: string; reviewerId: string; portionId: string; amount: number; reviewedDevices: number } | null = null;
+
+    await prisma.$transaction(async (tx) => {
+      const batch = await tx.qcRevisionBatch.findUnique({
+        where: { id: batchId },
+        select: { id: true, batchNumber: true, createdAt: true },
+      });
+      if (!batch) throw new Error("Lote QC no encontrado.");
+
+      const relevantAudits = await tx.auditLog.findMany({
+        where: {
+          entityId: batch.id,
+          action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_approve", "qc_batch.assignment_reject", "qc_batch.assignment_payment_reconciled"] },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+        select: { action: true, createdAt: true, afterData: true },
+      });
+      const portionMatches = (audit: (typeof relevantAudits)[number]) => {
+        const data = audit.afterData && typeof audit.afterData === "object" ? audit.afterData as Record<string, unknown> : {};
+        return data.reviewerId === reviewerId && data.portionId === portionId;
+      };
+      const submission = relevantAudits.find((audit) => audit.action === "qc_batch.assignment_submit" && portionMatches(audit));
+      if (!submission) throw new Error("No se encontró el envío original de esta porción.");
+      const decision = relevantAudits.find((audit) =>
+        audit.createdAt > submission.createdAt
+        && ["qc_batch.assignment_approve", "qc_batch.assignment_reject"].includes(audit.action)
+        && portionMatches(audit),
+      );
+      if (!decision || decision.action !== "qc_batch.assignment_approve") {
+        throw new Error("Solo se pueden recuperar porciones aprobadas.");
+      }
+      const approvalData = decision.afterData && typeof decision.afterData === "object" ? decision.afterData as Record<string, unknown> : {};
+      if (Number(approvalData.paidReviewers) !== 0) {
+        throw new Error("La aprobación no está marcada como pago omitido.");
+      }
+      const existingRepair = relevantAudits.some((audit) => audit.action === "qc_batch.assignment_payment_reconciled" && portionMatches(audit));
+      if (existingRepair) throw new Error("El pago de esta porción ya fue recuperado.");
+
+      const submissionData = submission.afterData && typeof submission.afterData === "object" ? submission.afterData as Record<string, unknown> : {};
+      const deviceIds = Array.isArray(submissionData.deviceIds)
+        ? [...new Set(submissionData.deviceIds.filter((deviceId): deviceId is string => typeof deviceId === "string"))]
+        : [];
+      const reviewedDevices = Number(submissionData.reviewedDevices);
+      if (!deviceIds.length || !Number.isInteger(reviewedDevices) || reviewedDevices <= 0 || deviceIds.length !== reviewedDevices) {
+        throw new Error("El envío no conserva una lista exacta de equipos; no se hizo ningún pago.");
+      }
+
+      const devices = await tx.deviceUnit.findMany({
+        where: { id: { in: deviceIds }, batchId: batch.id },
+        select: {
+          id: true,
+          inspections: {
+            where: { createdAt: { gte: batch.createdAt, lte: submission.createdAt } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { reviewerId: true, status: true },
+          },
+        },
+      });
+      const eligibleDevices = devices.filter((device) => {
+        const inspection = device.inspections[0];
+        return inspection?.reviewerId === reviewerId && inspection.status === "COMPLETED";
+      });
+      if (devices.length !== deviceIds.length || eligibleDevices.length !== reviewedDevices) {
+        throw new Error("Las inspecciones actuales no coinciden con el envío original; no se hizo ningún pago.");
+      }
+
+      const paidReviewers = await payReviewersForBatch(batch.id, tx, reviewerId, portionId, deviceIds, {
+        includeReleasedDevices: true,
+        inspectionCutoffAt: submission.createdAt,
+      });
+      if (paidReviewers !== 1) throw new Error("No se confirmó un único pago para esta porción.");
+
+      const amount = reviewedDevices * QC_REVIEW_RATE;
+      await tx.auditLog.create({
+        data: {
+          userId: persisted.id,
+          action: "qc_batch.assignment_payment_reconciled",
+          module: "qc",
+          entityType: "qc_revision_batch",
+          entityId: batch.id,
+          afterData: { batchNumber: batch.batchNumber, reviewerId, portionId, reviewedDevices, amount, paidReviewers: 1 },
+        },
+      });
+      result = { batchNumber: batch.batchNumber, reviewerId, portionId, amount, reviewedDevices };
+    });
+
+    const reconciled = result as { batchNumber: string; reviewerId: string; portionId: string; amount: number; reviewedDevices: number } | null;
+    if (!reconciled) return { success: false, error: "No se pudo recuperar el pago." };
+    revalidatePath("/qc/pagos");
+    revalidatePath("/qc");
+    revalidatePath("/dashboard");
+    return { success: true, data: reconciled, message: `Pago de ${reconciled.reviewedDevices} equipos acreditado: RD$ ${reconciled.amount.toLocaleString("es-DO")}.` };
+  } catch (error: any) {
+    console.error("Error al recuperar pago de porción QC:", error);
+    return { success: false, error: error.message || "No se pudo recuperar el pago de QC." };
+  }
+}
+
+/**
  * Gestión de pagos QC (solo ADMIN): lotes SUBMITTED (por aceptar y pagar)
  * y lotes COMPLETED recientes (historial de pagos acreditados).
  * Cada lote trae su monto estimado: revisados × QC_REVIEW_RATE.
@@ -1906,6 +2041,21 @@ export async function getQcPaymentsAction(): Promise<
       functionalCount: number;
       nonFunctionalCount: number;
       duplicateBatchNumber: string;
+      estimatedAmount: number;
+    }>;
+    unpaidApprovedPortions: Array<{
+      id: string;
+      assignmentKey: string;
+      portionId: string;
+      reviewerId: string;
+      batchNumber: string;
+      supplierName: string;
+      reviewedDevices: number;
+      functionalCount: number;
+      nonFunctionalCount: number;
+      reviewerName: string;
+      submittedAt: Date;
+      approvedAt: Date;
       estimatedAmount: number;
     }>;
   }>
@@ -1979,7 +2129,7 @@ export async function getQcPaymentsAction(): Promise<
         },
       }),
       prisma.auditLog.findMany({
-        where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve"] } },
+        where: { action: { in: ["qc_batch.assignment_submit", "qc_batch.assignment_reject", "qc_batch.assignment_approve", "qc_batch.assignment_payment_reconciled"] } },
         orderBy: { createdAt: "desc" },
         take: 300,
         select: { id: true, entityId: true, action: true, createdAt: true, afterData: true },
@@ -2010,6 +2160,7 @@ export async function getQcPaymentsAction(): Promise<
     // ningún pago asociado. Los pagos históricos por porción no se borran ni
     // se vuelven a presentar como pendientes.
     let mapPending: Array<any> = [];
+    const unpaidApprovedSubmissions: Array<{ portionId: string; batchId: string; reviewerId: string; reviewerName: string; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number; submittedAt: Date; approvedAt: Date }> = [];
     const assignmentSubmissions: Array<{ portionId: string; batchId: string; reviewerId: string; reviewerName: string; assignedDevices: number; reviewedDevices: number; functionalCount: number; nonFunctionalCount: number; submittedAt: Date }> = [];
     const submissionAudits = assignmentAudits.filter((audit) => audit.action === "qc_batch.assignment_submit");
     for (const [index, audit] of submissionAudits.entries()) {
@@ -2019,13 +2170,40 @@ export async function getQcPaymentsAction(): Promise<
       if (!audit.entityId || !reviewerId) continue;
       const portionId = typeof data.portionId === "string" ? data.portionId : `LEGACY-${audit.id}`;
       const nextNewerSubmission = index > 0 ? submissionAudits[index - 1] : null;
+      const latestDecision = assignmentAudits.find((candidate) => {
+        if (!["qc_batch.assignment_reject", "qc_batch.assignment_approve"].includes(candidate.action) || candidate.createdAt <= audit.createdAt) return false;
+        const candidateData = candidate.afterData && typeof candidate.afterData === "object" ? candidate.afterData as Record<string, unknown> : {};
+        if (typeof data.portionId === "string") return candidateData.reviewerId === reviewerId && candidateData.portionId === portionId;
+        return candidateData.reviewerId === reviewerId && (!nextNewerSubmission || candidate.createdAt < nextNewerSubmission.createdAt);
+      });
       const processed = assignmentAudits.some((candidate) => {
         if (!["qc_batch.assignment_reject", "qc_batch.assignment_approve"].includes(candidate.action) || candidate.createdAt <= audit.createdAt) return false;
         const candidateData = candidate.afterData && typeof candidate.afterData === "object" ? candidate.afterData as Record<string, unknown> : {};
         if (typeof data.portionId === "string") return candidateData.portionId === portionId;
         return candidateData.reviewerId === reviewerId && (!nextNewerSubmission || candidate.createdAt < nextNewerSubmission.createdAt);
       });
-      if (processed) continue;
+      if (processed) {
+        const decisionData = latestDecision?.afterData && typeof latestDecision.afterData === "object" ? latestDecision.afterData as Record<string, unknown> : {};
+        const reconciled = assignmentAudits.some((candidate) => {
+          if (candidate.action !== "qc_batch.assignment_payment_reconciled" || candidate.createdAt <= (latestDecision?.createdAt ?? audit.createdAt)) return false;
+          const candidateData = candidate.afterData && typeof candidate.afterData === "object" ? candidate.afterData as Record<string, unknown> : {};
+          return candidateData.reviewerId === reviewerId && candidateData.portionId === portionId;
+        });
+        if (latestDecision?.action === "qc_batch.assignment_approve" && Number(decisionData.paidReviewers) === 0 && !reconciled) {
+          unpaidApprovedSubmissions.push({
+            portionId,
+            batchId: audit.entityId,
+            reviewerId,
+            reviewerName: typeof data.reviewerName === "string" ? data.reviewerName : "QC",
+            reviewedDevices: Number(data.reviewedDevices) || 0,
+            functionalCount: Number(data.functionalCount) || 0,
+            nonFunctionalCount: Number(data.nonFunctionalCount) || 0,
+            submittedAt: audit.createdAt,
+            approvedAt: latestDecision.createdAt,
+          });
+        }
+        continue;
+      }
       assignmentSubmissions.push({
         portionId,
         batchId: audit.entityId,
@@ -2062,7 +2240,10 @@ export async function getQcPaymentsAction(): Promise<
         legacyPaymentUse.set(key, used + 1);
         return false;
       });
-    const assignmentBatchIds = [...new Set(visibleAssignments.map((item) => item.batchId))];
+    const assignmentBatchIds = [...new Set([
+      ...visibleAssignments.map((item) => item.batchId),
+      ...unpaidApprovedSubmissions.map((item) => item.batchId),
+    ])];
     const paymentBatchIds = paymentEntries
       .map((entry) => entry.externalKey.split(":")[1])
       .filter((id): id is string => Boolean(id));
@@ -2100,6 +2281,44 @@ export async function getQcPaymentsAction(): Promise<
       }),
     ]);
     const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
+    const unpaidPaymentKeys = unpaidApprovedSubmissions.flatMap((assignment) => [
+      `qc-payment:${assignment.batchId}:${assignment.portionId}:${assignment.reviewerId}`,
+      `qc-payment:${assignment.batchId}:${assignment.reviewerId}`,
+      `qc-payment:${assignment.batchId}:LEGACY-${assignment.reviewerId}`,
+      `qc-payment:${assignment.batchId}:LEGACY-${assignment.reviewerId}:${assignment.reviewerId}`,
+    ]);
+    const existingUnpaidEntries = unpaidPaymentKeys.length > 0
+      ? await prisma.walletLedgerEntry.findMany({
+          where: { externalKey: { in: unpaidPaymentKeys } },
+          select: { externalKey: true },
+        })
+      : [];
+    const existingUnpaidKeys = new Set(existingUnpaidEntries.map((entry) => entry.externalKey));
+    const unpaidApprovedPortions = unpaidApprovedSubmissions.flatMap((assignment) => {
+      const batch = assignmentBatchById.get(assignment.batchId);
+      const assignmentKey = `qc-payment:${assignment.batchId}:${assignment.portionId}:${assignment.reviewerId}`;
+      const legacyPaidKey = [
+        `qc-payment:${assignment.batchId}:${assignment.reviewerId}`,
+        `qc-payment:${assignment.batchId}:LEGACY-${assignment.reviewerId}`,
+        `qc-payment:${assignment.batchId}:LEGACY-${assignment.reviewerId}:${assignment.reviewerId}`,
+      ].some((key) => existingUnpaidKeys.has(key));
+      if (!batch || existingUnpaidKeys.has(assignmentKey) || legacyPaidKey || assignment.reviewedDevices <= 0) return [];
+      return [{
+        id: assignment.batchId,
+        assignmentKey,
+        portionId: assignment.portionId,
+        reviewerId: assignment.reviewerId,
+        batchNumber: batch.batchNumber,
+        supplierName: batch.supplierName,
+        reviewedDevices: assignment.reviewedDevices,
+        functionalCount: assignment.functionalCount,
+        nonFunctionalCount: assignment.nonFunctionalCount,
+        reviewerName: assignment.reviewerName,
+        submittedAt: assignment.submittedAt,
+        approvedAt: assignment.approvedAt,
+        estimatedAmount: assignment.reviewedDevices * RATE,
+      }];
+    });
     const paidAssignmentKeys = new Set(
       paymentEntries.map((entry) => entry.externalKey).filter((key) => key.startsWith("qc-payment:")),
     );
@@ -2212,7 +2431,7 @@ export async function getQcPaymentsAction(): Promise<
 
     return {
       success: true,
-      data: { pending: mapPending, history: mapHistory, payments, repairCandidates },
+      data: { pending: mapPending, history: mapHistory, payments, repairCandidates, unpaidApprovedPortions },
     };
   } catch (error: any) {
     console.error("Error al cargar pagos QC:", error);

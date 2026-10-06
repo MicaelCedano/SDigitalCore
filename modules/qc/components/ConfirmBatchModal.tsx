@@ -9,6 +9,7 @@ interface ConfirmBatchModalProps {
     id: string;
     batchNumber: string;
     portionId?: string | null;
+    reviewerName?: string | null;
     supplierName?: string | null;
     reviewedDevices: number;
     totalDevices: number;
@@ -17,16 +18,19 @@ interface ConfirmBatchModalProps {
     estimatedAmount: number;
   } | null;
   reject: boolean;
+  recovery?: boolean;
   loading: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-export function ConfirmBatchModal({ batch, reject, loading, onCancel, onConfirm }: ConfirmBatchModalProps) {
+export function ConfirmBatchModal({ batch, reject, recovery = false, loading, onCancel, onConfirm }: ConfirmBatchModalProps) {
   if (!batch) return null;
 
-  const title = reject ? "Devolver porción a revisión" : "Aceptar porción y acreditar pago";
-  const description = reject
+  const title = recovery ? "Acreditar pago omitido" : reject ? "Devolver porción a revisión" : "Aceptar porción y acreditar pago";
+  const description = recovery
+    ? "La porción ya fue aprobada y los equipos ya están disponibles. Se verificará el envío original y se acreditará una sola vez el monto faltante."
+    : reject
     ? "El lote volverá a EN REVISIÓN sin acreditar ningún pago. El equipo de control de calidad podrá seguir trabajando."
     : "Al aceptar el lote se acreditará el pago automáticamente a la wallet de los revisores que hicieron cada revisión.";
 
@@ -37,12 +41,14 @@ export function ConfirmBatchModal({ batch, reject, loading, onCancel, onConfirm 
         <div className="px-6 pt-6 pb-2 flex items-start justify-between">
           <div
             className={`p-3 rounded-2xl border shrink-0 ${
-              reject
+              recovery
+                ? "bg-amber-50 text-amber-600 border-amber-200"
+                : reject
                 ? "bg-amber-50 text-amber-600 border-amber-200"
                 : "bg-emerald-50 text-emerald-600 border-emerald-200"
             }`}
           >
-            {reject ? <RotateCcw className="w-6 h-6" /> : <CheckCheck className="w-6 h-6" />}
+            {recovery ? <Banknote className="w-6 h-6" /> : reject ? <RotateCcw className="w-6 h-6" /> : <CheckCheck className="w-6 h-6" />}
           </div>
           <button
             onClick={onCancel}
@@ -93,6 +99,12 @@ export function ConfirmBatchModal({ batch, reject, loading, onCancel, onConfirm 
                 </span>
               </span>
             </div>
+            {batch.reviewerName && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Revisor</span>
+                <span className="text-xs font-bold text-slate-700">{batch.reviewerName}</span>
+              </div>
+            )}
             {!reject && (
               <div className="flex items-center justify-between pt-2 mt-1 border-t border-dashed border-slate-200">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -119,19 +131,23 @@ export function ConfirmBatchModal({ batch, reject, loading, onCancel, onConfirm 
             onClick={onConfirm}
             disabled={loading}
             className={`px-5 py-2.5 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50 ${
-              reject
+              recovery
+                ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                : reject
                 ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
                 : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
             }`}
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
+            ) : recovery ? (
+              <Banknote className="w-4 h-4" />
             ) : reject ? (
               <RotateCcw className="w-4 h-4" />
             ) : (
               <CheckCheck className="w-4 h-4" />
             )}
-            {loading ? "Procesando..." : reject ? "Sí, devolver" : "Aceptar y acreditar"}
+            {loading ? "Procesando..." : recovery ? "Sí, acreditar pago" : reject ? "Sí, devolver" : "Aceptar y acreditar"}
           </button>
         </div>
       </div>
