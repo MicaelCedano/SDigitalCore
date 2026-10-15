@@ -5,8 +5,15 @@ export default auth((req) => {
   const { nextUrl, auth: session } = req;
   const isLoggedIn = !!session;
 
-  // Rutas públicas — no requieren autenticación
+  // La API de ChatGPT autentica cada solicitud con su propio Bearer token y
+  // valida un usuario ADMIN activo; no debe redirigirse a la pantalla de login.
+  const isChatGptApiRoute =
+    nextUrl.pathname === "/api/chatgpt" ||
+    nextUrl.pathname.startsWith("/api/chatgpt/");
+
+  // Rutas públicas — no requieren sesión de navegador
   const isPublicRoute =
+    isChatGptApiRoute ||
     nextUrl.pathname.startsWith("/login") ||
     nextUrl.pathname.startsWith("/descargas") ||
     nextUrl.pathname.startsWith("/solicitar-acceso") ||
