@@ -30,6 +30,7 @@ Referencias oficiales: [crear y usar ChatGPT Sites](https://help.openai.com/en/a
 Configurar en el entorno del servidor y en Vercel cuando se publique:
 
 - `CHATGPT_API_KEY`: token aleatorio de al menos 32 caracteres. Mantenerlo fuera del navegador y del repositorio.
+- `CHATGPT_SITES_TOKEN`: token aleatorio de al menos 32 caracteres, exclusivo para el puente MCP alojado en ChatGPT Sites. Puede configurarse junto a `CHATGPT_API_KEY`; ambos se comparan en tiempo constante.
 - `CHATGPT_ACTOR_USER_ID`: ID de una cuenta `ADMIN` activa de Core. Esa cuenta aparece como actor en auditoría.
 
 Para generar un token localmente, ejecuta `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` y guarda el resultado directamente en el administrador de contraseñas y en las variables privadas. No lo pegues en conversaciones, documentos ni logs.
@@ -38,11 +39,11 @@ La API responde `503` hasta que ambas variables estén configuradas y el usuario
 
 ## Conectar ChatGPT
 
-1. Publicar la aplicación existente en HTTPS y configurar ambas variables privadas en el entorno de destino.
-2. Crear o abrir un Site en ChatGPT y pedirle que prepare un plugin MCP para conectar con SDigitalCore.
-3. Configurar el endpoint HTTPS `https://TU-DOMINIO-DE-SDIGITALCORE/api/chatgpt/mcp` con autenticación Bearer usando `CHATGPT_API_KEY`.
-4. Revisar e instalar el plugin generado. Probar primero la consulta de IMEI y la lista de pendientes.
-5. Para aprobar/rechazar, ChatGPT debe presentar los detalles de la solicitud y esperar confirmación explícita. El servidor comprueba otra vez estado, código, inventario y actor antes de escribir.
+1. Publicar la aplicación existente en HTTPS y configurar `CHATGPT_API_KEY`, `CHATGPT_ACTOR_USER_ID` y, para el plugin de Sites, `CHATGPT_SITES_TOKEN` como variables privadas.
+2. Crear el Site privado `SDigitalCore Reportes` y alojar allí un servidor MCP puente. El puente llama a `https://TU-DOMINIO-DE-SDIGITALCORE/api/chatgpt/mcp` desde el servidor usando `CHATGPT_SITES_TOKEN`; guarda ese valor como secreto del entorno del Site, nunca en el navegador ni en el código fuente.
+3. Publicar el Site como privado para que ChatGPT cree su plugin MCP, y conectar/instalar el plugin en la cuenta propietaria.
+4. Probar primero `tools/list`; después, con una consulta expresamente solicitada, verificar una lectura de IMEI o solicitudes.
+5. Para aprobar/rechazar, ChatGPT debe presentar los detalles de la solicitud y esperar confirmación explícita para esa solicitud. El servidor comprueba otra vez estado, código, inventario y actor antes de escribir.
 
 Como alternativa, [`chatgpt-openapi.yaml`](./chatgpt-openapi.yaml) describe las mismas operaciones para GPT Actions en una cuenta que tenga acceso a editar un GPT con Actions.
 

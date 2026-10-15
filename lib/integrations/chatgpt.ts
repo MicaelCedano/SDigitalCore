@@ -18,9 +18,10 @@ function unauthorized() {
 
 /** Auth para GPT Actions: una clave privada se vincula a un usuario ADMIN activo de Core. */
 export async function authenticateChatGptRequest(request: Request): Promise<AuthResult> {
-  const configuredKey = process.env.CHATGPT_API_KEY;
+  const configuredKeys = [process.env.CHATGPT_API_KEY, process.env.CHATGPT_SITES_TOKEN]
+    .filter((key): key is string => typeof key === "string" && key.length >= 32);
   const actorId = process.env.CHATGPT_ACTOR_USER_ID;
-  if (!configuredKey || configuredKey.length < 32 || !actorId) {
+  if (configuredKeys.length === 0 || !actorId) {
     return {
       response: chatGptJson({ error: "La integración de ChatGPT no está configurada." }, { status: 503 }),
     };
@@ -28,9 +29,14 @@ export async function authenticateChatGptRequest(request: Request): Promise<Auth
 
   const authorization = request.headers.get("authorization") ?? "";
   const suppliedKey = authorization.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
-  const expected = Buffer.from(configuredKey, "utf8");
   const supplied = Buffer.from(suppliedKey, "utf8");
-  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
+  let authorized = false;
+  for (const configuredKey of configuredKeys) {
+    const expected = Buffer.from(configuredKey, "utf8");
+    const matches = expected.length === supplied.length && timingSafeEqual(expected, supplied);
+    authorized = matches || authorized;
+  }
+  if (!authorized) {
     return { response: unauthorized() };
   }
 
