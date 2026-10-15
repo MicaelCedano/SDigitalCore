@@ -15,9 +15,11 @@ import {
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
-import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
+import { sendPushToRole } from "@/lib/mobile/push";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { applyStockDelta, availableQuantity, resolveMovementLine } from "../lib/warehouse-stock";
+import { updateWarehouseRequestStatus } from "../lib/warehouse-request-status";
 
 const legacyWarehouseProductSelect = {
   id: true,
@@ -52,75 +54,6 @@ async function requireWarehouseAdmin() {
   const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
   if (persisted?.roleCode !== "ADMIN") throw new Error("Solo un administrador puede gestionar movimientos y solicitudes.");
   return actor;
-}
-
-function resolveMovementLine(item: { unitsCount: number; measure?: "BOXES" | "UNITS"; quantity?: number }, unitsPerBox: number) {
-  const measure: "BOXES" | "UNITS" = item.measure === "BOXES" ? "BOXES" : "UNITS";
-  const quantity = Math.max(1, Number(item.quantity) || (measure === "BOXES" ? Math.ceil(item.unitsCount / Math.max(1, unitsPerBox)) : item.unitsCount));
-  return {
-    measure,
-    quantity,
-    unitsCount: measure === "BOXES" ? quantity * Math.max(1, unitsPerBox) : quantity,
-    boxesCount: measure === "BOXES" ? quantity : 0,
-  };
-}
-
-function availableQuantity(product: { boxes: number; looseUnits: number; totalUnits: number }, measure: "BOXES" | "UNITS") {
-  if (measure === "BOXES") return Math.max(0, product.boxes);
-  return product.boxes === 0 ? Math.max(product.looseUnits, product.totalUnits) : Math.max(0, product.looseUnits);
-}
-
-async function applyStockDelta(
-  tx: Prisma.TransactionClient,
-  productId: string,
-  type: "ENTRY" | "EXIT",
-  line: { measure: "BOXES" | "UNITS"; quantity: number; unitsCount: number },
-  returnProduct = true,
-) {
-  const direction = type === "ENTRY" ? 1 : -1;
-  if (type === "EXIT" && line.measure === "UNITS") {
-    const current = await tx.warehouseProduct.findUnique({ where: { id: productId }, select: { boxes: true, looseUnits: true, totalUnits: true } });
-    // Algunos registros antiguos dejaron las unidades en totalUnits con cero
-    // cajas, pero no las copiaron a looseUnits. Regularizamos ese caso antes
-    // de descontar para que la salida de unidades sueltas sea consistente.
-    if (current && current.boxes === 0 && current.looseUnits < current.totalUnits) {
-      await tx.warehouseProduct.updateMany({
-        where: { id: productId, boxes: 0, looseUnits: current.looseUnits, totalUnits: current.totalUnits },
-        data: { looseUnits: current.totalUnits },
-      });
-    }
-  }
-  const changed = await tx.warehouseProduct.updateMany({
-    where: {
-      id: productId,
-      status: "ACTIVE",
-      ...(type === "EXIT"
-        ? line.measure === "BOXES"
-          ? { boxes: { gte: line.quantity }, totalUnits: { gte: line.unitsCount } }
-          : { looseUnits: { gte: line.quantity }, totalUnits: { gte: line.unitsCount } }
-        : {}),
-    },
-    data: {
-      boxes: { increment: line.measure === "BOXES" ? direction * line.quantity : 0 },
-      looseUnits: { increment: line.measure === "UNITS" ? direction * line.quantity : 0 },
-      totalUnits: { increment: direction * line.unitsCount },
-    },
-  });
-  if (changed.count !== 1) throw new Error("El producto ya no está activo o su stock disponible cambió. Actualiza e intenta de nuevo.");
-  if (returnProduct) return tx.warehouseProduct.findUniqueOrThrow({ where: { id: productId } });
-}
-
-function parseRequestLine(details: string | null | undefined, productId: string, unitsCount: number) {
-  try {
-    const parsed = details ? JSON.parse(details) : null;
-    const line = parsed?.items?.[productId];
-    if (line?.measure === "BOXES" || line?.measure === "UNITS") {
-      return { measure: line.measure as "BOXES" | "UNITS", quantity: Number(line.quantity) || 1 };
-    }
-  } catch {
-    // Solicitudes antiguas guardan texto plano y se interpretan como unidades sueltas.
-  }
-  return { measure: "UNITS" as const, quantity: unitsCount };
 }
 
 /**
@@ -493,64 +426,7 @@ export async function updateWarehouseRequestStatusAction(id: string, status: "AP
     const actor = await requireWarehouseAdmin();
     if (!actor.id) return { success: false, error: "La sesión no tiene un usuario identificable." };
     ({ id, status } = z.object({ id: z.string().min(1), status: z.enum(["APPROVED", "REJECTED"]) }).parse({ id, status }));
-    const updated = await prisma.$transaction(async (tx) => {
-      const claimed = await tx.warehouseRequest.updateMany({ where: { id, status: "PENDING" }, data: { status } });
-      if (claimed.count !== 1) throw new Error("La solicitud no existe o ya fue procesada. Actualiza la lista.");
-      const request = await tx.warehouseRequest.findUnique({ where: { id }, include: { items: true } });
-      if (!request) throw new Error("Solicitud no encontrada.");
-      await tx.auditLog.create({ data: { userId: actor.id, action: "warehouse_request.status.update", module: "almacen", entityType: "warehouse_request", entityId: id, beforeData: { status: "PENDING" }, afterData: { status } } });
-      if (status === "REJECTED") return request;
-      const movements: Prisma.WarehouseMovementCreateManyInput[] = [];
-      const products = await tx.warehouseProduct.findMany({ where: { id: { in: request.items.map((item) => item.productId) }, status: "ACTIVE" } });
-      for (const item of [...request.items].sort((a, b) => a.productId.localeCompare(b.productId))) {
-        const product = products.find((candidate) => candidate.id === item.productId);
-        if (!product) throw new Error("Uno de los productos de la solicitud ya no existe.");
-        const savedLine = parseRequestLine(request.details, item.productId, item.unitsCount);
-        const line = resolveMovementLine({ unitsCount: item.unitsCount, ...savedLine }, product.unitsPerBox);
-        if (request.type === "EXIT" && (availableQuantity(product, line.measure) < line.quantity || product.totalUnits < line.unitsCount)) {
-          throw new Error(`Stock insuficiente para ${product.code} · ${product.name} ${product.color || ""}: solicita ${line.quantity} ${line.measure === "BOXES" ? "cajas" : "unidades sueltas"}; disponibles ${availableQuantity(product, line.measure)}.`);
-        }
-        await applyStockDelta(tx, product.id, request.type, line, false);
-        movements.push({ productId: product.id, type: request.type, boxesCount: line.boxesCount, totalUnits: line.unitsCount, reason: `Solicitud ${request.requestCode}: ${request.title}`, createdBy: actor.id });
-      }
-      await tx.warehouseMovement.createMany({ data: movements });
-      return request;
-    }, { maxWait: 10_000, timeout: 30_000 });
-    try {
-    const requesterIdentity = await prisma.warehouseRequest.findUnique({ where: { id }, select: { requestedBy: true } });
-    const requesterMatches = requesterIdentity?.requestedBy
-      ? await prisma.user.findMany({
-          where: {
-            status: "ACTIVE",
-            OR: [
-              { id: requesterIdentity.requestedBy },
-              { email: requesterIdentity.requestedBy },
-              { username: requesterIdentity.requestedBy },
-              { name: requesterIdentity.requestedBy },
-            ],
-          },
-          select: { id: true },
-          take: 2,
-        })
-      : [];
-    const requester = requesterMatches.length === 1 ? requesterMatches[0] : null;
-    if (requester) {
-      await sendPushToUsers([requester.id], {
-        title: updated.status === "APPROVED" ? "Solicitud de almacén aprobada" : "Solicitud de almacén rechazada",
-        body: `La solicitud ${updated.requestCode} fue ${updated.status === "APPROVED" ? "aprobada" : "rechazada"}.`,
-        route: "/almacen/transferencias",
-        type: updated.status === "APPROVED" ? "warehouse_request.approved" : "warehouse_request.rejected",
-      });
-    }
-
-    } catch (notificationError) {
-      console.error("Solicitud procesada; no se pudo notificar al solicitante", notificationError);
-    }
-    revalidatePath("/almacen");
-    revalidatePath("/almacen/movimientos");
-    revalidatePath("/almacen/transferencias");
-    revalidatePath("/dashboard");
-    revalidatePath("/", "layout");
+    const updated = await updateWarehouseRequestStatus({ id, status, actorId: actor.id, source: "web" });
     return {
       success: true,
       data: updated,

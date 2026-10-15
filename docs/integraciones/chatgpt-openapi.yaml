@@ -1,0 +1,137 @@
+openapi: 3.1.0
+info:
+  title: SDigitalCore para ChatGPT
+  version: 1.0.0
+  description: >-
+    Consultas puntuales de IMEI, solicitudes de Almacén y progreso de revisión
+    de lotes QC. No ofrece acceso general a tablas ni sincronización automática.
+servers:
+  - url: https://TU-DOMINIO-DE-SDIGITALCORE
+    description: Reemplazar por el dominio HTTPS de producción de SDigitalCore.
+security:
+  - bearerAuth: []
+paths:
+  /api/chatgpt/v1/imei:
+    get:
+      operationId: consultarIMEI
+      summary: Consultar quién revisó un IMEI
+      description: Busca un IMEI completo de 15 dígitos y devuelve hasta 20 inspecciones QC vigentes con el nombre registrado del revisor.
+      parameters:
+        - name: imei
+          in: query
+          required: true
+          description: IMEI completo de 15 dígitos.
+          schema:
+            type: string
+            pattern: '^\d{15}$'
+      responses:
+        '200':
+          description: Registro y revisión encontrados, o found=false.
+        '400':
+          description: IMEI inválido.
+        '401':
+          description: Credencial no autorizada.
+  /api/chatgpt/v1/warehouse/requests:
+    get:
+      operationId: listarSolicitudesAlmacen
+      summary: Ver solicitudes de Almacén
+      description: Por defecto muestra solo las solicitudes pendientes; el máximo es 25 por llamada.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, ALL]
+            default: PENDING
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 25
+            default: 15
+      responses:
+        '200':
+          description: Solicitudes y artículos con cantidades limitadas.
+        '401':
+          description: Credencial no autorizada.
+  /api/chatgpt/v1/warehouse/requests/{id}/decision:
+    post:
+      operationId: decidirSolicitudAlmacen
+      summary: Aprobar o rechazar una solicitud de Almacén
+      description: >-
+        Acción sensible. Antes de llamar, presenta el código, solicitante, sucursal,
+        tipo y artículos al usuario y pide confirmación explícita para esa solicitud.
+        Envía el requestCode exacto recibido de listarSolicitudesAlmacen. Nunca
+        apruebes por inferencia. Core vuelve a comprobar estado, existencias y
+        actor ADMIN en una transacción y registra auditoría.
+      x-openai-isConsequential: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, confirmedRequestCode]
+              properties:
+                decision:
+                  type: string
+                  enum: [APPROVED, REJECTED]
+                confirmedRequestCode:
+                  type: string
+                  description: Código exacto de la solicitud que el usuario confirmó.
+      responses:
+        '200':
+          description: Solicitud procesada.
+        '400':
+          description: Entrada inválida.
+        '401':
+          description: Credencial no autorizada.
+        '404':
+          description: Código no coincide con la solicitud.
+        '409':
+          description: Solicitud ya procesada.
+        '422':
+          description: No se puede aprobar con el stock actual.
+  /api/chatgpt/v1/purchases/progress:
+    get:
+      operationId: consultarAvanceCompras
+      summary: Consultar avance de revisión de lotes recibidos
+      description: >-
+        Busca por número de lote o suplidor. El porcentaje representa equipos QC
+        revisados sobre total de equipos del lote; no representa porcentaje pagado
+        ni porcentaje monetario de una orden de compra.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 80
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 25
+            default: 15
+      responses:
+        '200':
+          description: Lotes de QC con equipos revisados, pendientes y porcentaje.
+        '401':
+          description: Credencial no autorizada.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
