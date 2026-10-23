@@ -47,6 +47,9 @@ function environment({ actor = admin, wallet, audits = [] } = {}) {
       if (id === "@/lib/auth/config") return { auth: async () => actor ? { user: { id: actor.id } } : null };
       if (id === "next/navigation") return { redirect: () => { throw new Error("UNAUTHENTICATED"); } };
       if (id === "@/components/layout/DashboardLayoutClient") return { DashboardLayoutClient: () => null };
+      if (id === "@/modules/facturas/components/InvoicesList") return { InvoicesList: () => null };
+      if (id === "@/modules/facturas/actions/invoice") return { getInvoicesAction: async () => ({ success: true, data: [{ id: "invoice-demo", createdAt: new Date("2026-10-24T02:30:00Z") }] }) };
+      if (id === "@/modules/facturas/lib/display-date") return load("modules/facturas/lib/display-date.ts");
       if (id.startsWith("@/lib/dashboard/")) return load(`${id.slice(2)}.ts`);
       if (id === "./admin-operations") return load("lib/dashboard/admin-operations.ts");
       throw new Error(`Unrecognized dependency: ${id}`);
@@ -130,3 +133,14 @@ for (const actor of [null, { ...admin, status: "BLOCKED" }, { ...admin, roleCode
   assert.ok(Object.values(roles.DEFAULT_ROLE_MODULES).every(modules => !modules.includes("precios")));
 }
 console.log("Navigation: streaming, shared counts, actor isolation, QC payment reads and retired prices passed (no database connection).");
+
+// The first invoice snapshot includes one stable label in Santo Domingo, even across UTC midnight.
+{
+  const env = environment();
+  const page = await env.load("app/(dashboard)/facturas/page.tsx").default();
+  const invoice = page.props.initialInvoices[0];
+  assert.equal(invoice.createdAt.toISOString(), "2026-10-24T02:30:00.000Z");
+  assert.match(invoice.displayCreatedAt, /^23 /);
+  assert.ok(invoice.displayCreatedAt.length > 10);
+}
+console.log("Invoice first render: stable display snapshot and Santo Domingo date boundary passed.");

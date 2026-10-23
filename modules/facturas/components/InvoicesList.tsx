@@ -5,6 +5,7 @@ import { getInvoicesAction, deleteInvoiceAction } from "../actions/invoice";
 import { InvoiceGenerator } from "./InvoiceGenerator";
 import { InvoicePDFPreviewModal } from "./InvoicePDFPreviewModal";
 import { ChargerClassifier } from "./ChargerClassifier";
+import { formatInvoiceDate } from "../lib/display-date";
 import {
   FileText,
   Search,
@@ -17,7 +18,7 @@ import {
   Filter,
 } from "lucide-react";
 
-type InvoiceListItem = Awaited<ReturnType<typeof getInvoicesAction>>["data"][number];
+type InvoiceListItem = Awaited<ReturnType<typeof getInvoicesAction>>["data"][number] & { displayCreatedAt?: string };
 
 export function InvoicesList({ initialInvoices }: { initialInvoices?: InvoiceListItem[] }) {
   const [invoices, setInvoices] = useState<InvoiceListItem[]>(initialInvoices ?? []);
@@ -225,10 +226,7 @@ export function InvoicesList({ initialInvoices }: { initialInvoices?: InvoiceLis
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {invoices.map((inv) => {
-                  const formattedDate = new Date(inv.createdAt).toLocaleString("es-DO", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  });
+                  const formattedDate = inv.displayCreatedAt ?? formatInvoiceDate(inv.createdAt);
 
                   return (
                     <tr key={inv.id} className={`hover:bg-slate-50/80 transition-colors ${inv.status === "ANULADA" ? "opacity-60" : ""}`}>

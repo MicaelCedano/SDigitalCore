@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { InvoicesList } from "@/modules/facturas/components/InvoicesList";
 import { getInvoicesAction } from "@/modules/facturas/actions/invoice";
+import { formatInvoiceDate } from "@/modules/facturas/lib/display-date";
 
 export const metadata: Metadata = {
   title: "Facturas & Conduces PDF | SDigitalCore",
@@ -10,5 +11,9 @@ export const metadata: Metadata = {
 export default async function FacturasPage() {
   // Load under the same authenticated render instead of a second client round trip.
   const initial = await getInvoicesAction();
-  return <InvoicesList initialInvoices={initial.success ? initial.data : undefined} />;
+  // Send the display label with the snapshot: Node and browser ICU can differ.
+  const initialInvoices = initial.success
+    ? initial.data.map(invoice => ({ ...invoice, displayCreatedAt: formatInvoiceDate(invoice.createdAt) }))
+    : undefined;
+  return <InvoicesList initialInvoices={initialInvoices} />;
 }
