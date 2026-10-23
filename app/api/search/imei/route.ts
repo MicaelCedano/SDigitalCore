@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
+import { isAdministrativeQcReview } from "@/modules/qc/lib/reviewer-selection";
 
 const searchSchema = z.object({
   q: z.string().trim().min(3, "Escribe al menos 3 caracteres.").max(80, "La búsqueda no puede exceder 80 caracteres.").regex(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/, "Usa letras, números, puntos, guiones o barras."),
@@ -130,6 +131,8 @@ export async function GET(request: Request) {
             reviewedAt: true,
             createdAt: true,
             reviewerNameSnapshot: true,
+            reviewerId: true,
+            reviewer: { select: { roleCode: true } },
             functionalityNotes: true,
             physicalNotes: true,
             grade: true,
@@ -216,6 +219,35 @@ export async function GET(request: Request) {
     .some((items) => items.length > pageSize);
   const pageItems = <T,>(items: T[]) => items.slice(0, pageSize);
 
+  // A later administrative recovery supersedes the QC row for operational state,
+  // but must not replace its employee author or original observations.
+  const administrativeDeviceIds = pageItems(latestQcInspections)
+    .filter(isAdministrativeQcReview)
+    .map(inspection => inspection.device.id);
+  const priorQcCandidates = administrativeDeviceIds.length
+    ? await prisma.qcInspection.findMany({
+        where: { status: "COMPLETED", deviceId: { in: administrativeDeviceIds } },
+        orderBy: [{ reviewedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }, { id: "desc" }],
+        select: {
+          deviceId: true,
+          reviewerId: true,
+          reviewerNameSnapshot: true,
+          reviewer: { select: { roleCode: true } },
+          reviewedAt: true,
+          functionalityNotes: true,
+          physicalNotes: true,
+          grade: true,
+          batteryHealth: true,
+        },
+      })
+    : [];
+  const priorQcReviewerByDevice = new Map<string, (typeof priorQcCandidates)[number]>();
+  for (const inspection of priorQcCandidates) {
+    if (!isAdministrativeQcReview(inspection) && !priorQcReviewerByDevice.has(inspection.deviceId)) {
+      priorQcReviewerByDevice.set(inspection.deviceId, inspection);
+    }
+  }
+
   const results: GlobalImeiResult[] = [
     ...pageItems(warranties).map((item) => ({
       id: `warranty-${item.id}`,
@@ -265,27 +297,30 @@ export async function GET(request: Request) {
       date: item.invoice.createdAt.toISOString(),
       href: "/facturas",
     })),
-    ...pageItems(latestQcInspections).map((item) => ({
-      id: `qc-${item.id}`,
-      dedupeKey: `device-${item.device.id}`,
-      source: "qc" as const,
-      sourceLabel: "Control de calidad",
-      documentNumber: item.device.batch?.batchNumber ?? "Equipo revisado",
-      imei: item.device.imei ?? query,
-      title: `${item.device.brand ? `${item.device.brand} ` : ""}${item.device.model}`,
-      detail: `${item.device.batch?.supplierName ?? "Sin suplidor"} · ${item.reviewerNameSnapshot}`,
-      status: item.result ?? "COMPLETED",
-      date: (item.reviewedAt ?? item.createdAt).toISOString(),
-      href: `/qc/equipos-revisados?q=${encodeURIComponent(item.device.imei ?? query)}`,
-      qcReview: {
-        reviewerName: item.reviewerNameSnapshot,
-        reviewedAt: item.reviewedAt?.toISOString() ?? null,
-        functionalityNotes: item.functionalityNotes,
-        physicalNotes: item.physicalNotes,
-        grade: item.grade,
-        batteryHealth: item.batteryHealth,
-      },
-    })),
+    ...pageItems(latestQcInspections).map((item) => {
+      const qcReviewer = isAdministrativeQcReview(item) ? priorQcReviewerByDevice.get(item.device.id) : item;
+      return {
+        id: `qc-${item.id}`,
+        dedupeKey: `device-${item.device.id}`,
+        source: "qc" as const,
+        sourceLabel: "Control de calidad",
+        documentNumber: item.device.batch?.batchNumber ?? "Equipo revisado",
+        imei: item.device.imei ?? query,
+        title: `${item.device.brand ? `${item.device.brand} ` : ""}${item.device.model}`,
+        detail: `${qcReviewer ? `Revisado por ${qcReviewer.reviewerNameSnapshot}` : "Sin revisión QC registrada"} · ${item.device.batch?.supplierName ?? "Sin suplidor"}`,
+        status: item.result ?? "COMPLETED",
+        date: (item.reviewedAt ?? item.createdAt).toISOString(),
+        href: `/qc/equipos-revisados?q=${encodeURIComponent(item.device.imei ?? query)}`,
+        qcReview: qcReviewer ? {
+          reviewerName: qcReviewer.reviewerNameSnapshot,
+          reviewedAt: qcReviewer.reviewedAt?.toISOString() ?? null,
+          functionalityNotes: qcReviewer.functionalityNotes,
+          physicalNotes: qcReviewer.physicalNotes,
+          grade: qcReviewer.grade,
+          batteryHealth: qcReviewer.batteryHealth,
+        } : null,
+      };
+    }),
     ...pageItems(deviceOnlyResults).map((item) => ({
       id: `device-${item.id}`,
       dedupeKey: `device-${item.id}`,

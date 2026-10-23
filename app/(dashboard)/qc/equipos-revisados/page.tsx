@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { prisma } from "@/lib/db/prisma";
 import { ReviewedDevicesPage } from "@/modules/qc/components/ReviewedDevicesPage";
+import { isAdministrativeQcReview } from "@/modules/qc/lib/reviewer-selection";
 
 export const metadata: Metadata = { title: "Equipos revisados | Control de Calidad" };
 
@@ -98,10 +99,7 @@ export default async function EquiposRevisadosPage({
   for (const inspection of inspectionIndexRows) {
     // La verificación física del administrador puede crear una inspección
     // posterior, pero no debe reemplazar al último revisor de QC en esta vista.
-    const snapshotRole = inspection.reviewerNameSnapshot.trim().toLocaleLowerCase("es");
-    const isLegacyAdministrativeReview =
-      !inspection.reviewerId && ["admin", "administrador", "administración"].includes(snapshotRole);
-    if (inspection.reviewer?.roleCode === "ADMIN" || isLegacyAdministrativeReview) continue;
+    if (isAdministrativeQcReview(inspection)) continue;
     if (!latestByDevice.has(inspection.deviceId)) latestByDevice.set(inspection.deviceId, inspection);
   }
 
