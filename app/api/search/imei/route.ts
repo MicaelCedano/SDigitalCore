@@ -21,6 +21,14 @@ type GlobalImeiResult = {
   date: string;
   href: string;
   dedupeKey?: string;
+  qcReview?: {
+    reviewerName: string;
+    reviewedAt: string | null;
+    functionalityNotes: string | null;
+    physicalNotes: string | null;
+    grade: string | null;
+    batteryHealth: number | null;
+  } | null;
 };
 
 function findMatchingImei(value: string | null, query: string) {
@@ -122,6 +130,10 @@ export async function GET(request: Request) {
             reviewedAt: true,
             createdAt: true,
             reviewerNameSnapshot: true,
+            functionalityNotes: true,
+            physicalNotes: true,
+            grade: true,
+            batteryHealth: true,
             device: {
               select: {
                 id: true,
@@ -265,6 +277,14 @@ export async function GET(request: Request) {
       status: item.result ?? "COMPLETED",
       date: (item.reviewedAt ?? item.createdAt).toISOString(),
       href: `/qc/equipos-revisados?q=${encodeURIComponent(item.device.imei ?? query)}`,
+      qcReview: {
+        reviewerName: item.reviewerNameSnapshot,
+        reviewedAt: item.reviewedAt?.toISOString() ?? null,
+        functionalityNotes: item.functionalityNotes,
+        physicalNotes: item.physicalNotes,
+        grade: item.grade,
+        batteryHealth: item.batteryHealth,
+      },
     })),
     ...pageItems(deviceOnlyResults).map((item) => ({
       id: `device-${item.id}`,
@@ -278,6 +298,7 @@ export async function GET(request: Request) {
       status: item.status,
       date: item.updatedAt.toISOString(),
       href: `/qc/equipos-revisados?q=${encodeURIComponent(item.imei ?? query)}`,
+      qcReview: null,
     })),
     ...pageItems(repairItems).map((item) => ({
       id: `repair-${item.id}`,
