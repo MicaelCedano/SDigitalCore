@@ -50,7 +50,7 @@ const success = value => ({ success: true, data: value });
 const method = (name, value) => async (...args) => { calls.push({ name, args }); return value; };
 const dependencies = {
   './workspace-contract': contract,
-  '@/modules/almacen/actions/warehouse': { getWarehouseProductsAction: method('stock', success([fixture])) },
+  '@/modules/almacen/actions/warehouse': { getWarehouseProductsAction: async (...args) => { calls.push({ name: 'stock', args }); return success(args[0] === 'no existe' ? [] : [fixture]); } },
   '@/modules/almacen/actions/goods-receipt': { getGoodsReceiptsAction: method('receipts', success([{ ...fixture, receiptNumber: 'REC-1', items: [{ description: 'Samsung A17', imeiOrSerial: '000000000000001', quantity: 2 }] }])) },
   '@/modules/garantias/actions/warranty': { listWarrantyCases: method('warranties', success({ cases: [{ ...fixture, model: 'A17', problem: 'Nota original', imei: '000000000000001' }], total: 41 })) },
   '@/modules/reparaciones/actions/repairs': { getPendingRepairJobsAction: method('adminRepairs', success([{ ...fixture, jobCode: 'REP-1', items: [] }])), getRepairDashboardAction: method('myRepairs', success({ data: { queue: [], myJobs: [{ ...fixture, jobCode: 'REP-2' }] } })) },
@@ -80,6 +80,8 @@ assert.equal(calls.filter(call => call.name === 'adminRepairs').length, 1);
 assert.equal(calls.filter(call => call.name === 'myRepairs').length, 1);
 assert.equal((await readWorkspaceModule('almacen', 'no existe', 1, actor)).entries.length, 0);
 assert.deepEqual(calls.find(call => call.name === 'stock').args, ['', { limit: 100 }]);
+assert.equal((await readWorkspaceModule('recibos', 'codigo-interno-no-proyectado', 1, actor)).entries.length, 1, 'Do not discard matches found by the existing reader in related records');
+assert.equal((await readWorkspaceModule('qc', 'imei-interno-no-proyectado', 1, { roleCode: 'ADMIN' })).entries.length, 1);
 
 // Exercise real data readers: the GET variants must never provision or synchronize.
 let writes = 0;
