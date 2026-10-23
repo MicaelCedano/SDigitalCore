@@ -59,7 +59,8 @@ async function requireWarehouseAdmin() {
 /**
  * Obtiene la lista de productos de almacén con sus cajas y unidades totales
  */
-export async function getWarehouseProductsAction(query?: string) {
+export async function getWarehouseProductsAction(query?: string, options?: { limit: number }) {
+  const take = options ? Math.min(100, Math.max(1, Math.trunc(options.limit) || 100)) : undefined;
   try {
     await requirePermission("warehouse.read");
     const where: Prisma.WarehouseProductWhereInput = { status: "ACTIVE" };
@@ -68,6 +69,7 @@ export async function getWarehouseProductsAction(query?: string) {
 
     const products = await prisma.warehouseProduct.findMany({
       where,
+      take,
       orderBy: { createdAt: "desc" },
     });
 
@@ -84,6 +86,7 @@ export async function getWarehouseProductsAction(query?: string) {
 
       const products = await prisma.warehouseProduct.findMany({
         where: legacyWhere,
+        take,
         orderBy: { createdAt: "desc" },
         select: legacyWarehouseProductSelect,
       });

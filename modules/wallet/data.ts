@@ -67,7 +67,7 @@ export async function getLegacyMigrationDashboard() {
   }
 }
 
-export async function getCurrentWallet() {
+export async function getCurrentWallet(options: { provision?: boolean } = {}) {
   const sessionUser = await requireUser();
   await requirePermission("wallet.read");
   if (!sessionUser.id) throw new Error("La sesión no tiene un usuario persistido.");
@@ -101,7 +101,7 @@ export async function getCurrentWallet() {
     ]);
 
     // Si el usuario no tiene wallet registrada en PostgreSQL, crearla automáticamente con su cuenta principal
-    if (!wallet) {
+    if (!wallet && options.provision !== false) {
       try {
         await prisma.wallet.create({
           data: {
@@ -132,7 +132,7 @@ export async function getCurrentWallet() {
       } catch (provisionError) {
         console.warn("[getCurrentWallet] No se pudo auto-provisionar wallet:", provisionError);
       }
-    } else if (wallet.accounts.length === 0 || !wallet.accounts.some((a) => a.kind === "PRIMARY")) {
+    } else if (wallet && options.provision !== false && (wallet.accounts.length === 0 || !wallet.accounts.some((a) => a.kind === "PRIMARY"))) {
       try {
         await prisma.walletAccount.create({
           data: {

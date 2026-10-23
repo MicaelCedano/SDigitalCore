@@ -53,7 +53,7 @@ function startOfCurrentWeekInSantoDomingo() {
   return new Date(Date.UTC(year, month - 1, day - daysSinceMonday, 4));
 }
 
-export async function getWorkCenterData() {
+export async function getWorkCenterData(options: { syncQc?: boolean } = {}) {
   const sessionUser = await requirePermission("centro-trabajo.read");
   if (!sessionUser.id) throw new Error("La sesión no tiene un usuario persistido.");
 
@@ -63,7 +63,7 @@ export async function getWorkCenterData() {
   });
   if (!user) throw new Error("Usuario no encontrado.");
 
-  after(async () => {
+  if (options.syncQc !== false) after(async () => {
     try {
       await syncQcWorkTasks(user.id);
       revalidatePath("/centro-trabajo");
@@ -87,7 +87,7 @@ export async function getWorkCenterData() {
     const weekStart = startOfCurrentWeekInSantoDomingo();
     const terminalStatuses: WorkTaskStatus[] = ["COMPLETED", "CANCELLED"];
     const currentTasksWhere: Prisma.WorkTaskWhereInput = {
-      ...scope,
+      AND: [scope],
       OR: [
         { status: { notIn: terminalStatuses } },
         { status: { in: terminalStatuses }, completedAt: { gte: weekStart } },
