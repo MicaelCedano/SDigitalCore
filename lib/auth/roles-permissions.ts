@@ -65,7 +65,6 @@ export const SYSTEM_ROLES: SystemRole[] = [
 export const SYSTEM_MODULES: ModuleDefinition[] = [
   { key: "almacen", label: "Almacén", permission: "warehouse.read", description: "Ubicaciones y solicitudes" },
   { key: "qc", label: "Control de Calidad", permission: "qc.read", description: "Inspecciones y equipos revisados" },
-  { key: "precios", label: "Lista de Precios", permission: "prices.read", description: "Listas de precios" },
   { key: "facturas", label: "Facturas PDF", permission: "invoices.read", description: "Comprobantes" },
   { key: "garantias", label: "Gestión de Garantías", permission: "warranties.read", description: "Casos, flujos y documentos" },
   { key: "reparaciones", label: "Reparaciones", permission: "reparaciones.read", description: "Cola de reparaciones y pago a técnicos" },
@@ -76,11 +75,11 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
 ];
 
 export const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
-  ADMIN: ["almacen", "qc", "precios", "facturas", "garantias", "reparaciones", "desbloqueos", "centro-trabajo", "wallet", "configuracion"],
+  ADMIN: ["almacen", "qc", "facturas", "garantias", "reparaciones", "desbloqueos", "centro-trabajo", "wallet", "configuracion"],
   ALMACEN: ["almacen"],
-  VENTAS: ["precios", "facturas"],
+  VENTAS: ["facturas"],
   TECNICO: ["reparaciones", "desbloqueos", "wallet"],
   QC: ["qc", "wallet"],
-  SUPERVISOR: ["almacen", "precios", "facturas", "garantias"],
+  SUPERVISOR: ["almacen", "facturas", "garantias"],
   PERSONALIZADO: [],
 };

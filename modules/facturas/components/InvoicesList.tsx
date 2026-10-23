@@ -1,52 +1,56 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getInvoicesAction, deleteInvoiceAction } from "../actions/invoice";
 import { InvoiceGenerator } from "./InvoiceGenerator";
 import { InvoicePDFPreviewModal } from "./InvoicePDFPreviewModal";
 import { ChargerClassifier } from "./ChargerClassifier";
 import {
   FileText,
-  Plus,
   Search,
   RefreshCw,
-  Printer,
   Trash2,
   Calendar,
-  User,
   Truck,
   DollarSign,
   Eye,
   Filter,
 } from "lucide-react";
 
-export function InvoicesList() {
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+type InvoiceListItem = Awaited<ReturnType<typeof getInvoicesAction>>["data"][number];
+
+export function InvoicesList({ initialInvoices }: { initialInvoices?: InvoiceListItem[] }) {
+  const [invoices, setInvoices] = useState<InvoiceListItem[]>(initialInvoices ?? []);
+  const [loading, setLoading] = useState(initialInvoices === undefined);
+  const filtersChanged = useRef(false);
+  const requestId = useRef(0);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
 
   const [showGenerator, setShowGenerator] = useState(false);
   const [showChargerClassifier, setShowChargerClassifier] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceListItem | null>(null);
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
-    const res = await getInvoicesAction(search, typeFilter);
-    if (res.success && res.data) {
-      setInvoices(res.data);
+    try {
+      const res = await getInvoicesAction(search, typeFilter);
+      if (requestId.current === id && res.success && res.data) setInvoices(res.data);
+    } finally {
+      if (requestId.current === id) setLoading(false);
     }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchInvoices();
-    }, 300);
-    return () => clearTimeout(timer);
   }, [search, typeFilter]);
 
-  const handleCreatedSuccess = (createdInvoice: any) => {
+  useEffect(() => {
+    if (initialInvoices !== undefined && !filtersChanged.current) return;
+    const timer = setTimeout(() => {
+      void fetchInvoices();
+    }, 300);
+    return () => { clearTimeout(timer); requestId.current += 1; };
+  }, [fetchInvoices, initialInvoices]);
+
+  const handleCreatedSuccess = (createdInvoice: InvoiceListItem) => {
     setShowGenerator(false);
     setSelectedInvoice(createdInvoice);
     fetchInvoices();
@@ -161,7 +165,7 @@ export function InvoicesList() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { filtersChanged.current = true; setSearch(e.target.value); }}
             placeholder="Buscar por número, NCF o cliente..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
           />
@@ -172,7 +176,7 @@ export function InvoicesList() {
             <Filter className="w-4 h-4 text-slate-400" />
             <select
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+              onChange={(e) => { filtersChanged.current = true; setTypeFilter(e.target.value); }}
               className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-[#5750f1]"
             >
               <option value="ALL">Todos los Documentos</option>

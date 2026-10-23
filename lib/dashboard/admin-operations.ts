@@ -2,14 +2,12 @@ import "server-only";
 
 import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
+import { getPersistedCurrentUser } from "@/lib/auth/helpers";
 
 export const getAdminOperationsOverview = cache(async (userId: string) => {
-  const admin = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { roleCode: true, status: true },
-  });
+  const admin = await getPersistedCurrentUser();
 
-  if (admin?.roleCode !== "ADMIN" || admin.status !== "ACTIVE") return null;
+  if (admin?.id !== userId || admin.roleCode !== "ADMIN" || admin.status !== "ACTIVE") return null;
 
   const weekStart = startOfCurrentWeekInSantoDomingo();
   const now = new Date();
@@ -41,9 +39,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   });
 
   const [
-    pendingWarehouseRequestCount,
+    notificationCounts,
     pendingWarehouseRequests,
-    pendingAccessRequestCount,
     pendingAccessRequests,
     latestReceipt,
     recentWarrantyCases,
@@ -56,7 +53,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     walletRedemptionsPending,
     assignmentAudits,
   ] = await Promise.all([
-    prisma.warehouseRequest.count({ where: { status: "PENDING" } }),
+    getAdminNotificationCounts(),
     prisma.warehouseRequest.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -72,7 +69,6 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         _count: { select: { items: true } },
       },
     }),
-    prisma.accessRequest.count({ where: { status: "PENDING" } }),
     prisma.accessRequest.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -264,14 +260,14 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   }
   const assignmentBatchIds = [...new Set([...latestAssignments.values()].map((item) => item.batchId))];
   const [assignmentBatches, paidAssignments] = await Promise.all([
-    prisma.qcRevisionBatch.findMany({
+    assignmentBatchIds.length ? prisma.qcRevisionBatch.findMany({
       where: { id: { in: assignmentBatchIds } },
       select: { id: true, batchNumber: true, supplierName: true },
-    }),
-    prisma.walletLedgerEntry.findMany({
+    }) : Promise.resolve([]),
+    assignmentBatchIds.length ? prisma.walletLedgerEntry.findMany({
       where: { externalKey: { startsWith: "qc-payment:" }, actorId: { in: [...new Set(latestAssignments.values().map((item) => item.reviewerId))] }, type: "CREDIT", status: "POSTED" },
       select: { externalKey: true, actorId: true },
-    }),
+    }) : Promise.resolve([]),
   ]);
   const assignmentBatchById = new Map(assignmentBatches.map((batch) => [batch.id, batch]));
   const paidAssignmentKeys = new Set(
@@ -280,7 +276,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
       return `${batchId}:${entry.actorId}`;
     }),
   );
-  const partialQcBatches: any[] = [];
+  type DashboardQcBatch = (typeof qcBatchesPending)[number] & { assignmentKey?: string; reviewerId?: string; reviewerName?: string };
+  const partialQcBatches: DashboardQcBatch[] = [];
   for (const assignment of latestAssignments.values()) {
     const batch = assignmentBatchById.get(assignment.batchId);
     if (!batch || /-R-[^-]+-/i.test(batch.batchNumber) || paidAssignmentKeys.has(`${assignment.batchId}:${assignment.reviewerId}`)) continue;
@@ -297,7 +294,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
       createdAt: assignment.submittedAt,
     });
   }
-  const qcBatchesForDashboard: any[] = [...qcBatchesPending, ...partialQcBatches];
+  const qcBatchesForDashboard: DashboardQcBatch[] = [...qcBatchesPending, ...partialQcBatches];
   const qcPendingTotalDevices = qcBatchesForDashboard.reduce((sum, batch) => sum + batch.totalDevices, 0);
   const qcSubmittedBatches = qcBatchesForDashboard.filter((b) => b.status === "SUBMITTED");
   const qcSubmittedPendingTotal = qcSubmittedBatches.reduce((sum, b) => sum + b.reviewedDevices * 50, 0);
@@ -408,9 +405,9 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
   }
 
   return {
-    pendingWarehouseRequestCount,
+    pendingWarehouseRequestCount: notificationCounts.pendingWarehouseRequestCount,
     pendingWarehouseRequests,
-    pendingAccessRequestCount,
+    pendingAccessRequestCount: notificationCounts.pendingAccessRequestCount,
     pendingAccessRequests,
     latestAccessRequestAt: pendingAccessRequests[0]?.createdAt ?? null,
     latestReceipt: latestReceipt

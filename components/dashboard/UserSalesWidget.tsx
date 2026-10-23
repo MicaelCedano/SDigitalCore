@@ -1,18 +1,7 @@
-"use client";
+
 
 import Link from "next/link";
-import {
-  FileText,
-  Tag,
-  ArrowRight,
-  Plus,
-  TrendingUp,
-  Receipt,
-  Search,
-  Sparkles,
-  Layers,
-  ArrowUpRight,
-} from "lucide-react";
+import { FileText, ArrowRight, Plus, TrendingUp } from "lucide-react";
 
 interface UserSalesWidgetProps {
   data: {
@@ -28,15 +17,6 @@ interface UserSalesWidgetProps {
     }[];
     invoicesCountToday: number;
     totalAmountToday: number;
-    priceListTotalCount: number;
-    priceListFeatured: {
-      id: string;
-      model: string;
-      brand: string | null;
-      capacity: string | null;
-      wholesalePrice: number;
-      retailPrice: number;
-    }[];
   };
 }
 
@@ -61,7 +41,7 @@ export function UserSalesWidget({ data }: UserSalesWidgetProps) {
           <div>
             <h3 className="text-base font-bold text-slate-900">Ventas & Facturación</h3>
             <p className="text-xs text-slate-500">
-              Comprobantes emitidos, lista de precios actualizada y accesos rápidos
+              Comprobantes emitidos y accesos rápidos
             </p>
           </div>
         </div>
@@ -73,17 +53,11 @@ export function UserSalesWidget({ data }: UserSalesWidgetProps) {
           >
             <Plus size={14} /> Nueva Factura / Conduce
           </Link>
-          <Link
-            href="/precios"
-            className="focus-ring inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50"
-          >
-            <Tag size={14} /> Lista de Precios
-          </Link>
         </div>
       </div>
 
-      {/* Grid de 2 columnas: Facturas recientes y Lista de precios destacada */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Comprobantes recientes */}
+      <div className="space-y-6">
         {/* Columna 1: Facturas Recientes */}
         <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4.5 py-3">
@@ -153,75 +127,6 @@ export function UserSalesWidget({ data }: UserSalesWidgetProps) {
           </div>
         </div>
 
-        {/* Columna 2: Resumen Lista de Precios */}
-        <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-4.5 py-3">
-            <div className="flex items-center gap-2">
-              <Tag size={16} className="text-indigo-600" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Lista de Precios ({data.priceListTotalCount} modelos)
-              </h4>
-            </div>
-            <Link
-              href="/precios"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-            >
-              Consultar catálogo <ArrowRight size={12} />
-            </Link>
-          </div>
-
-          <div className="p-4 flex-1">
-            {data.priceListFeatured.length > 0 ? (
-              <div className="divide-y divide-slate-100">
-                {data.priceListFeatured.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 px-2 rounded-lg hover:bg-slate-50/50 transition-colors"
-                  >
-                    <div className="min-w-0 flex-1 pr-3">
-                      <p className="truncate text-xs font-bold text-slate-900">
-                        {item.brand ? `${item.brand} ` : ""}
-                        {item.model}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {item.capacity || "Capacidad estándar"}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-right">
-                      <div>
-                        <p className="text-[10px] uppercase font-semibold text-slate-400">Mayorista</p>
-                        <p className="font-mono text-xs font-bold text-emerald-600">
-                          RD$ {item.wholesalePrice.toLocaleString("es-DO")}
-                        </p>
-                      </div>
-                      <div className="border-l border-slate-100 pl-3">
-                        <p className="text-[10px] uppercase font-semibold text-slate-400">Detalle</p>
-                        <p className="font-mono text-xs font-bold text-slate-900">
-                          RD$ {item.retailPrice.toLocaleString("es-DO")}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-xs text-slate-400">
-                No hay modelos activos en la lista de precios.
-              </div>
-            )}
-          </div>
-
-          <div className="border-t border-slate-100 bg-slate-50/30 px-4.5 py-2.5 flex items-center justify-between">
-            <span className="text-xs text-slate-500">Márgenes y combos configurados</span>
-            <Link
-              href="/precios"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
-            >
-              Abrir buscador rápido <ArrowUpRight size={13} />
-            </Link>
-          </div>
-        </div>
       </div>
     </div>
   );

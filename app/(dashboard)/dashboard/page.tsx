@@ -27,14 +27,8 @@ import {
   ScanSearch,
   FilePlus,
   ExternalLink,
-  Calendar,
-  Sparkles,
-  TrendingUp,
   BriefcaseBusiness,
   FileText,
-  Tag,
-  Wrench,
-  Lock,
   WalletCards,
   ShieldAlert,
 } from "lucide-react";
@@ -104,7 +98,7 @@ export default async function DashboardPage() {
     : 0;
 
   // Verificamos si el usuario no-admin tiene algún módulo activo visible
-  const hasSalesModule = allowedModuleSet.has("facturas") || allowedModuleSet.has("precios") || persistedUser?.roleCode === "VENTAS";
+  const hasSalesModule = allowedModuleSet.has("facturas") || persistedUser?.roleCode === "VENTAS";
   const hasWorkCenterModule = allowedModuleSet.has("centro-trabajo");
   const hasWarrantyModule = allowedModuleSet.has("garantias");
   const hasWarehouseModule = allowedModuleSet.has("almacen") || persistedUser?.roleCode === "ALMACEN";
@@ -180,14 +174,6 @@ export default async function DashboardPage() {
                 className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 transition-all hover:bg-emerald-700 active:scale-[0.98]"
               >
                 <Plus size={15} /> Nueva Factura
-              </Link>
-            )}
-            {allowedModuleSet.has("precios") && (
-              <Link
-                href="/precios"
-                className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300"
-              >
-                <Tag size={15} /> Lista de Precios
               </Link>
             )}
             {hasWorkCenterModule && (
@@ -670,7 +656,7 @@ export default async function DashboardPage() {
 
           {/* Renderizado Modular de Widgets según Permisos */}
           <section className="space-y-8">
-            {/* Widget 1: Ventas y Lista de Precios */}
+            {/* Widget 1: Ventas y facturación */}
             {userOverview.sales && hasSalesModule && (
               <UserSalesWidget data={userOverview.sales} />
             )}

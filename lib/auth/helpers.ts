@@ -53,6 +53,8 @@ export async function requirePermission(permission: string) {
  * Utiliza la consulta cacheada del usuario en memoria para máxima velocidad.
  */
 export async function can(permission: string): Promise<boolean> {
+  // Retired module: legacy user assignments must not reactivate its actions.
+  if (/^(prices|precios)\./.test(permission)) return false;
   try {
     const persistedUser = await getPersistedCurrentUser();
     if (!persistedUser || persistedUser.status !== "ACTIVE") return false;
@@ -69,7 +71,6 @@ export async function can(permission: string): Promise<boolean> {
       repair: "taller",
       customers: "clientes",
       suppliers: "proveedores",
-      prices: "precios",
       invoices: "facturas",
       reports: "reportes",
       settings: "configuracion",

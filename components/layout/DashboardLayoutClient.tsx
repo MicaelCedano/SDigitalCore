@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import type { TopbarNotification } from "@/components/layout/Topbar";
+import type { DashboardHeaderSummary } from "@/lib/dashboard/header-summary";
 
 interface DashboardLayoutClientProps {
   userName?: string | null;
@@ -14,6 +15,7 @@ interface DashboardLayoutClientProps {
   walletBalance?: string | null;
   notifications?: TopbarNotification[];
   notificationCount?: number;
+  headerSummary?: Promise<DashboardHeaderSummary>;
   children: React.ReactNode;
 }
 
@@ -26,6 +28,7 @@ export function DashboardLayoutClient({
   walletBalance,
   notifications,
   notificationCount,
+  headerSummary,
   children,
 }: DashboardLayoutClientProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -50,6 +53,7 @@ export function DashboardLayoutClient({
           walletBalance={walletBalance}
           notifications={notifications}
           notificationCount={notificationCount}
+          headerSummary={headerSummary}
           onMobileToggle={() => setMobileOpen((v) => !v)}
         />
         <main className="dashboard-content">

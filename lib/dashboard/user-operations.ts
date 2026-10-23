@@ -18,15 +18,6 @@ export type UserOperationsOverview = {
     }[];
     invoicesCountToday: number;
     totalAmountToday: number;
-    priceListTotalCount: number;
-    priceListFeatured: {
-      id: string;
-      model: string;
-      brand: string | null;
-      capacity: string | null;
-      wholesalePrice: number;
-      retailPrice: number;
-    }[];
   };
   workCenter?: {
     totalPending: number;
@@ -177,12 +168,12 @@ export const getUserOperationsOverview = cache(
 
     const fetchers: Promise<void>[] = [];
 
-    // 1. VENTAS: Precios & Facturas
-    if (moduleSet.has("facturas") || moduleSet.has("precios") || roleCode === "VENTAS") {
+    // 1. VENTAS: Facturas
+    if (moduleSet.has("facturas") || roleCode === "VENTAS") {
       fetchers.push(
         (async () => {
           try {
-            const [recentInvoices, todayInvoiceStats, priceListTotalCount, priceListFeatured] = await Promise.all([
+            const [recentInvoices, todayInvoiceStats] = await Promise.all([
               prisma.invoice.findMany({
                 orderBy: { createdAt: "desc" },
                 take: 5,
@@ -202,22 +193,6 @@ export const getUserOperationsOverview = cache(
                 _count: { _all: true },
                 _sum: { total: true },
               }),
-              prisma.priceListItem.count({
-                where: { status: "ACTIVE" },
-              }),
-              prisma.priceListItem.findMany({
-                where: { status: "ACTIVE" },
-                orderBy: [{ updatedAt: "desc" }],
-                take: 5,
-                select: {
-                  id: true,
-                  model: true,
-                  brand: true,
-                  capacity: true,
-                  wholesalePrice: true,
-                  retailPrice: true,
-                },
-              }),
             ]);
 
             const invoicesCountToday = todayInvoiceStats._count._all;
@@ -227,8 +202,6 @@ export const getUserOperationsOverview = cache(
               recentInvoices,
               invoicesCountToday,
               totalAmountToday,
-              priceListTotalCount,
-              priceListFeatured,
             };
           } catch (e) {
             console.error("[getUserOperationsOverview] Error fetching sales data:", e);

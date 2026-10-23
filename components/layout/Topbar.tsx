@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User, Wallet, Sparkles } from "lucide-react";
+import { Bell, CheckCircle2, ChevronDown, Clock3, LogOut, Menu, Settings, User, Wallet } from "lucide-react";
 import { GlobalImeiSearch } from "@/components/layout/GlobalImeiSearch";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import type { DashboardHeaderSummary } from "@/lib/dashboard/header-summary";
 
 export interface TopbarNotification {
   id: string;
@@ -25,6 +26,7 @@ interface TopbarProps {
   walletBalance?: string | null;
   notifications?: TopbarNotification[];
   notificationCount?: number;
+  headerSummary?: Promise<DashboardHeaderSummary>;
   onMobileToggle?: () => void;
 }
 
@@ -33,7 +35,6 @@ const pageTitles: Record<string, string> = {
   "/almacen/conteos": "Auditorías de almacén",
   "/almacen": "Almacén y solicitudes",
   "/garantias": "Gestión de Garantías",
-  "/precios": "Lista de precios",
   "/facturas": "Facturas y comprobantes",
   "/inventario": "Inventario y equipos",
   "/ventas": "Ventas y facturación",
@@ -62,6 +63,38 @@ function formatNotificationDate(value: string) {
   }).format(new Date(value));
 }
 
+function NotificationTrigger({ summary, fallbackCount, loadedCount, open, onOpen }: {
+  summary?: Promise<DashboardHeaderSummary>;
+  fallbackCount: number;
+  loadedCount: number | null;
+  open: boolean;
+  onOpen: () => void;
+}) {
+  const data = summary ? use(summary) : null;
+  const count = loadedCount ?? data?.notificationCount ?? fallbackCount;
+  return (
+    <button type="button" onClick={onOpen}
+      className="focus-ring relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+      aria-label={count > 0 ? `Notificaciones, ${count} pendientes` : "Notificaciones"}
+      aria-expanded={open} aria-haspopup="dialog">
+      <Bell size={18} strokeWidth={2} />
+      {count > 0 ? <span className="absolute -right-0.5 -top-0.5 flex min-h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{count > 99 ? "99+" : count}</span> : null}
+    </button>
+  );
+}
+
+function WalletIndicator({ summary, fallbackBalance }: { summary?: Promise<DashboardHeaderSummary>; fallbackBalance?: string | null }) {
+  const data = summary ? use(summary) : null;
+  const balance = summary ? data?.walletBalance : fallbackBalance;
+  if (balance === null || balance === undefined) return null;
+  return (
+    <Link href="/wallet" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 text-xs font-bold text-indigo-700 shadow-2xs transition-all hover:bg-indigo-100/70 hover:border-indigo-200" title="Ver Mi Wallet">
+      <Wallet size={14} strokeWidth={2.2} className="text-indigo-600" />
+      <span className="font-mono">RD$ {Number(balance).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+    </Link>
+  );
+}
+
 export function Topbar({
   userName,
   userEmail,
@@ -70,13 +103,13 @@ export function Topbar({
   walletBalance,
   notifications = [],
   notificationCount = 0,
+  headerSummary,
   onMobileToggle,
 }: TopbarProps) {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [loadedNotifications, setLoadedNotifications] = useState<TopbarNotification[] | null>(null);
-  const [loadedNotificationCount, setLoadedNotificationCount] = useState<number | null>(null);
+  const [notificationData, setNotificationData] = useState<{ pathname: string; notifications: TopbarNotification[]; count: number } | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -90,11 +123,8 @@ export function Topbar({
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, []);
 
-  useEffect(() => {
-    setLoadedNotifications(null);
-    setLoadedNotificationCount(null);
-  }, [pathname]);
-
+  const loadedNotifications = notificationData?.pathname === pathname ? notificationData.notifications : null;
+  const loadedNotificationCount = notificationData?.pathname === pathname ? notificationData.count : null;
   const visibleNotifications = loadedNotifications ?? notifications;
   const visibleNotificationCount = loadedNotificationCount ?? notificationCount;
 
@@ -112,11 +142,9 @@ export function Topbar({
         notifications: TopbarNotification[];
         notificationCount: number;
       };
-      setLoadedNotifications(data.notifications);
-      setLoadedNotificationCount(data.notificationCount);
+      setNotificationData({ pathname, notifications: data.notifications, count: data.notificationCount });
     } catch {
-      setLoadedNotifications([]);
-      setLoadedNotificationCount(0);
+      setNotificationData({ pathname, notifications: [], count: 0 });
     } finally {
       setNotificationsLoading(false);
     }
@@ -146,21 +174,9 @@ export function Topbar({
 
         {/* Notifications Popover */}
         <div className="relative" ref={notificationsRef}>
-          <button
-            type="button"
-            onClick={() => void openNotifications()}
-            className="focus-ring relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
-            aria-label={visibleNotificationCount > 0 ? `Notificaciones, ${visibleNotificationCount} pendientes` : "Notificaciones"}
-            aria-expanded={notificationsOpen}
-            aria-haspopup="dialog"
-          >
-            <Bell size={18} strokeWidth={2} />
-            {visibleNotificationCount > 0 ? (
-              <span className="absolute -right-0.5 -top-0.5 flex min-h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
-                {visibleNotificationCount > 99 ? "99+" : visibleNotificationCount}
-              </span>
-            ) : null}
-          </button>
+          <Suspense fallback={<NotificationTrigger fallbackCount={notificationCount} loadedCount={loadedNotificationCount} open={notificationsOpen} onOpen={() => void openNotifications()} />}>
+            <NotificationTrigger summary={headerSummary} fallbackCount={notificationCount} loadedCount={loadedNotificationCount} open={notificationsOpen} onOpen={() => void openNotifications()} />
+          </Suspense>
 
           {notificationsOpen ? (
             <div
@@ -189,8 +205,7 @@ export function Topbar({
                       href={notification.href}
                       onClick={() => {
                         setNotificationsOpen(false);
-                        setLoadedNotifications(null);
-                        setLoadedNotificationCount(null);
+                        setNotificationData(null);
                       }}
                       className="group flex gap-3 rounded-xl p-3 transition-colors hover:bg-slate-50"
                     >
@@ -230,18 +245,9 @@ export function Topbar({
 
         {/* User profile & Wallet pill */}
         <div className="relative flex items-center gap-2" ref={dropdownRef}>
-          {walletBalance !== null && walletBalance !== undefined ? (
-            <Link
-              href="/wallet"
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 text-xs font-bold text-indigo-700 shadow-2xs transition-all hover:bg-indigo-100/70 hover:border-indigo-200"
-              title="Ver Mi Wallet"
-            >
-              <Wallet size={14} strokeWidth={2.2} className="text-indigo-600" />
-              <span className="font-mono">
-                RD$ {Number(walletBalance).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </Link>
-          ) : null}
+          <Suspense fallback={<Link href="/wallet" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-indigo-100 px-3 text-xs text-indigo-700" title="Cargando saldo"><Wallet size={14} /> Mi Wallet</Link>}>
+            <WalletIndicator summary={headerSummary} fallbackBalance={walletBalance} />
+          </Suspense>
 
           <button
             type="button"

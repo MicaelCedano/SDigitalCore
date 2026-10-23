@@ -1,7 +1,6 @@
 import { DashboardLayoutClient } from "@/components/layout/DashboardLayoutClient";
 import { getPersistedCurrentUser, requireUser } from "@/lib/auth/helpers";
-import { getAdminNotificationCounts } from "@/lib/dashboard/admin-operations";
-import { prisma } from "@/lib/db/prisma";
+import { getDashboardHeaderSummary } from "@/lib/dashboard/header-summary";
 
 export default async function DashboardLayout({
   children,
@@ -13,22 +12,11 @@ export default async function DashboardLayout({
     getPersistedCurrentUser(),
   ]);
   const allowedModules = persistedUser?.roleCode === "ADMIN" ? undefined : persistedUser?.allowedModules ?? [];
-  const [notificationCounts, walletBalance] = await Promise.all([
-    persistedUser?.roleCode === "ADMIN" && persistedUser.status === "ACTIVE"
-      ? getAdminNotificationCounts()
-      : Promise.resolve(null),
-    (async () => {
-      try {
-        const wallet = await prisma.wallet.findUnique({
-          where: { userId: user.id },
-          select: { balance: true },
-        });
-        return wallet ? wallet.balance.toFixed(2) : null;
-      } catch {
-        return null;
-      }
-    })(),
-  ]);
+  // Stream optional header indicators; module content only waits for authentication.
+  const userId = persistedUser?.id ?? user.id;
+  const headerSummary = userId
+    ? getDashboardHeaderSummary(userId, persistedUser?.roleCode === "ADMIN" && persistedUser.status === "ACTIVE")
+    : Promise.resolve({ walletBalance: null, notificationCount: null });
 
   return (
     <DashboardLayoutClient
@@ -37,8 +25,7 @@ export default async function DashboardLayout({
       userRole={persistedUser?.roleCode}
       userAvatarUrl={persistedUser?.image}
       allowedModules={allowedModules}
-      walletBalance={walletBalance}
-      notificationCount={(notificationCounts?.pendingWarehouseRequestCount ?? 0) + (notificationCounts?.pendingAccessRequestCount ?? 0) + (notificationCounts?.pendingQcImeiRequestCount ?? 0)}
+      headerSummary={headerSummary}
     >
       {children}
     </DashboardLayoutClient>

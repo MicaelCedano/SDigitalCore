@@ -31,7 +31,7 @@ try {
   );
   if (conflict.rowCount > 1) throw new Error("El correo y el usuario pertenecen a cuentas diferentes.");
 
-  const allowedModules = ["almacen", "precios", "facturas", "configuracion"];
+  const allowedModules = ["almacen", "facturas", "configuracion"];
   if (conflict.rowCount === 1) {
     await client.query(
       'UPDATE "user" SET name=$1, username=$2, email=$3, password_hash=$4, role_code=$5, allowed_modules=$6, status=$7, updated_at=NOW() WHERE id=$8',

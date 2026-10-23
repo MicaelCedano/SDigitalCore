@@ -15,13 +15,11 @@ import {
   Settings,
   ShieldCheck,
   ScanSearch,
-  Tag,
   Warehouse,
   WalletCards,
   Wrench,
   Lock,
   X,
-  Sparkles,
 } from "lucide-react";
 
 interface SubNavItem {
@@ -69,7 +67,6 @@ const navItems: NavItem[] = [
     { label: "Aprobar y pagar", href: "/desbloqueos/pagos", adminOnly: true },
   ] },
   { label: "Mi Wallet", href: "/wallet", moduleKey: "wallet", icon: WalletCards, section: "Comercial" },
-  { label: "Lista de precios", href: "/precios", moduleKey: "precios", icon: Tag, section: "Comercial" },
   { label: "Facturas", href: "/facturas", moduleKey: "facturas", icon: FileText, section: "Comercial" },
   { label: "Gestión de Garantías", href: "/garantias", moduleKey: "garantias", icon: ShieldCheck, section: "Operaciones", children: [
     { label: "Panel de casos", href: "/garantias" },
