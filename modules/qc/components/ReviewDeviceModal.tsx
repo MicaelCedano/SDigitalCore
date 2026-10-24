@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { QC_CHECKLIST } from "@/lib/mobile/qc-contract";
 import {
   X,
   Smartphone,
@@ -22,16 +23,7 @@ import {
 import { compressImage } from "@/lib/image-compression";
 import { cacheDevicePhotos, getCachedDevicePhotos, clearCachedDevicePhotos } from "../lib/photo-cache";
 
-const CHECKLIST_ITEMS = [
-  { id: "pantalla", label: "Pantalla & Táctil" },
-  { id: "bateria", label: "Batería / Carga" },
-  { id: "camaras", label: "Cámaras (Fr./Post.)" },
-  { id: "sensores", label: "Face ID / Touch ID" },
-  { id: "audio", label: "Bocinas & Micrófono" },
-  { id: "botones", label: "Botones Físicos" },
-  { id: "conexion", label: "Wi-Fi & Bluetooth" },
-  { id: "chasis", label: "Chasis / Estética Gral." },
-];
+const CHECKLIST_ITEMS = QC_CHECKLIST;
 
 const GRADES = [
   { value: "A", label: "A (Excelente)" },

@@ -39,6 +39,9 @@ export default auth((req) => {
 
   // Rutas protegidas — exigir sesión
   if (!isLoggedIn) {
+    if (nextUrl.pathname === '/api/mobile/qc' || nextUrl.pathname.startsWith('/api/mobile/qc/')) {
+      return NextResponse.json({ error: 'Tu sesión venció. Vuelve a iniciar sesión.' }, { status: 401, headers: { 'Cache-Control': 'private, no-store' } });
+    }
     const loginUrl = new URL("/login", nextUrl);
     loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
     return NextResponse.redirect(loginUrl);

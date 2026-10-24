@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { createServiceClient } from "@/lib/storage";
+import { normalizeQcPhoto } from '../lib/photo-input';
+import { z } from 'zod';
 
 const BUCKET = "defectos-equipos";
 const DRIVE_PREFIX = "drive:";
@@ -45,7 +47,8 @@ async function assertDeviceAccess(deviceId: string, actorId: string) {
   });
   if (!device) return { error: "El equipo no existe." };
   const persisted = await getPersistedCurrentUser();
-  if (persisted && persisted.roleCode !== "ADMIN" && device.assignedToId !== actorId) {
+  if (!persisted || persisted.status !== 'ACTIVE' || persisted.id !== actorId) return { error: 'La sesión ya no está activa.' };
+  if (persisted.roleCode !== "ADMIN" && device.assignedToId !== actorId) {
     return { error: "Este IMEI no está asignado a tu usuario." };
   }
   return { device };
@@ -66,11 +69,44 @@ export async function uploadDevicePhotosAction(formData: FormData) {
     const deviceId = String(formData.get("deviceId") || "");
     if (!deviceId) return { success: false, error: "Falta el identificador del equipo.", uploaded: 0 };
 
-    const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-    if (files.length === 0) return { success: false, error: "No se recibieron fotos.", uploaded: 0 };
+    const received = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+    if (received.length === 0) return { success: false, error: "No se recibieron fotos.", uploaded: 0 };
+    if (received.length > 20 || received.reduce((sum, file) => sum + file.size, 0) > 20 * 1024 * 1024)
+      return { success: false, error: 'Adjunta hasta 20 fotos y 20 MB por envío.', uploaded: 0 };
+    const command = formData.get('mobileCommandId');
+    const commandId = command === null ? null : z.string().uuid().parse(command);
+    if (commandId && received.length !== 1) return { success: false, error: 'Envía una foto por operación.', uploaded: 0 };
 
     const access = await assertDeviceAccess(deviceId, actor.id);
-    if (access.error) return { success: false, error: access.error, uploaded: 0 };
+    if (access.error) return { success: false, error: access.error, errorCode: 'QC_FORBIDDEN', uploaded: 0 };
+
+    const photoId = commandId ? `mobile-photo-${commandId}` : undefined;
+    if (photoId) {
+      const previous = await prisma.devicePhoto.findUnique({ where: { id: photoId } });
+      if (previous) return previous.deviceId === deviceId && previous.createdById === actor.id
+        ? { success: true, uploaded: 1, replayed: true }
+        : { success: false, error: 'El envío pertenece a otra foto.', uploaded: 0 };
+    }
+    const files = await Promise.all(received.map(normalizeQcPhoto));
+    const persistPhoto = async (storagePath: string) => {
+      if (!photoId) { await prisma.devicePhoto.create({ data: { deviceId, storagePath, createdById: actor.id } }); return; }
+      try {
+        await prisma.$transaction(async tx => {
+          await tx.devicePhoto.create({ data: { id: photoId, deviceId, storagePath, createdById: actor.id } });
+          await tx.auditLog.create({ data: { userId: actor.id, action: 'device_photo.upload', module: 'qc', entityType: 'device_unit', entityId: deviceId, afterData: { uploaded: 1, commandId } } });
+        });
+      } catch (error) {
+        // Clean up a failed/competing upload; a retry reads the durable photo ID.
+        const existing = await prisma.devicePhoto.findUnique({ where: { id: photoId } });
+        if (!existing || existing.storagePath !== storagePath) {
+          try {
+            if (storagePath.startsWith(DRIVE_PREFIX)) await callDriveScript({ action: 'delete', fileId: storagePath.slice(DRIVE_PREFIX.length) });
+            else await createServiceClient().storage.from(BUCKET).remove([storagePath]);
+          } catch { console.error('[qc/photo] No se pudo limpiar una carga sin registrar.'); }
+        }
+        if (!existing || existing.deviceId !== deviceId || existing.createdById !== actor.id) throw error;
+      }
+    };
 
     const device = access.device;
     const imei = String(formData.get("imei") || device?.id || deviceId);
@@ -91,12 +127,10 @@ export async function uploadDevicePhotosAction(formData: FormData) {
 
     if (driveFiles) {
       for (const file of driveFiles.uploaded ?? []) {
-        await prisma.devicePhoto.create({
-          data: { deviceId, storagePath: `${DRIVE_PREFIX}${file.id}`, createdById: actor.id },
-        });
+        await persistPhoto(`${DRIVE_PREFIX}${file.id}`);
       }
       const uploaded = driveFiles.uploaded?.length ?? 0;
-      await logAudit({ userId: actor.id, action: "device_photo.upload", module: "qc", entityType: "device_unit", entityId: deviceId, afterData: { uploaded, provider: "google_drive" } });
+      if (!photoId) await logAudit({ userId: actor.id, action: "device_photo.upload", module: "qc", entityType: "device_unit", entityId: deviceId, afterData: { uploaded, provider: "google_drive" } });
       return uploaded > 0
         ? { success: true, uploaded }
         : { success: false, error: "Google Drive no devolvió archivos subidos.", uploaded: 0 };
@@ -117,13 +151,11 @@ export async function uploadDevicePhotosAction(formData: FormData) {
         console.error("Error subiendo foto al storage:", error);
         continue;
       }
-      await prisma.devicePhoto.create({
-        data: { deviceId, storagePath: path, createdById: actor.id },
-      });
+      await persistPhoto(path);
       uploaded++;
     }
 
-    await logAudit({
+    if (!photoId) await logAudit({
       userId: actor.id,
       action: "device_photo.upload",
       module: "qc",

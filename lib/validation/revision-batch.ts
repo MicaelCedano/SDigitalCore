@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { QC_CHECKLIST } from '@/lib/mobile/qc-contract';
 
 export const revisionBatchDeviceSchema = z.object({
   brand: z.string().optional().nullable(),
@@ -49,6 +50,15 @@ export const reviewDeviceSchema = z.object({
     (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
     z.number().int().min(0).max(100).optional().nullable()
   ),
+  mobile: z.object({
+    commandId: z.string().uuid(),
+    expectedUpdatedAt: z.string().datetime(),
+    expectedBatchId: z.string().min(1).max(100),
+    checklist: z.array(z.string().max(20)).max(8),
+  }).strict().optional(),
+}).superRefine((data, ctx) => {
+  if (data.mobile && data.result === 'FUNCTIONAL' && !QC_CHECKLIST.every(item => data.mobile!.checklist.includes(item.id)))
+    ctx.addIssue({ code: 'custom', path: ['mobile', 'checklist'], message: 'Completa el checklist antes de marcar el equipo funcional.' });
 });
 
 export type RevisionBatchDeviceInput = z.infer<typeof revisionBatchDeviceSchema>;

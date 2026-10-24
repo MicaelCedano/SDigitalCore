@@ -24,6 +24,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { normalizeModelName } from "../lib/model-name";
 import { isReconciledSubmission } from "../lib/reconciled-submission";
+import { recordReview, QcCommandError } from '../lib/record-review';
 
 type Result<T> = { success: true; data: T; message?: string } | { success: false; error: string };
 
@@ -1423,114 +1424,30 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
       include: { batch: true },
     });
     if (!device) {
-      return { success: false, error: "El equipo no existe." };
+      return { success: false, errorCode: "QC_CONFLICT", error: "El equipo no existe." };
     }
     if (!device.batch) {
-      return { success: false, error: "El equipo no pertenece a ningún Lote de Revisión." };
+      return { success: false, errorCode: "QC_CONFLICT", error: "El equipo no pertenece a ningún Lote de Revisión." };
     }
     if (device.batch.status === "CANCELLED") {
-      return { success: false, error: "No se puede revisar un equipo de un lote cancelado." };
+      return { success: false, errorCode: "QC_CONFLICT", error: "No se puede revisar un equipo de un lote cancelado." };
     }
     const reviewer = await getPersistedCurrentUser();
-    if (reviewer && reviewer.roleCode !== "ADMIN" && device.assignedToId !== reviewer.id) {
-      return { success: false, error: "Este IMEI no está asignado a tu usuario." };
+    if (!reviewer || reviewer.status !== 'ACTIVE' || reviewer.id !== actor.id) {
+      return { success: false, error: 'La sesión ya no está activa.', errorCode: 'QC_FORBIDDEN' };
+    }
+    if (reviewer.roleCode !== "ADMIN" && device.assignedToId !== reviewer.id) {
+      return { success: false, errorCode: "QC_FORBIDDEN", error: "Este IMEI no está asignado a tu usuario." };
     }
 
     const batch = device.batch;
     const reviewerName = actor.name || actor.email || "Control de Calidad";
 
-    const updatedBatch = await prisma.$transaction(async (tx) => {
-      // Si ya había una inspección completada EN ESTE LOTE, la nueva la reemplaza
-      // (cadena de correcciones). Las inspecciones de lotes anteriores (reingresos)
-      // NO se encadenan: el equipo vuelve a revisarse desde cero.
-      const lastCompleted = await tx.qcInspection.findFirst({
-        where: { deviceId: device.id, status: "COMPLETED", createdAt: { gte: batch.createdAt } },
-        orderBy: { createdAt: "desc" },
-        select: { id: true },
-      });
-
-      await tx.qcInspection.create({
-        data: {
-          deviceId: device.id,
-          reviewerId: actor.id,
-          reviewerNameSnapshot: reviewerName.slice(0, 160),
-          status: "COMPLETED",
-          result: validated.result,
-          grade: validated.grade,
-          batteryHealth: validated.batteryHealth ?? null,
-          functionalityNotes: validated.notes || null,
-          reviewedAt: new Date(),
-          supersedesId: lastCompleted?.id ?? null,
-        },
-      });
-
-      await tx.deviceUnit.update({
-        where: { id: device.id },
-        data: {
-          status: validated.result === "FUNCTIONAL" ? "AVAILABLE" : "QUARANTINED",
-        },
-      });
-
-      // Recalcular contadores del lote desde las inspecciones reales (idempotente).
-      // Solo cuentan inspecciones de ESTE lote (createdAt >= lote) — los reingresos
-      // sin revisar no se contabilizan como revisados.
-      const batchDevices = await tx.deviceUnit.findMany({
-        where: { batchId: batch.id },
-        include: {
-          inspections: { where: { createdAt: { gte: batch.createdAt } }, orderBy: { createdAt: "desc" }, take: 1 },
-        },
-      });
-
-      let reviewed = 0;
-      let functional = 0;
-      let nonFunctional = 0;
-      for (const d of batchDevices) {
-        const last = d.inspections[0];
-        if (last && last.status === "COMPLETED") {
-          reviewed++;
-          if (last.result === "FUNCTIONAL") functional++;
-          else if (last.result === "NON_FUNCTIONAL") nonFunctional++;
-        }
-      }
-
-      // Completar el último equipo no debe cerrar ni enviar el lote por sí
-      // solo: el QC debe pulsar "Enviar para pago". Así el administrador
-      // recibe una solicitud explícita antes de acreditar la wallet.
-      const allReviewed = batchDevices.length > 0 && reviewed >= batchDevices.length;
-      const nextStatus = batch.status === "SUBMITTED" ? "SUBMITTED" : allReviewed ? "IN_REVIEW" : batch.status;
-
-      const updatedBatch = await tx.qcRevisionBatch.update({
-        where: { id: batch.id },
-        data: {
-          reviewedDevices: reviewed,
-          functionalCount: functional,
-          nonFunctionalCount: nonFunctional,
-          status: nextStatus as QcBatchStatus,
-          completedAt: nextStatus === "COMPLETED" ? new Date() : null,
-        },
-      });
-
-      // Sin pago aquí: el pago a revisores ocurre SOLO cuando el admin
-      // acepta el lote (approveRevisionBatchAction).
-
-      return updatedBatch;
-    });
-
-    await logAudit({
-      userId: actor.id,
-      action: "qc_batch.review_device",
-      module: "qc",
-      entityType: "qc_inspection",
-      entityId: device.id,
-      afterData: {
-        batchId: batch.id,
-        batchNumber: batch.batchNumber,
-        deviceId: device.id,
-        result: validated.result,
-        grade: validated.grade,
-        status: updatedBatch.status,
-      },
-    });
+    const recorded = await recordReview(prisma, {
+      id: actor.id, name: reviewerName, admin: reviewer.roleCode === "ADMIN",
+    }, validated);
+    const updatedBatch = recorded.batch;
+    if (recorded.replayed) return { success: true, replayed: true, message: "Esta revisión ya estaba registrada.", data: updatedBatch };
 
     if (updatedBatch.reviewedDevices >= updatedBatch.totalDevices && batch.reviewedDevices < batch.totalDevices) {
       await sendPushToRole("ADMIN", {
@@ -1561,6 +1478,7 @@ export async function reviewDeviceAction(input: ReviewDeviceInput) {
     console.error("Error al revisar equipo:", error);
     return {
       success: false,
+      errorCode: error instanceof QcCommandError ? error.code : error instanceof z.ZodError ? "QC_INVALID" : "QC_UNAVAILABLE",
       error: error.message || "Error al registrar la revisión del equipo",
     };
   }
