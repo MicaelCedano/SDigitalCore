@@ -1,4 +1,6 @@
 import { auth } from "@/lib/auth/config";
+import { loadAvatarPresence } from "@/lib/auth/avatar-presence";
+import { avatarVersion } from "@/lib/auth/avatar-url";
 import { prisma } from "@/lib/db/prisma";
 import { cache } from "react";
 import { redirect } from "next/navigation";
@@ -26,10 +28,18 @@ export const getPersistedCurrentUser = cache(async () => {
   const user = await getCurrentUser();
   if (!user) return null;
 
-  return prisma.user.findFirst({
+  const persisted = await prisma.user.findFirst({
     where: user.id ? { id: user.id } : { email: user.email ?? "" },
-    select: { id: true, roleCode: true, allowedModules: true, image: true, status: true },
+    select: { id: true, roleCode: true, allowedModules: true, status: true, updatedAt: true },
   });
+  if (!persisted) return null;
+
+  const presence = await loadAvatarPresence([persisted.id]);
+  return {
+    ...persisted,
+    hasImage: presence.get(persisted.id) === true,
+    avatarVersion: avatarVersion(persisted.updatedAt),
+  };
 });
 
 /**

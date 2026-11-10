@@ -5,6 +5,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser, requirePermission } from "@/lib/auth/helpers";
+import { loadAvatarPresence } from "@/lib/auth/avatar-presence";
+import { publicAvatarUrl } from "@/lib/auth/avatar-url";
 import { hashPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
 import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
@@ -31,17 +33,31 @@ const userSchema = z.object({
   allowedModules: z.array(z.string()).refine((values) => values.every((value) => validModules.has(value)), "Módulo inválido"),
 });
 
+const userPublicSelect = {
+  id: true,
+  name: true,
+  username: true,
+  email: true,
+  phone: true,
+  roleCode: true,
+  status: true,
+  allowedModules: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 function serializeUser(user: {
   id: string;
   name: string | null;
   username: string | null;
   email: string;
   phone: string | null;
-  image: string | null;
   roleCode: string;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
   allowedModules: string[];
   createdAt: Date;
+  updatedAt: Date;
+  hasImage: boolean;
 }): SystemUser {
   return {
     id: user.id,
@@ -49,7 +65,7 @@ function serializeUser(user: {
     username: user.username ?? user.email.split("@")[0],
     email: user.email,
     phone: user.phone ?? "",
-    avatarUrl: user.image ?? "",
+    avatarUrl: user.hasImage ? publicAvatarUrl(user.id, user.updatedAt) : "",
     roleCode: user.roleCode,
     status: user.status === "ACTIVE" ? "ACTIVE" : "BLOCKED",
     allowedModules: user.roleCode === "ADMIN" ? [...DEFAULT_ROLE_MODULES.ADMIN] : user.allowedModules,
@@ -136,7 +152,7 @@ export async function getUserManagementDataAction() {
       prisma.user.findMany({
         orderBy: { createdAt: "desc" },
         take: 100,
-        select: { id: true, name: true, username: true, email: true, phone: true, image: true, roleCode: true, status: true, allowedModules: true, createdAt: true },
+        select: userPublicSelect,
       }),
       prisma.accessRequest.findMany({
         orderBy: { createdAt: "desc" },
@@ -184,7 +200,14 @@ export async function getUserManagementDataAction() {
         } : undefined,
       };
     });
-    return { success: true as const, data: { users: users.map(serializeUser), requests: serializedRequests } };
+    const presence = await loadAvatarPresence(users.map((user) => user.id));
+    return {
+      success: true as const,
+      data: {
+        users: users.map((user) => serializeUser({ ...user, hasImage: presence.get(user.id) === true })),
+        requests: serializedRequests,
+      },
+    };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudieron cargar los usuarios."), data: { users: [], requests: [] } };
   }
@@ -244,7 +267,7 @@ export async function createDirectUserAction(input: z.input<typeof userSchema>) 
     });
     await logAudit({ userId: actor.id, action: "user.create", module: "configuracion", entityType: "user", entityId: created.id, afterData: { roleCode: created.roleCode } });
     revalidatePath("/configuracion");
-    return { success: true as const, data: serializeUser(created) };
+    return { success: true as const, data: serializeUser({ ...created, hasImage: false }) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo crear el usuario.") };
   }
@@ -299,7 +322,7 @@ export async function approveAccessRequestAction(requestId: string, roleCode: st
       route: "/dashboard",
       type: "access_request.approved",
     });
-    return { success: true as const, data: serializeUser(approval.user) };
+    return { success: true as const, data: serializeUser({ ...approval.user, hasImage: false }) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo aprobar la solicitud.") };
   }
@@ -328,10 +351,15 @@ export async function updateUserRoleAction(userId: string, roleCode: string) {
     if (userId === actor.id && roleCode !== "ADMIN") {
       return { success: false as const, error: "No puedes quitarte tu propio rol de administrador." };
     }
-    const updated = await prisma.user.update({ where: { id: userId }, data: { roleCode, allowedModules: DEFAULT_ROLE_MODULES[roleCode] ?? [] } });
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { roleCode, allowedModules: DEFAULT_ROLE_MODULES[roleCode] ?? [] },
+      select: userPublicSelect,
+    });
+    const presence = await loadAvatarPresence([updated.id]);
     await logAudit({ userId: actor.id, action: "user.role.update", module: "configuracion", entityType: "user", entityId: userId, afterData: { roleCode } });
     revalidatePath("/configuracion");
-    return { success: true as const, data: serializeUser(updated) };
+    return { success: true as const, data: serializeUser({ ...updated, hasImage: presence.get(updated.id) === true }) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo actualizar el rol.") };
   }
@@ -341,14 +369,15 @@ export async function toggleUserModuleAction(userId: string, moduleKey: string) 
   try {
     const actor = await requireUserAdmin();
     if (!validModules.has(moduleKey)) throw new Error("Módulo inválido.");
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { allowedModules: true } });
     const allowedModules = user.allowedModules.includes(moduleKey)
       ? user.allowedModules.filter((key) => key !== moduleKey)
       : [...user.allowedModules, moduleKey];
-    const updated = await prisma.user.update({ where: { id: userId }, data: { allowedModules } });
+    const updated = await prisma.user.update({ where: { id: userId }, data: { allowedModules }, select: userPublicSelect });
+    const presence = await loadAvatarPresence([updated.id]);
     await logAudit({ userId: actor.id, action: "user.modules.update", module: "configuracion", entityType: "user", entityId: userId, afterData: { moduleKey, enabled: allowedModules.includes(moduleKey) } });
     revalidatePath("/configuracion");
-    return { success: true as const, data: serializeUser(updated) };
+    return { success: true as const, data: serializeUser({ ...updated, hasImage: presence.get(updated.id) === true }) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo actualizar el módulo.") };
   }
@@ -358,11 +387,16 @@ export async function toggleUserStatusAction(userId: string) {
   try {
     const actor = await requireUserAdmin();
     if (userId === actor.id) return { success: false as const, error: "No puedes bloquear tu cuenta actual." };
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    const updated = await prisma.user.update({ where: { id: userId }, data: { status: user.status === "ACTIVE" ? "BLOCKED" : "ACTIVE" } });
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { status: true } });
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { status: user.status === "ACTIVE" ? "BLOCKED" : "ACTIVE" },
+      select: userPublicSelect,
+    });
+    const presence = await loadAvatarPresence([updated.id]);
     await logAudit({ userId: actor.id, action: "user.status.update", module: "configuracion", entityType: "user", entityId: userId, afterData: { status: updated.status } });
     revalidatePath("/configuracion");
-    return { success: true as const, data: serializeUser(updated) };
+    return { success: true as const, data: serializeUser({ ...updated, hasImage: presence.get(updated.id) === true }) };
   } catch (error) {
     return { success: false as const, error: messageFrom(error, "No se pudo cambiar el estado.") };
   }

@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { requirePermission, getPersistedCurrentUser } from "@/lib/auth/helpers";
+import { loadAvatarPresence } from "@/lib/auth/avatar-presence";
+import { publicAvatarSrc } from "@/lib/auth/avatar-url";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -137,13 +139,14 @@ export async function getPendingWithdrawalsAction(): Promise<Result<{
         description: { contains: "Retiro de efectivo" },
       },
       include: {
-        actor: { select: { name: true, username: true, email: true, image: true } },
+        actor: { select: { id: true, name: true, username: true, email: true, updatedAt: true } },
         account: { select: { name: true } },
       },
       orderBy: { occurredAt: "desc" },
       take: 100,
     });
 
+    const presence = await loadAvatarPresence(entries.flatMap((entry) => entry.actor ? [entry.actor.id] : []));
     return ok({
       pending: entries.map((entry) => ({
         id: entry.id,
@@ -153,7 +156,7 @@ export async function getPendingWithdrawalsAction(): Promise<Result<{
         technicianName: entry.actor?.name ?? "Usuario",
         technicianUsername: entry.actor?.username ?? "",
         technicianEmail: entry.actor?.email ?? "",
-        technicianImage: entry.actor?.image ?? null,
+        technicianImage: entry.actor ? publicAvatarSrc(entry.actor.id, entry.actor.updatedAt, presence.get(entry.actor.id) === true) : null,
         accountName: entry.account.name,
         occurredAt: entry.occurredAt.toISOString(),
       })),

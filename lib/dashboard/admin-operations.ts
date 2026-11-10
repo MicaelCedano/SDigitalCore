@@ -3,6 +3,8 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
 import { getPersistedCurrentUser } from "@/lib/auth/helpers";
+import { loadAvatarPresence } from "@/lib/auth/avatar-presence";
+import { publicAvatarSrc } from "@/lib/auth/avatar-url";
 
 export const getAdminOperationsOverview = cache(async (userId: string) => {
   const admin = await getPersistedCurrentUser();
@@ -15,9 +17,9 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     prisma.workTask.findMany({
       where: { status: { in: ["PENDING", "IN_PROGRESS", "IN_REVIEW"] } },
       include: {
-        assignee: { select: { id: true, name: true, email: true, image: true } },
+        assignee: { select: { id: true, name: true, email: true, updatedAt: true } },
         assignees: {
-          include: { user: { select: { id: true, name: true, email: true, image: true } } },
+          include: { user: { select: { id: true, name: true, email: true, updatedAt: true } } },
           orderBy: { assignedAt: "asc" },
         },
       },
@@ -29,7 +31,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
     }),
     prisma.user.findMany({
       where: { status: "ACTIVE", allowedModules: { has: "centro-trabajo" } },
-      select: { id: true, name: true, email: true, image: true },
+      select: { id: true, name: true, email: true, updatedAt: true },
       orderBy: { name: "asc" },
       take: 30,
     }),
@@ -365,6 +367,26 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
       const overdueCount = activeTasks.filter((t) => t.dueAt && t.dueAt < now).length;
       const urgentCount = activeTasks.filter((t) => t.priority === "URGENT" || t.priority === "HIGH").length;
 
+      const presence = await loadAvatarPresence([
+        ...activeUsers.map((user) => user.id),
+        ...activeTasks.flatMap((task) => [task.assignee?.id, ...task.assignees.map((assignment) => assignment.user.id)]),
+      ].filter((id): id is string => Boolean(id)));
+      const avatarFor = (person: { id: string; updatedAt: Date }) =>
+        publicAvatarSrc(person.id, person.updatedAt, presence.get(person.id) === true);
+      const presentTask = <T extends {
+        assignee: { id: string; name: string | null; email: string; updatedAt: Date } | null;
+        assignees: { user: { id: string; name: string | null; email: string; updatedAt: Date } }[];
+      }>(task: T) => ({
+        ...task,
+        assignee: task.assignee
+          ? { id: task.assignee.id, name: task.assignee.name, email: task.assignee.email, image: avatarFor(task.assignee) }
+          : null,
+        assignees: task.assignees.map((assignment) => ({
+          ...assignment,
+          user: { id: assignment.user.id, name: assignment.user.name, email: assignment.user.email, image: avatarFor(assignment.user) },
+        })),
+      });
+
       const teamMembers = activeUsers.map((user) => {
         const userInProgressTask = inProgressTasks.find(
           (t) =>
@@ -380,7 +402,7 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
           id: user.id,
           name: user.name,
           email: user.email,
-          image: user.image,
+          image: avatarFor(user),
           currentTaskTitle: userInProgressTask ? userInProgressTask.title : null,
           currentTaskModule: userInProgressTask ? userInProgressTask.sourceModule : null,
           currentTaskCode: userInProgressTask ? userInProgressTask.sourceCode : null,
@@ -395,8 +417,8 @@ export const getAdminOperationsOverview = cache(async (userId: string) => {
         overdueCount,
         urgentCount,
         completedWeekCount,
-        inProgressTasks: inProgressTasks.slice(0, 6),
-        pendingTasks: pendingTasks.slice(0, 6),
+        inProgressTasks: inProgressTasks.slice(0, 6).map(presentTask),
+        pendingTasks: pendingTasks.slice(0, 6).map(presentTask),
         teamMembers,
       };
     }

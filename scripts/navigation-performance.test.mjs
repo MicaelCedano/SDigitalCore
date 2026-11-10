@@ -16,18 +16,28 @@ function memoize(fn) {
 
 function environment({ actor = admin, wallet, audits = [] } = {}) {
   const calls = [];
-  const prisma = new Proxy({}, { get: (_, model) => new Proxy({}, { get: (_target, operation) => async args => {
-    calls.push({ model, operation, args });
-    if (model === "priceListItem") throw new Error("Retired price list was queried");
-    if (model === "wallet" && operation === "findUnique") return wallet ? wallet.promise : { balance: { toFixed: () => "100.00" } };
-    if (model === "user" && operation === "findFirst") return actor;
-    if (operation === "count") return 2;
-    if (operation === "aggregate") return { _count: { _all: 3 }, _sum: { total: 125 } };
-    if (model === "auditLog") return audits;
-    if (model === "qcRevisionBatch" && args.where.id) return [{ id: "batch-test", batchNumber: "QC-TEST", supplierName: "Demo" }];
-    if (operation === "findMany" || operation === "groupBy") return [];
-    return null;
-  } }) });
+  const prisma = new Proxy({}, {
+    get: (_, model) => {
+      if (model === "$queryRaw" || model === "$queryRawUnsafe") {
+        return async (...args) => {
+          calls.push({ model: "user", operation: String(model), args });
+          return [{ id: actor?.id ?? "", hasImage: false }];
+        };
+      }
+      return new Proxy({}, { get: (_target, operation) => async args => {
+        calls.push({ model, operation, args });
+        if (model === "priceListItem") throw new Error("Retired price list was queried");
+        if (model === "wallet" && operation === "findUnique") return wallet ? wallet.promise : { balance: { toFixed: () => "100.00" } };
+        if (model === "user" && operation === "findFirst") return actor;
+        if (operation === "count") return 2;
+        if (operation === "aggregate") return { _count: { _all: 3 }, _sum: { total: 125 } };
+        if (model === "auditLog") return audits;
+        if (model === "qcRevisionBatch" && args.where.id) return [{ id: "batch-test", batchNumber: "QC-TEST", supplierName: "Demo" }];
+        if (operation === "findMany" || operation === "groupBy") return [];
+        return null;
+      } });
+    },
+  });
   const modules = new Map();
   const helpers = {
     requireUser: async () => { if (!actor) throw new Error("UNAUTHENTICATED"); return { id: actor.id, name: "Demo", email: "demo@example.test" }; },
@@ -45,6 +55,8 @@ function environment({ actor = admin, wallet, audits = [] } = {}) {
       if (id === "@/lib/db/prisma") return { prisma };
       if (id === "@/lib/auth/helpers") return helpers;
       if (id === "@/lib/auth/config") return { auth: async () => actor ? { user: { id: actor.id } } : null };
+      if (id === "@prisma/client") return requireReal(id);
+      if (id.startsWith("@/lib/auth/avatar")) return load(`${id.slice(2)}.ts`);
       if (id === "next/navigation") return { redirect: () => { throw new Error("UNAUTHENTICATED"); } };
       if (id === "@/components/layout/DashboardLayoutClient") return { DashboardLayoutClient: () => null };
       if (id === "@/modules/facturas/components/InvoicesList") return { InvoicesList: () => null };
