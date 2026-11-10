@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { changePasswordAction, getProfileAction, updateProfileAction } from "@/app/actions/profile";
+import { publicAvatarUrl } from "@/lib/auth/avatar-url";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,6 @@ export default function PerfilPage() {
     username: "",
     email: "",
     phone: "",
-    avatarUrl: "",
     roleCode: "",
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -40,7 +40,9 @@ export default function PerfilPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [hasImage, setHasImage] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState("0");
+  const [draftAvatar, setDraftAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     void getProfileAction().then((result) => {
@@ -55,7 +57,6 @@ export default function PerfilPage() {
         email: result.data.email,
         username: result.data.username ?? "",
         phone: result.data.phone ?? "",
-        avatarUrl: result.data.image ?? "",
         roleCode: result.data.roleCode,
       };
       setProfileUser(nextUser);
@@ -63,7 +64,9 @@ export default function PerfilPage() {
       setEmail(nextUser.email);
       setUsername(nextUser.username);
       setPhone(nextUser.phone);
-      setAvatarUrl(nextUser.avatarUrl ?? "");
+      setHasImage(result.data.hasImage);
+      setAvatarVersion(result.data.avatarVersion);
+      setDraftAvatar(null);
       setIsLoading(false);
     });
   }, []);
@@ -94,7 +97,7 @@ export default function PerfilPage() {
       if (preservesAnimation) {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setAvatarUrl(reader.result as string);
+          setDraftAvatar(reader.result as string);
           setNotice("Imagen animada preparada. Se comprimirá al guardar si supera 1.5 MB.");
           setTimeout(() => setNotice(null), 3000);
         };
@@ -119,7 +122,7 @@ export default function PerfilPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result as string;
-        setAvatarUrl(base64);
+        setDraftAvatar(base64);
         setNotice("Foto preparada. Guarda los cambios para actualizarla.");
         setTimeout(() => setNotice(null), 3000);
       };
@@ -132,7 +135,7 @@ export default function PerfilPage() {
   }
 
   function handleRemovePhoto() {
-    setAvatarUrl("");
+    setDraftAvatar("");
     setNotice("La foto se eliminará cuando guardes los cambios.");
     setTimeout(() => setNotice(null), 3000);
   }
@@ -144,16 +147,17 @@ export default function PerfilPage() {
       email,
       username,
       phone,
-      avatarUrl,
+      ...(draftAvatar !== null ? { avatarUrl: draftAvatar } : {}),
     });
     if (!result.success) {
       setNotice(result.error || "No se pudo actualizar el perfil.");
       setTimeout(() => setNotice(null), 4000);
       return;
     }
-    const savedAvatarUrl = result.data?.image ?? "";
-    setAvatarUrl(savedAvatarUrl);
-    setProfileUser({ ...profileUser, name, email, username, phone, avatarUrl: savedAvatarUrl });
+    setDraftAvatar(null);
+    setHasImage(result.data?.hasImage ?? false);
+    setAvatarVersion(result.data?.avatarVersion ?? "0");
+    setProfileUser({ ...profileUser, name, email, username, phone });
     setNotice(result.requiresRelogin ? "Perfil guardado. Cierra sesión y vuelve a entrar para activar el nuevo correo." : "¡Perfil actualizado con éxito!");
     setTimeout(() => setNotice(null), 3500);
   }
@@ -184,14 +188,11 @@ export default function PerfilPage() {
     setTimeout(() => setNotice(null), 3500);
   }
 
-  function getInitials(n: string) {
-    return n
-      .split(" ")
-      .slice(0, 2)
-      .map((p) => p[0])
-      .join("")
-      .toUpperCase();
-  }
+  const displaySrc = draftAvatar !== null
+    ? draftAvatar || null
+    : hasImage && profileUser.id
+      ? publicAvatarUrl(profileUser.id, avatarVersion)
+      : null;
 
   if (isLoading) {
     return <Card className="mx-auto max-w-4xl p-10 text-center text-sm text-slate-500">Cargando perfil...</Card>;
@@ -223,19 +224,7 @@ export default function PerfilPage() {
         <div className="p-6 flex flex-col sm:flex-row items-center gap-6 bg-gradient-to-r from-[#5750f1]/5 via-white to-white">
           {/* Avatar Container with Upload overlay */}
           <div className="relative group shrink-0">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white ring-4 ring-[#5750f1]/20 bg-[#5750f1] flex items-center justify-center text-white text-2xl font-bold shadow-md relative">
-              {avatarUrl ? (
-                <Image
-                  src={avatarUrl}
-                  alt={name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <span>{getInitials(name)}</span>
-              )}
-            </div>
+            <UserAvatar name={name} email={email} src={displaySrc} className="h-24 w-24 text-2xl shadow-md ring-4 ring-[#5750f1]/20" textClassName="text-2xl" />
 
             {/* Camera Overlay Trigger */}
             <label
@@ -274,7 +263,7 @@ export default function PerfilPage() {
                 <span>Subir Foto</span>
               </label>
 
-              {avatarUrl && (
+              {displaySrc && (
                 <Button
                   variant="outline"
                   size="sm"

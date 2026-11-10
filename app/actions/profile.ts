@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { requireUser } from "@/lib/auth/helpers";
+import { loadAvatarPresence } from "@/lib/auth/avatar-presence";
+import { avatarVersion } from "@/lib/auth/avatar-url";
 import { profileSchema, type ProfileInput } from "@/lib/validation/profile";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { logAudit } from "@/lib/audit";
@@ -20,10 +22,23 @@ export async function getProfileAction() {
     if (!sessionUser.id) return { success: false as const, error: "La sesión no tiene un usuario identificable." };
     const user = await prisma.user.findUnique({
       where: { id: sessionUser.id },
-      select: { id: true, name: true, email: true, username: true, phone: true, image: true, roleCode: true },
+      select: { id: true, name: true, email: true, username: true, phone: true, roleCode: true, updatedAt: true },
     });
     if (!user) return { success: false as const, error: "La cuenta autenticada no existe en la base de datos." };
-    return { success: true as const, data: user };
+    const presence = await loadAvatarPresence([user.id]);
+    return {
+      success: true as const,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        phone: user.phone,
+        roleCode: user.roleCode,
+        hasImage: presence.get(user.id) === true,
+        avatarVersion: avatarVersion(user.updatedAt),
+      },
+    };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "No se pudo cargar el perfil" };
   }
@@ -33,9 +48,11 @@ export async function updateProfileAction(input: ProfileInput) {
   try {
     const sessionUser = await requireUser();
     const validated = profileSchema.parse(input);
-    const avatarUrl = await fitAnimatedProfileImage(validated.avatarUrl);
     const userId = sessionUser.id;
     if (!userId) return { success: false, error: "La sesión no tiene un usuario identificable." };
+    const nextImage = validated.avatarUrl === undefined
+      ? undefined
+      : (validated.avatarUrl ? await fitAnimatedProfileImage(validated.avatarUrl) : "") || null;
 
     const existingEmail = await prisma.user.findFirst({
       where: { email: validated.email, NOT: { id: userId } },
@@ -49,7 +66,10 @@ export async function updateProfileAction(input: ProfileInput) {
     });
     if (existingUsername) return { success: false, error: "Ese nombre de usuario ya está registrado." };
 
-    const before = await prisma.user.findUnique({ where: { id: userId } });
+    const before = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true, username: true, phone: true },
+    });
     if (!before) return { success: false, error: "La cuenta no existe en la base de datos." };
     const user = await prisma.user.update({
       where: { id: userId },
@@ -58,22 +78,45 @@ export async function updateProfileAction(input: ProfileInput) {
         email: validated.email.toLowerCase(),
         username: validated.username.toLowerCase(),
         phone: validated.phone || null,
-        image: avatarUrl || null,
+        ...(nextImage !== undefined ? { image: nextImage } : {}),
       },
-      select: { id: true, name: true, email: true, username: true, phone: true, image: true, roleCode: true },
+      select: { id: true, name: true, email: true, username: true, phone: true, roleCode: true, updatedAt: true },
     });
+    const hasImage = nextImage !== undefined
+      ? Boolean(nextImage)
+      : (await loadAvatarPresence([userId])).get(userId) === true;
     await logAudit({
       userId,
       action: "profile.update",
       module: "perfil",
       entityType: "user",
       entityId: userId,
-      beforeData: { name: before.name, email: before.email, username: before.username, phone: before.phone, image: before.image },
-      afterData: { name: user.name, email: user.email, username: user.username, phone: user.phone, image: user.image },
+      beforeData: { name: before.name, email: before.email, username: before.username, phone: before.phone },
+      afterData: {
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        phone: user.phone,
+        avatarUpdated: nextImage !== undefined,
+      },
     });
 
     revalidatePath("/perfil");
-    return { success: true, data: user, requiresRelogin: user.email !== sessionUser.email };
+    revalidatePath("/", "layout");
+    return {
+      success: true,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        phone: user.phone,
+        roleCode: user.roleCode,
+        hasImage,
+        avatarVersion: avatarVersion(user.updatedAt),
+      },
+      requiresRelogin: user.email !== sessionUser.email,
+    };
   } catch (error) {
     if (error instanceof z.ZodError) return { success: false, error: error.issues[0]?.message ?? "Los datos del perfil no son válidos." };
     return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el perfil" };

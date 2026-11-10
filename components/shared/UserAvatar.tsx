@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 function getInitials(name?: string | null, email?: string | null) {
@@ -18,11 +21,21 @@ export function UserAvatar({
   className?: string;
   textClassName?: string;
 }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
   const label = name || email || "Usuario";
+  const showImage = Boolean(src) && !failed;
 
   return (
     <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 font-bold text-white ${textClassName} ${className}`}>
-      {src ? <Image src={src} alt={label} fill sizes="40px" className="object-cover" unoptimized /> : getInitials(name, email)}
+      {showImage ? (
+        <Image src={src as string} alt={label} fill sizes="96px" className="object-cover" unoptimized onError={() => setFailed(true)} />
+      ) : (
+        getInitials(name, email)
+      )}
     </span>
   );
 }

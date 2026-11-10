@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
+import { loadAvatarPresence } from "@/lib/auth/avatar-presence";
+import { publicAvatarSrc } from "@/lib/auth/avatar-url";
 import { syncQcWorkTasks } from "@/modules/centro-trabajo/integrations/qc";
 import { Prisma, WorkTaskStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -7,9 +9,9 @@ import { after } from "next/server";
 
 const taskInclude = {
   creator: { select: { name: true, email: true } },
-  assignee: { select: { id: true, name: true, email: true, image: true } },
+  assignee: { select: { id: true, name: true, email: true, updatedAt: true } },
   assignees: {
-    include: { user: { select: { id: true, name: true, email: true, image: true } } },
+    include: { user: { select: { id: true, name: true, email: true, updatedAt: true } } },
     orderBy: { assignedAt: "asc" },
   },
   events: {
@@ -20,10 +22,15 @@ const taskInclude = {
 } satisfies Prisma.WorkTaskInclude;
 
 type WorkTaskWithRelations = Prisma.WorkTaskGetPayload<{ include: typeof taskInclude }>;
+type PublicUser = { id: string; name: string | null; email: string; image: string | null };
+type WorkTaskForClient = Omit<WorkTaskWithRelations, "assignee" | "assignees"> & {
+  assignee: PublicUser | null;
+  assignees: Array<Omit<WorkTaskWithRelations["assignees"][number], "user"> & { user: PublicUser }>;
+};
 type WorkCenterData = {
-  tasks: WorkTaskWithRelations[];
-  historyTasks: WorkTaskWithRelations[];
-  activeUsers: { id: string; name: string | null; email: string; image: string | null }[];
+  tasks: WorkTaskForClient[];
+  historyTasks: WorkTaskForClient[];
+  activeUsers: PublicUser[];
   metrics: { action: number; completedToday: number; overdue: number };
   currentUserId: string;
   roleCode: string;
@@ -118,7 +125,7 @@ export async function getWorkCenterData(options: { syncQc?: boolean } = {}) {
     const [activeUsers, completedToday] = await Promise.all([
       prisma.user.findMany({
         where: { status: "ACTIVE", allowedModules: { has: "centro-trabajo" } },
-        select: { id: true, name: true, email: true, image: true },
+        select: { id: true, name: true, email: true, updatedAt: true },
         orderBy: { name: "asc" },
         take: 100,
       }),
@@ -135,17 +142,30 @@ export async function getWorkCenterData(options: { syncQc?: boolean } = {}) {
     const overdue = tasks.filter(
       (task) => task.dueAt && task.dueAt < now && !["COMPLETED", "CANCELLED"].includes(task.status),
     ).length;
+    const presence = await loadAvatarPresence([
+      ...activeUsers.map((person) => person.id),
+      ...[...tasks, ...historyTasks].flatMap((task) => [
+        task.assignee?.id,
+        ...task.assignees.map((assignment) => assignment.user.id),
+      ]),
+    ].filter((id): id is string => Boolean(id)));
+    const toPublicUser = (person: { id: string; name: string | null; email: string; updatedAt: Date }): PublicUser => ({
+      id: person.id,
+      name: person.name,
+      email: person.email,
+      image: publicAvatarSrc(person.id, person.updatedAt, presence.get(person.id) === true),
+    });
+    const presentTask = (task: WorkTaskWithRelations): WorkTaskForClient => ({
+      ...task,
+      sourceUrl: task.sourceModule === "envios" ? null : task.sourceUrl,
+      assignee: task.assignee ? toPublicUser(task.assignee) : null,
+      assignees: task.assignees.map((assignment) => ({ ...assignment, user: toPublicUser(assignment.user) })),
+    });
 
     return {
-      tasks: tasks.map((task) => ({
-        ...task,
-        sourceUrl: task.sourceModule === "envios" ? null : task.sourceUrl,
-      })),
-      historyTasks: historyTasks.map((task) => ({
-        ...task,
-        sourceUrl: task.sourceModule === "envios" ? null : task.sourceUrl,
-      })),
-      activeUsers,
+      tasks: tasks.map(presentTask),
+      historyTasks: historyTasks.map(presentTask),
+      activeUsers: activeUsers.map(toPublicUser),
       metrics: {
         action: tasks.filter((task) => ["PENDING", "IN_PROGRESS", "IN_REVIEW"].includes(task.status)).length,
         completedToday,

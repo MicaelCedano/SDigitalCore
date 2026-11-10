@@ -99,6 +99,8 @@ await walletReader.getCurrentWallet({ provision: false });
 assert.equal(writes, 0);
 const workReader = await load('modules/centro-trabajo/data.ts', {
   '@/lib/db/prisma': { prisma }, '@/lib/auth/helpers': auth, '@/modules/centro-trabajo/integrations/qc': { syncQcWorkTasks: async () => { writes++; } },
+  '@/lib/auth/avatar-presence': { loadAvatarPresence: async () => new Map() },
+  '@/lib/auth/avatar-url': { publicAvatarSrc: () => null },
   'next/cache': { revalidatePath: () => { writes++; } }, 'next/server': { after: callback => callback() },
 });
 await workReader.getWorkCenterData({ syncQc: false });

@@ -1,5 +1,6 @@
 import { DashboardLayoutClient } from "@/components/layout/DashboardLayoutClient";
 import { getPersistedCurrentUser, requireUser } from "@/lib/auth/helpers";
+import { publicAvatarSrc } from "@/lib/auth/avatar-url";
 import { getDashboardHeaderSummary } from "@/lib/dashboard/header-summary";
 
 export default async function DashboardLayout({
@@ -23,7 +24,7 @@ export default async function DashboardLayout({
       userName={user.name}
       userEmail={user.email}
       userRole={persistedUser?.roleCode}
-      userAvatarUrl={persistedUser?.image}
+      userAvatarUrl={persistedUser ? publicAvatarSrc(persistedUser.id, persistedUser.updatedAt, persistedUser.hasImage) : null}
       allowedModules={allowedModules}
       headerSummary={headerSummary}
     >
