@@ -23,13 +23,11 @@ const updateDeviceSchema = z.object({
   result: z.enum(["FUNCTIONAL", "NON_FUNCTIONAL", "UNSPECIFIED"]),
 });
 
-export async function updateDeviceAction(input: z.input<typeof updateDeviceSchema>): Promise<Result<{ deviceId: string }>> {
+export async function updateDeviceForActor(
+  actorId: string,
+  input: z.input<typeof updateDeviceSchema>,
+): Promise<Result<{ deviceId: string }>> {
   try {
-    await requirePermission("qc.write");
-    const persisted = await getPersistedCurrentUser();
-    if (!persisted || persisted.roleCode !== "ADMIN") {
-      return { success: false, error: "Solo el administrador puede editar equipos." };
-    }
     const data = updateDeviceSchema.parse(input);
 
     const device = await prisma.deviceUnit.findUnique({
@@ -95,7 +93,7 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
     });
 
     await logAudit({
-      userId: persisted.id,
+      userId: actorId,
       action: "qc.device.update",
       module: "qc",
       entityType: "device_unit",
@@ -113,6 +111,19 @@ export async function updateDeviceAction(input: z.input<typeof updateDeviceSchem
 
     for (const path of ["/qc/equipos-revisados", "/qc", "/qc/lotes"]) revalidatePath(path);
     return { success: true, data: { deviceId: data.deviceId }, message: "Equipo actualizado." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el equipo." };
+  }
+}
+
+export async function updateDeviceAction(input: z.input<typeof updateDeviceSchema>): Promise<Result<{ deviceId: string }>> {
+  try {
+    await requirePermission("qc.write");
+    const persisted = await getPersistedCurrentUser();
+    if (!persisted || persisted.roleCode !== "ADMIN") {
+      return { success: false, error: "Solo el administrador puede editar equipos." };
+    }
+    return await updateDeviceForActor(persisted.id, input);
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "No se pudo actualizar el equipo." };
   }

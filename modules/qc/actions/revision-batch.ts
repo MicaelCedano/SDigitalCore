@@ -627,13 +627,8 @@ export async function getRevisionBatchDetailAction(idOrNumber: string) {
 /**
  * Actualiza el estado de un Lote de Revisión (ej. PENDING_REVIEW -> IN_REVIEW -> COMPLETED -> CANCELLED)
  */
-export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatchStatusInput) {
+export async function updateRevisionBatchStatusForActor(actorId: string, input: UpdateRevisionBatchStatusInput) {
   try {
-    const actor = await requirePermission("qc.write");
-    if (!actor.id) {
-      return { success: false, error: "La sesión no tiene un usuario identificable." };
-    }
-
     const validated = updateRevisionBatchStatusSchema.parse(input);
     const existing = await prisma.qcRevisionBatch.findUnique({
       where: { id: validated.id },
@@ -661,7 +656,7 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
     });
 
     await logAudit({
-      userId: actor.id,
+      userId: actorId,
       action: "qc_batch.update_status",
       module: "qc",
       entityType: "qc_revision_batch",
@@ -681,6 +676,19 @@ export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatch
       message: `Estado del Lote ${updated.batchNumber} actualizado a ${updated.status}.`,
     };
   } catch (error: any) {
+    console.error("Error al actualizar estado del lote:", error);
+    return { success: false, error: "Error al actualizar el estado del Lote de Revisión" };
+  }
+}
+
+export async function updateRevisionBatchStatusAction(input: UpdateRevisionBatchStatusInput) {
+  try {
+    const actor = await requirePermission("qc.write");
+    if (!actor.id) {
+      return { success: false, error: "La sesión no tiene un usuario identificable." };
+    }
+    return await updateRevisionBatchStatusForActor(actor.id, input);
+  } catch (error: unknown) {
     console.error("Error al actualizar estado del lote:", error);
     return { success: false, error: "Error al actualizar el estado del Lote de Revisión" };
   }

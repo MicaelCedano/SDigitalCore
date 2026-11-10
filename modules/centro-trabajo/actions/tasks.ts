@@ -151,24 +151,90 @@ export async function deleteWorkTaskAction(taskId: string) {
   return { success: true };
 }
 
-export async function updateWorkTaskStatusAction(taskId: string, nextStatus: string) {
-  const user = await actor();
-  const status = statusSchema.parse(nextStatus);
-  const task = await prisma.workTask.findUnique({ where: { id: taskId }, select: { id: true, title: true, status: true, startedAt: true, creatorId: true, assigneeId: true, sourceUrl: true, sourceModule: true } });
+const taskPatchSchema = z.object({
+  titulo: z.string().trim().min(3).max(160).optional(),
+  descripcion: z.string().trim().max(5000).nullable().optional(),
+  prioridad: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
+  vence: z.string().nullable().optional(),
+  estado: statusSchema.optional(),
+  comentario: z.string().trim().min(1).max(2000).optional(),
+}).strict();
+
+export async function applyWorkTaskPatchForActor(
+  user: { id: string; roleCode: string; allowedModules: string[] },
+  taskId: string,
+  input: unknown,
+) {
+  const parsed = taskPatchSchema.parse(input);
+  const task = await prisma.workTask.findUnique({ where: { id: taskId } });
   if (!task || !canAccessTask(user, task)) throw new Error("No puedes modificar esta tarea.");
-  const completedAt = status === "COMPLETED" ? new Date() : null;
-  const updated = await prisma.workTask.update({ where: { id: taskId }, data: { status, startedAt: status === "IN_PROGRESS" && !task.startedAt ? new Date() : undefined, completedAt, events: { create: { actorId: user.id, type: status === "COMPLETED" ? "COMPLETED" : "STATUS_CHANGED", beforeData: { status: task.status }, afterData: { status }, } } } });
-  await logAudit({ userId: user.id, action: "work_task.status.update", module: "centro-trabajo", entityType: "work_task", entityId: task.id, beforeData: { status: task.status }, afterData: { status: updated.status } });
-  const recipients = [task.creatorId, task.assigneeId].filter((id): id is string => Boolean(id && id !== user.id));
-  if (recipients.length) {
-    await sendPushToUsers(recipients, {
-      title: updated.status === "COMPLETED" ? "Tarea completada" : "Estado de tarea actualizado",
-      body: `${task.title}: ${updated.status === "COMPLETED" ? "completada" : updated.status.toLowerCase().replaceAll("_", " ")}.`,
-      route: task.sourceUrl || "/centro-trabajo",
-      type: updated.status === "COMPLETED" ? "work_task.completed" : "work_task.status_changed",
-    });
+  const touchesContent = parsed.titulo !== undefined || parsed.descripcion !== undefined || parsed.prioridad !== undefined || parsed.vence !== undefined;
+  if (task.kind === "AUTOMATIC" && touchesContent) {
+    throw new Error("Las tareas automáticas solo admiten estado y comentario desde esta vía.");
+  }
+  const dueAt = parsed.vence === undefined ? undefined : parsed.vence ? parseDueDate(parsed.vence) : null;
+  const status = parsed.estado;
+  const completedAt = status === undefined ? undefined : status === "COMPLETED" ? new Date() : null;
+  const events = [
+    ...(status && status !== task.status
+      ? [{
+          actorId: user.id,
+          type: status === "COMPLETED" ? "COMPLETED" as const : "STATUS_CHANGED" as const,
+          beforeData: { status: task.status },
+          afterData: { status },
+        }]
+      : []),
+    ...(parsed.prioridad && parsed.prioridad !== task.priority
+      ? [{ actorId: user.id, type: "PRIORITY_CHANGED" as const, beforeData: { priority: task.priority }, afterData: { priority: parsed.prioridad } }]
+      : []),
+    ...(dueAt !== undefined && dueAt?.toISOString() !== task.dueAt?.toISOString()
+      ? [{ actorId: user.id, type: "DUE_DATE_CHANGED" as const, beforeData: { dueAt: task.dueAt }, afterData: { dueAt } }]
+      : []),
+    ...(parsed.comentario
+      ? [{ actorId: user.id, type: "COMMENTED" as const, note: parsed.comentario }]
+      : []),
+  ];
+  const updated = await prisma.workTask.update({
+    where: { id: taskId },
+    data: {
+      title: parsed.titulo,
+      description: parsed.descripcion === undefined ? undefined : parsed.descripcion || null,
+      priority: parsed.prioridad,
+      dueAt,
+      status,
+      startedAt: status === "IN_PROGRESS" && !task.startedAt ? new Date() : undefined,
+      completedAt,
+      ...(events.length ? { events: { create: events } } : {}),
+    },
+    include: { events: { where: { type: "COMMENTED" as const }, orderBy: { createdAt: "desc" }, take: 1 } },
+  });
+  await logAudit({
+    userId: user.id,
+    action: "work_task.patch",
+    module: "centro-trabajo",
+    entityType: "work_task",
+    entityId: task.id,
+    beforeData: { title: task.title, description: task.description, priority: task.priority, dueAt: task.dueAt, status: task.status },
+    afterData: { title: updated.title, description: updated.description, priority: updated.priority, dueAt: updated.dueAt, status: updated.status, comentario: parsed.comentario ?? null },
+  });
+  if (status && status !== task.status) {
+    const recipients = [task.creatorId, task.assigneeId].filter((id): id is string => Boolean(id && id !== user.id));
+    if (recipients.length) {
+      await sendPushToUsers(recipients, {
+        title: updated.status === "COMPLETED" ? "Tarea completada" : "Estado de tarea actualizado",
+        body: `${task.title}: ${updated.status === "COMPLETED" ? "completada" : updated.status.toLowerCase().replaceAll("_", " ")}.`,
+        route: task.sourceUrl || "/centro-trabajo",
+        type: updated.status === "COMPLETED" ? "work_task.completed" : "work_task.status_changed",
+      });
+    }
   }
   revalidatePath("/centro-trabajo");
+  return { success: true as const, id: updated.id, commentEventId: parsed.comentario ? updated.events[0]?.id ?? null : null };
+}
+
+export async function updateWorkTaskStatusAction(taskId: string, nextStatus: string) {
+  const user = await actor();
+  await applyWorkTaskPatchForActor(user, taskId, { estado: statusSchema.parse(nextStatus) });
   return { success: true };
 }
 
@@ -229,10 +295,6 @@ export async function claimWorkTaskAction(taskId: string) {
 export async function addWorkTaskCommentAction(taskId: string, note: string) {
   const user = await actor();
   const cleanNote = z.string().trim().min(1).max(2000).parse(note);
-  const task = await prisma.workTask.findUnique({ where: { id: taskId } });
-  if (!task || !canAccessTask(user, task)) throw new Error("No puedes comentar esta tarea.");
-  await prisma.workTaskEvent.create({ data: { taskId, actorId: user.id, type: "COMMENTED", note: cleanNote } });
-  await logAudit({ userId: user.id, action: "work_task.comment.create", module: "centro-trabajo", entityType: "work_task", entityId: task.id, afterData: { note: cleanNote } });
-  revalidatePath("/centro-trabajo");
+  await applyWorkTaskPatchForActor(user, taskId, { comentario: cleanNote });
   return { success: true };
 }

@@ -51,7 +51,14 @@ export const caseCodesSchema = z.object({ caseCodes: z.array(text("Código", 40)
   if (new Set(input.caseCodes).size !== input.caseCodes.length) ctx.addIssue({ code: "custom", path: ["caseCodes"], message: "Hay casos repetidos." });
 });
 
-export const updateWarrantySchema = z.object({ caseCode: text("El código", 40), clientName: text("El cliente", 160), model: text("El modelo", 120), imei: warrantyIdentifierSchema, problem: text("El problema", 1000) });
+export const updateWarrantySchema = z.object({
+  caseCode: text("El código", 40),
+  clientName: text("El cliente", 160),
+  model: text("El modelo", 120),
+  imei: warrantyIdentifierSchema,
+  problem: text("El problema", 1000),
+  color: optionalText(80),
+});
 export const flowSchema = caseCodesSchema.extend({
   counterpartyName: optionalText(160),
   reason: optionalText(1000),

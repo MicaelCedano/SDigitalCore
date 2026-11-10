@@ -19,11 +19,6 @@ const listRequestsArgs = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED", "ALL"]).optional(),
   limit: z.number().int().min(1).max(25).optional(),
 }).strict();
-const decisionArgs = z.object({
-  id: z.string().min(1).max(128),
-  decision: z.enum(["APPROVED", "REJECTED"]),
-  confirmedRequestCode: z.string().trim().min(1).max(40),
-}).strict();
 const progressArgs = z.object({
   query: z.string().trim().max(80).optional(),
   limit: z.number().int().min(1).max(25).optional(),
@@ -55,22 +50,6 @@ const tools = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  },
-  {
-    name: "decidir_solicitud_almacen",
-    title: "Aprobar o rechazar una solicitud de Almacén",
-    description: "Acción que cambia datos e inventario. Primero muestra al usuario el código, solicitante, sucursal, artículos y decisión; llama esta herramienta únicamente después de que confirme explícitamente esa solicitud. Envía el id y requestCode exactos obtenidos al listar. El servidor valida que siga pendiente, valida existencias y registra auditoría.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: { type: "string", minLength: 1, maxLength: 128 },
-        decision: { type: "string", enum: ["APPROVED", "REJECTED"] },
-        confirmedRequestCode: { type: "string", minLength: 1, maxLength: 40, description: "Código exacto de la solicitud que el usuario confirmó." },
-      },
-      required: ["id", "decision", "confirmedRequestCode"],
-      additionalProperties: false,
-    },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   {
     name: "consultar_avance_compras",
@@ -177,15 +156,6 @@ async function callTool(request: Request, name: string, rawArgs: unknown) {
     return callCoreApi(request, `/api/chatgpt/v1/warehouse/requests?${params.toString()}`);
   }
 
-  if (name === "decidir_solicitud_almacen") {
-    const parsed = decisionArgs.safeParse(rawArgs);
-    if (!parsed.success) return toolTextResult({ error: "Indica la decisión, el id y el código exacto confirmado." }, true);
-    return callCoreApi(request, `/api/chatgpt/v1/warehouse/requests/${encodeURIComponent(parsed.data.id)}/decision`, {
-      method: "POST",
-      body: JSON.stringify({ decision: parsed.data.decision, confirmedRequestCode: parsed.data.confirmedRequestCode }),
-    });
-  }
-
   if (name === "consultar_avance_compras") {
     const parsed = progressArgs.safeParse(rawArgs);
     if (!parsed.success) return toolTextResult({ error: "Los filtros de avance no son válidos." }, true);
@@ -248,7 +218,7 @@ export async function POST(request: Request) {
       protocolVersion,
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "SDigitalCore", version: "1.0.0" },
-      instructions: "Consulta datos solo a pedido. Antes de decidir una solicitud de Almacén, muestra sus detalles y espera confirmación explícita del usuario.",
+      instructions: "Este conector es solo de lectura. Las escrituras viven en /api/mcp, con preparar_cambios y confirmar_cambios.",
     });
   }
 
