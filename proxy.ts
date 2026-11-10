@@ -11,9 +11,17 @@ export default auth((req) => {
     nextUrl.pathname === "/api/chatgpt" ||
     nextUrl.pathname.startsWith("/api/chatgpt/");
 
+  // MCP y OAuth autentican con su propio Bearer / clave del dueño.
+  // Si el proxy las manda al login, ChatGPT no descubre el recurso.
+  const isMcpRoute =
+    nextUrl.pathname === "/api/mcp" ||
+    nextUrl.pathname.startsWith("/oauth/") ||
+    nextUrl.pathname.startsWith("/.well-known/oauth-");
+
   // Rutas públicas — no requieren sesión de navegador
   const isPublicRoute =
     isChatGptApiRoute ||
+    isMcpRoute ||
     nextUrl.pathname.startsWith("/login") ||
     nextUrl.pathname.startsWith("/descargas") ||
     nextUrl.pathname.startsWith("/solicitar-acceso") ||

@@ -69,6 +69,7 @@ model User {
   pushDevices                PushDevice[]
   shipmentsCreated           Shipment[]         @relation("ShipmentCreatedBy")
   shipmentsAssigned          Shipment[]         @relation("ShipmentDriver")
+  mcpOperaciones             McpOperacion[]
 
   @@map("user")
 }
@@ -1586,4 +1587,45 @@ model InvoiceItem {
   totalPrice  Float   @default(0) @map("precio_total")
 
   @@map("invoice_item")
+}
+
+// ============================================================
+// MCP — previews, confirmación y reversión. OAuth no se persiste.
+// ============================================================
+
+enum McpOperacionEstado {
+  PENDIENTE
+  APLICADA
+  EXPIRADA
+  REVERTIDA
+
+  @@map("mcp_operacion_estado")
+}
+
+model McpOperacion {
+  id                 String             @id @default(uuid()) @db.Uuid
+  entidad            String             @db.VarChar(40)
+  entityId           String             @map("entity_id")
+  versionHashAntes   String             @map("version_hash_antes") @db.VarChar(64)
+  versionHashDespues String?            @map("version_hash_despues") @db.VarChar(64)
+  propuesta          Json
+  diff               Json
+  snapshotAntes      Json               @map("snapshot_antes")
+  snapshotDespues    Json?              @map("snapshot_despues")
+  estado             McpOperacionEstado @default(PENDIENTE)
+  justificacion      String?            @db.Text
+  actorUserId        String?            @map("actor_user_id")
+  reversaDeId        String?            @unique @map("reversa_de_id") @db.Uuid
+  expiresAt          DateTime           @map("expires_at")
+  appliedAt          DateTime?          @map("applied_at")
+  revertedAt         DateTime?          @map("reverted_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+
+  actor    User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  reversaDe McpOperacion? @relation("McpOperacionReversa", fields: [reversaDeId], references: [id], onDelete: SetNull)
+  reversa   McpOperacion? @relation("McpOperacionReversa")
+
+  @@index([entidad, entityId, createdAt])
+  @@index([estado, expiresAt])
+  @@map("mcp_operacion")
 }

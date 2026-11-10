@@ -1,24 +1,99 @@
-import fs from 'node:fs';
-import assert from 'node:assert/strict';
-import ts from 'typescript';
-import { z } from 'zod';
-const source=fs.readFileSync('modules/almacen/actions/warehouse.ts','utf8');
-const action=source.slice(source.indexOf('export async function updateWarehouseRequestStatusAction'));
-const js=ts.transpileModule(action,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
-async function run({claimed=1,status='APPROVED',stock=100,notifyFails=false}={}) {
- const calls={stock:0,moves:0,audit:0};
- const items=Array.from({length:33},(_,i)=>({productId:String(i),unitsCount:2}));
- const tx={warehouseRequest:{updateMany:async()=>({count:claimed}),findUnique:async()=>({id:'r',status,items,type:'EXIT',requestCode:'SOL',title:'Test'})},auditLog:{create:async()=>{calls.audit++}},warehouseProduct:{findMany:async()=>items.map(i=>({id:i.productId,code:i.productId,name:'Test',boxes:0,looseUnits:stock,totalUnits:stock,unitsPerBox:1}))},warehouseMovement:{createMany:async({data})=>{calls.moves=data.length}}};
- const prisma={$transaction:async(fn,options)=>{assert.equal(options.timeout,30000);return fn(tx)},warehouseRequest:{findUnique:async()=>{if(notifyFails)throw Error('notification');return null}}};
- const mod={exports:{}};
- new Function('exports','prisma','requireWarehouseAdmin','z','parseRequestLine','resolveMovementLine','availableQuantity','applyStockDelta','sendPushToUsers','revalidatePath','console',js)(mod.exports,prisma,async()=>({id:'admin'}),z,()=>({measure:'UNITS',quantity:2}),()=>({measure:'UNITS',quantity:2,unitsCount:2,boxesCount:0}),p=>p.looseUnits,async()=>{calls.stock++},async()=>{},()=>{},{error:()=>{}});
- const result=await mod.exports.updateWarehouseRequestStatusAction('r',status);
- return {result,calls};
+import fs from "node:fs";
+import assert from "node:assert/strict";
+import ts from "typescript";
+import { z } from "zod";
+
+const source = fs.readFileSync("modules/almacen/lib/warehouse-request-status.ts", "utf8");
+const action = source.slice(source.indexOf("const inputSchema"));
+const js = ts.transpileModule(action, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+
+async function run({ claimed = 1, status = "APPROVED", stock = 100, notifyFails = false } = {}) {
+  const calls = { stock: 0, moves: 0, audit: 0 };
+  const items = Array.from({ length: 33 }, (_, i) => ({ productId: String(i), unitsCount: 2 }));
+  const tx = {
+    warehouseRequest: {
+      updateMany: async () => ({ count: claimed }),
+      findUnique: async () => ({ id: "r", status, items, type: "EXIT", requestCode: "SOL", title: "Test", details: null }),
+    },
+    auditLog: { create: async () => { calls.audit += 1; } },
+    warehouseProduct: {
+      findMany: async () => items.map((item) => ({
+        id: item.productId,
+        code: item.productId,
+        name: "Test",
+        color: "",
+        boxes: 0,
+        looseUnits: stock,
+        totalUnits: stock,
+        unitsPerBox: 1,
+        status: "ACTIVE",
+      })),
+    },
+    warehouseMovement: { createMany: async ({ data }) => { calls.moves = data.length; } },
+  };
+  const prisma = {
+    $transaction: async (fn, options) => {
+      assert.equal(options.timeout, 30000);
+      return fn(tx);
+    },
+    warehouseRequest: {
+      findUnique: async () => {
+        if (notifyFails) throw new Error("notification");
+        return null;
+      },
+    },
+    user: { findMany: async () => [] },
+  };
+  const mod = { exports: {} };
+  new Function(
+    "exports",
+    "prisma",
+    "z",
+    "parseRequestLine",
+    "resolveMovementLine",
+    "availableQuantity",
+    "applyStockDelta",
+    "sendPushToUsers",
+    "revalidatePath",
+    "console",
+    js,
+  )(
+    mod.exports,
+    prisma,
+    z,
+    () => ({ measure: "UNITS", quantity: 2 }),
+    () => ({ measure: "UNITS", quantity: 2, unitsCount: 2, boxesCount: 0 }),
+    (product) => product.looseUnits,
+    async () => { calls.stock += 1; },
+    async () => {},
+    () => {},
+    { error() {} },
+  );
+  try {
+    await mod.exports.updateWarehouseRequestStatus({ id: "r", status, actorId: "admin", source: "web" });
+    return { result: { success: true }, calls };
+  } catch (error) {
+    return { result: { success: false, error: error instanceof Error ? error.message : String(error) }, calls };
+  }
 }
-let r=await run();assert.equal(r.result.success,true);assert.equal(r.calls.stock,33);assert.equal(r.calls.moves,33);assert.equal(r.calls.audit,1);
-r=await run({claimed:0});assert.equal(r.result.success,false);assert.equal(r.calls.stock,0);
-r=await run({status:'REJECTED'});assert.equal(r.result.success,true);assert.equal(r.calls.stock,0);
-r=await run({stock:1});assert.equal(r.result.success,false);assert.match(r.result.error,/Stock insuficiente/);
-r=await run({notifyFails:true});assert.equal(r.result.success,true);
-r=await run({status:'INVALID'});assert.equal(r.result.success,false);assert.equal(r.calls.stock,0);
-console.log('Warehouse approval: 33 lines, duplicate claim, rejection, insufficient stock, notification failure and invalid status passed.');
+
+let report = await run();
+assert.equal(report.result.success, true);
+assert.equal(report.calls.stock, 33);
+assert.equal(report.calls.moves, 33);
+assert.equal(report.calls.audit, 1);
+report = await run({ claimed: 0 });
+assert.equal(report.result.success, false);
+assert.equal(report.calls.stock, 0);
+report = await run({ status: "REJECTED" });
+assert.equal(report.result.success, true);
+assert.equal(report.calls.stock, 0);
+report = await run({ stock: 1 });
+assert.equal(report.result.success, false);
+assert.match(report.result.error, /Stock insuficiente/);
+report = await run({ notifyFails: true });
+assert.equal(report.result.success, true);
+report = await run({ status: "INVALID" });
+assert.equal(report.result.success, false);
+assert.equal(report.calls.stock, 0);
+console.log("Warehouse approval: 33 lines, duplicate claim, rejection, insufficient stock, notification failure and invalid status passed.");

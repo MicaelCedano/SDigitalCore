@@ -19,7 +19,7 @@ import { sendPushToRole, sendPushToUsers } from "@/lib/mobile/push";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 type ArchiveFilter = "active" | "archived" | "all";
-type FlowOperation = "assign" | "receive-repaired" | "receive-unrepaired" | "send-supplier" | "receive-supplier" | "mark-ready" | "deliver" | "credit";
+export type FlowOperation = "assign" | "receive-repaired" | "receive-unrepaired" | "send-supplier" | "receive-supplier" | "mark-ready" | "deliver" | "credit";
 
 export type WarrantyCaseListItem = {
   id: string;
@@ -345,9 +345,13 @@ export async function createWarrantyCases(input: unknown): Promise<Result<{ case
   }
 }
 
-export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<{ caseCode: string }>> {
+export type WarrantyActor = { id: string; roleCode: string | null };
+
+export async function updateWarrantyCaseDetailsForActor(
+  actor: WarrantyActor,
+  input: unknown,
+): Promise<Result<{ caseCode: string }>> {
   try {
-    const actor = await requirePermission("warranties.update");
     const parsed = updateWarrantySchema.safeParse(input);
     if (!parsed.success) return { success: false, error: "Revisa los datos del caso." };
     const result = await prisma.$transaction(async (tx) => {
@@ -367,6 +371,9 @@ export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<
           model: normalizeName(parsed.data.model),
           imei: parsed.data.imei,
           problem: parsed.data.problem.trim(),
+          ...(parsed.data.color !== undefined
+            ? { color: parsed.data.color ? normalizeName(parsed.data.color) : null }
+            : {}),
           updatedById: actor.id,
         },
       });
@@ -376,6 +383,15 @@ export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<
     });
     revalidateWarranty([result.caseCode]);
     return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function updateWarrantyCaseDetails(input: unknown): Promise<Result<{ caseCode: string }>> {
+  try {
+    const actor = await requirePermission("warranties.update");
+    return await updateWarrantyCaseDetailsForActor({ id: actor.id, roleCode: null }, input);
   } catch (error) {
     return fail(error);
   }
@@ -399,13 +415,12 @@ const flowRules: Record<FlowOperation, {
   credit: { toStatus: "CREDIT_NOTE", allowed: ["RECEIVED", "IN_REPAIR", "RECEIVED_FROM_TECHNICIAN", "SENT_TO_SUPPLIER", "RECEIVED_FROM_SUPPLIER", "READY_FOR_CUSTOMER"], documentType: "CREDIT_NOTE", eventType: "CREDIT_NOTE_MARKED", needsCounterparty: false, needsReason: true },
 };
 
-async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode?: string; status: WarrantyStatus }>> {
+export async function applyWarrantyFlowForActor(
+  actor: WarrantyActor,
+  input: unknown,
+  operation: FlowOperation,
+): Promise<Result<{ documentCode?: string; status: WarrantyStatus }>> {
   try {
-    const actor = await requirePermission("warranties.transition");
-    const actorRecord = await prisma.user.findUnique({
-      where: { id: actor.id },
-      select: { roleCode: true },
-    });
     const parsed = flowSchema.safeParse(input);
     if (!parsed.success) return { success: false, error: "Revisa los datos del flujo." };
     const data = parsed.data;
@@ -453,7 +468,7 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
       if (cases.some((item) => !rule.allowed.includes(item.status))) throw new WarrantyActionError("Uno o más casos cambiaron de estado y ya no son elegibles.");
       if (
         (operation === "receive-repaired" || operation === "receive-unrepaired") &&
-        actorRecord?.roleCode === "TECNICO" &&
+        actor.roleCode === "TECNICO" &&
         cases.some((item) => item.assignedTechnicianId === actor.id)
       ) {
         throw new WarrantyActionError("El técnico que reportó el resultado no puede confirmar su propia recepción. Debe confirmarla otra persona.");
@@ -517,6 +532,23 @@ async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ 
     }
     revalidateWarranty(data.caseCodes, result.documentCode);
     return ok(result);
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+async function flow(input: unknown, operation: FlowOperation): Promise<Result<{ documentCode?: string; status: WarrantyStatus }>> {
+  try {
+    const actor = await requirePermission("warranties.transition");
+    const actorRecord = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { roleCode: true },
+    });
+    return await applyWarrantyFlowForActor(
+      { id: actor.id, roleCode: actorRecord?.roleCode ?? null },
+      input,
+      operation,
+    );
   } catch (error) {
     return fail(error);
   }
