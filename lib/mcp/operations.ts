@@ -7,14 +7,18 @@ import {
   assessEquipo,
   assessGarantia,
   assessLote,
+  assessSolicitudDecision,
   assessTarea,
   computeVersionHash,
   diffFrom,
   isWriteEntity,
   sameChanges,
+  SOLICITUD_ALMACEN_REVERT_ERROR,
   warrantyMove,
   type WriteEntity,
 } from "@/lib/mcp/validation";
+import { buildWarehouseDecisionPreview } from "@/modules/almacen/lib/warehouse-request-plan";
+import { readWarehouseRequestDecision, updateWarehouseRequestStatus } from "@/modules/almacen/lib/warehouse-request-status";
 import { applyWarrantyFlowForActor, createEvent, updateWarrantyCaseDetailsForActor } from "@/modules/garantias/actions/warranty";
 import { updateDeviceForActor } from "@/modules/qc/actions/device-edit";
 import { updateRevisionBatchStatusForActor } from "@/modules/qc/actions/revision-batch";
@@ -61,6 +65,7 @@ async function loadTarea(idOCodigo: string) {
 }
 
 function snapshotOf(entidad: WriteEntity, row: Awaited<ReturnType<typeof loadEntity>>): Record<string, unknown> {
+  if (entidad === "solicitud_almacen") return (row as { snapshot: Record<string, unknown> }).snapshot;
   if (entidad === "garantia") return garantiaSnapshot(row as Awaited<ReturnType<typeof loadGarantia>>);
   if (entidad === "equipo_qc") return equipoSnapshot(row as Awaited<ReturnType<typeof loadEquipo>>);
   if (entidad === "lote_qc") return loteSnapshot(row as Awaited<ReturnType<typeof loadLote>>);
@@ -68,6 +73,11 @@ function snapshotOf(entidad: WriteEntity, row: Awaited<ReturnType<typeof loadEnt
 }
 
 async function loadEntity(entidad: WriteEntity, idOCodigo: string) {
+  if (entidad === "solicitud_almacen") {
+    const loaded = await readWarehouseRequestDecision(idOCodigo);
+    if (!loaded) fail("No se encontró la solicitud de almacén.");
+    return loaded;
+  }
   if (entidad === "garantia") return loadGarantia(idOCodigo);
   if (entidad === "equipo_qc") return loadEquipo(idOCodigo);
   if (entidad === "lote_qc") return loadLote(idOCodigo);
@@ -75,6 +85,9 @@ async function loadEntity(entidad: WriteEntity, idOCodigo: string) {
 }
 
 function assess(entidad: WriteEntity, row: Awaited<ReturnType<typeof loadEntity>>, propuesta: Record<string, unknown>) {
+  if (entidad === "solicitud_almacen") {
+    return { ok: false, errors: ["La solicitud de almacén se valida con su inventario en preparar_cambios."], warnings: [], cambios: {} };
+  }
   if (entidad === "garantia") {
     const current = row as Awaited<ReturnType<typeof loadGarantia>>;
     return assessGarantia(
@@ -125,6 +138,15 @@ function assess(entidad: WriteEntity, row: Awaited<ReturnType<typeof loadEntity>
 }
 
 async function applyChange(actor: McpActor, entidad: WriteEntity, idOCodigo: string, cambios: Record<string, unknown>) {
+  if (entidad === "solicitud_almacen") {
+    if (actor.roleCode !== "ADMIN") fail("Solo un administrador puede aprobar o rechazar solicitudes de almacén.");
+    const decision = cambios.estado === "APPROVED" || cambios.estado === "REJECTED" ? cambios.estado : null;
+    if (!decision) fail("La decisión no es válida.");
+    const loaded = await readWarehouseRequestDecision(idOCodigo);
+    if (!loaded) fail("No se encontró la solicitud de almacén.");
+    await updateWarehouseRequestStatus({ id: loaded.request.id, status: decision, actorId: actor.id, source: "mcp" });
+    return;
+  }
   if (entidad === "garantia") {
     const row = await loadGarantia(idOCodigo);
     const fields = ["cliente", "modelo", "color", "imei", "problema"].some((key) => key in cambios);
@@ -245,6 +267,7 @@ async function applyChange(actor: McpActor, entidad: WriteEntity, idOCodigo: str
 }
 
 async function restore(actor: McpActor, entidad: WriteEntity, idOCodigo: string, before: Record<string, unknown>, after: Record<string, unknown> | null) {
+  if (entidad === "solicitud_almacen") fail(SOLICITUD_ALMACEN_REVERT_ERROR);
   if (entidad === "garantia") {
     const row = await loadGarantia(idOCodigo);
     await prisma.$transaction(async (tx) => {
@@ -339,9 +362,82 @@ async function restore(actor: McpActor, entidad: WriteEntity, idOCodigo: string,
   await logAudit({ userId: actor.id, action: "mcp.revertir", module: "mcp", entityType: "tarea", entityId: row.id, afterData: before as Prisma.InputJsonObject });
 }
 
+async function prepararDecisionAlmacen(actor: McpActor, idOCodigo: string, propuesta: Record<string, unknown>, justificacion?: string) {
+  if (actor.roleCode !== "ADMIN") fail("Solo un administrador puede aprobar o rechazar solicitudes de almacén.");
+  const loaded = await readWarehouseRequestDecision(idOCodigo);
+  if (!loaded) fail("No se encontró la solicitud de almacén.");
+  const shape = assessSolicitudDecision(propuesta);
+  const decision = shape.cambios.estado === "APPROVED" || shape.cambios.estado === "REJECTED" ? shape.cambios.estado : null;
+  const solicitud = {
+    id: loaded.request.id,
+    codigo: loaded.request.requestCode,
+    titulo: loaded.request.title,
+    sucursal: loaded.request.branch,
+    solicitado_por: loaded.request.requestedBy,
+    tipo: loaded.request.type,
+    estado: loaded.request.status,
+  };
+  if (!shape.ok || !decision) {
+    return {
+      rechazado: true,
+      entidad: "solicitud_almacen" as const,
+      id: loaded.snapshot.id,
+      codigo: loaded.snapshot.codigo,
+      errores: shape.errors,
+      advertencias: shape.warnings,
+      vista_previa: { solicitud, decision: null, items: [], errores: shape.errors, advertencias: shape.warnings },
+      resumen: shape.errors.join(" "),
+    };
+  }
+  const preview = buildWarehouseDecisionPreview(loaded.request, decision);
+  if (!preview.ok) {
+    return {
+      rechazado: true,
+      entidad: "solicitud_almacen" as const,
+      id: preview.snapshot.id,
+      codigo: preview.snapshot.codigo,
+      errores: preview.errores,
+      advertencias: [...shape.warnings, ...preview.advertencias],
+      vista_previa: preview.vista,
+      resumen: preview.errores.join(" "),
+    };
+  }
+  const versionHash = computeVersionHash(preview.snapshot);
+  const created = await prisma.mcpOperacion.create({
+    data: {
+      entidad: "solicitud_almacen",
+      entityId: String(preview.snapshot.id),
+      versionHashAntes: versionHash,
+      propuesta: { cambios: preview.cambios, original: propuesta, vista_previa: preview.vista } as Prisma.InputJsonObject,
+      diff: diffFrom(preview.snapshot, preview.cambios) as unknown as Prisma.InputJsonValue,
+      snapshotAntes: preview.snapshot as Prisma.InputJsonObject,
+      justificacion: justificacion?.slice(0, 1000) || null,
+      actorUserId: actor.id,
+      expiresAt: new Date(Date.now() + PREVIEW_MS),
+    },
+  });
+  return {
+    operacion_id: created.id,
+    entidad: "solicitud_almacen" as const,
+    id: preview.snapshot.id,
+    codigo: preview.snapshot.codigo,
+    version_hash: versionHash,
+    diff: created.diff,
+    cambios: preview.cambios,
+    advertencias: [...shape.warnings, ...preview.advertencias],
+    vista_previa: preview.vista,
+    requiere_confirmacion_usuario: true,
+    expira_en: created.expiresAt.toISOString(),
+    resumen: decision === "REJECTED"
+      ? "No se escribió nada. El rechazo no mueve inventario. Muestra la vista previa y confirma con confirmar_cambios y aprobacion_explicita true."
+      : "No se escribió nada. Revisa el stock actual y el resultante. Confirma con confirmar_cambios y aprobacion_explicita true.",
+  };
+}
+
 export async function prepararCambios(entidad: string, idOCodigo: string, propuesta: Record<string, unknown>, justificacion?: string) {
   if (!isWriteEntity(entidad)) fail("Esa entidad no admite escritura en esta versión.");
   const actor = await requireMcpActor();
+  if (entidad === "solicitud_almacen") return prepararDecisionAlmacen(actor, idOCodigo, propuesta, justificacion);
   const row = await loadEntity(entidad, idOCodigo);
   const reviewed = assess(entidad, row, propuesta);
   if (!reviewed.ok) fail(reviewed.errors.join(" "));
@@ -401,6 +497,16 @@ export async function confirmarCambios(input: {
   if (String(snapshot.id) !== operacion.entityId) fail("La operación no corresponde a ese registro.");
   const versionHash = computeVersionHash(snapshot);
   if (versionHash !== operacion.versionHashAntes || versionHash !== input.versionHash) {
+    if (input.entidad === "solicitud_almacen") {
+      const decision = cambios.estado;
+      if (decision === "APPROVED" || decision === "REJECTED") {
+        const loadedNow = await readWarehouseRequestDecision(input.idOCodigo);
+        if (!loadedNow) fail("No se encontró la solicitud de almacén.");
+        const preview = buildWarehouseDecisionPreview(loadedNow.request, decision);
+        if (!preview.ok) fail(preview.errores.join(" "));
+      }
+      fail("La solicitud o el stock cambiaron desde el preview. Vuelve a preparar los cambios.");
+    }
     fail("El registro cambió desde el preview. Vuelve a leerlo y a preparar los cambios.");
   }
   const applied = await applyChange(actor, input.entidad, input.idOCodigo, cambios);
@@ -433,7 +539,9 @@ export async function confirmarCambios(input: {
     id: after.id,
     version_hash: computeVersionHash(after),
     campos_actualizados: Object.keys(cambios),
-    mensaje: "Cambios guardados.",
+    mensaje: input.entidad === "solicitud_almacen"
+      ? (cambios.estado === "REJECTED" ? "Solicitud rechazada. No se movió inventario." : "Solicitud aprobada. El inventario quedó actualizado.")
+      : "Cambios guardados.",
   };
 }
 
@@ -473,6 +581,7 @@ function stableEnough(expected: unknown, actual: unknown) {
 }
 
 export async function revertirCambios(entidad: string, idOCodigo: string, operacionId: string, aprobacionExplicita: boolean) {
+  if (entidad === "solicitud_almacen") fail(SOLICITUD_ALMACEN_REVERT_ERROR);
   if (!aprobacionExplicita) fail("Se requiere aprobacion_explicita true para revertir.");
   if (!isWriteEntity(entidad)) fail("Esa entidad no admite reversión.");
   const actor = await requireMcpActor();

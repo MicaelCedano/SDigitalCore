@@ -3,8 +3,18 @@ import assert from "node:assert/strict";
 import ts from "typescript";
 import { z } from "zod";
 
-const source = fs.readFileSync("modules/almacen/lib/warehouse-request-status.ts", "utf8");
-const action = source.slice(source.indexOf("const inputSchema"));
+const statusSource = fs.readFileSync("modules/almacen/lib/warehouse-request-status.ts", "utf8");
+const planSource = fs.readFileSync("modules/almacen/lib/warehouse-request-plan.ts", "utf8");
+assert.match(statusSource, /planWarehouseRequestLines/);
+assert.doesNotMatch(statusSource, /\b(UPDATE|DELETE)\s+warehouse_/i);
+
+function stripImports(source) {
+  return source
+    .replace(/^\s*import\s+type\s+[\s\S]*?from\s+["'][^"']+["'];?\s*$/gm, "")
+    .replace(/^\s*import\s+[\s\S]*?from\s+["'][^"']+["'];?\s*$/gm, "");
+}
+
+const action = stripImports(planSource) + "\n" + statusSource.slice(statusSource.indexOf("const inputSchema"));
 const js = ts.transpileModule(action, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 
 async function run({ claimed = 1, status = "APPROVED", stock = 100, notifyFails = false } = {}) {

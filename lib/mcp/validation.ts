@@ -4,8 +4,11 @@ import { canTransition } from "@/modules/garantias/lib/status-machine";
 import type { FlowOperation } from "@/modules/garantias/actions/warranty";
 import { warrantyIdentifierSchema } from "@/lib/validation/warranty";
 
-export const WRITE_ENTITIES = ["garantia", "equipo_qc", "lote_qc", "tarea"] as const;
+export const WRITE_ENTITIES = ["garantia", "equipo_qc", "lote_qc", "tarea", "solicitud_almacen"] as const;
 export type WriteEntity = (typeof WRITE_ENTITIES)[number];
+export const REVERT_ENTITIES = ["garantia", "equipo_qc", "lote_qc", "tarea"] as const;
+export const SOLICITUD_ALMACEN_REVERT_ERROR =
+  "No se puede revertir una decisión de almacén por el MCP. Aprobar ya movió inventario y deshacerlo no es seguro: el stock pudo cambiar después. El rechazo tampoco se reabre desde aquí.";
 
 const GARANTIA_FIELDS = ["cliente", "modelo", "color", "imei", "problema", "estado", "contraparte", "tecnicoId", "motivo"] as const;
 const EQUIPO_FIELDS = ["marca", "modelo", "almacenamientoGb", "color", "resultado"] as const;
@@ -13,6 +16,7 @@ const EQUIPO_FORBIDDEN = ["imei", "serial", "serialNumber", "serie", "id"] as co
 const LOTE_FIELDS = ["estado", "notas"] as const;
 const LOTE_ESTADOS = ["DRAFT", "PENDING_REVIEW", "IN_REVIEW", "CANCELLED"] as const;
 const TAREA_FIELDS = ["titulo", "descripcion", "prioridad", "vence", "estado", "comentario"] as const;
+const SOLICITUD_FIELDS = ["estado"] as const;
 const TAREA_ESTADOS = ["PENDING", "IN_PROGRESS", "IN_REVIEW", "COMPLETED", "CANCELLED"] as const;
 const TAREA_PRIORIDADES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
 
@@ -269,6 +273,20 @@ export function assessTarea(
     if (typeof propuesta.comentario !== "string" || propuesta.comentario.trim().length < 1) errors.push("El comentario no es válido.");
     else cambios.comentario = propuesta.comentario.trim();
   }
+  if (Object.keys(cambios).length === 0 && errors.length === 0) errors.push("La propuesta no cambia ningún dato.");
+  return { ok: errors.length === 0, errors, warnings, cambios };
+}
+
+export function assessSolicitudDecision(raw: unknown): ProposalResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const propuesta = asRecord(raw);
+  if (!propuesta) return { ok: false, errors: ["La propuesta debe ser un objeto."], warnings, cambios: {} };
+  for (const key of unknownKeys(propuesta, SOLICITUD_FIELDS)) warnings.push(`El campo "${key}" se ignora.`);
+  const cambios: Record<string, unknown> = {};
+  if (!("estado" in propuesta)) errors.push("Indica estado APPROVED para aprobar o REJECTED para rechazar.");
+  else if (propuesta.estado !== "APPROVED" && propuesta.estado !== "REJECTED") errors.push("El estado debe ser APPROVED o REJECTED.");
+  else cambios.estado = propuesta.estado;
   if (Object.keys(cambios).length === 0 && errors.length === 0) errors.push("La propuesta no cambia ningún dato.");
   return { ok: errors.length === 0, errors, warnings, cambios };
 }
