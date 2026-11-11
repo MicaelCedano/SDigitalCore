@@ -1,100 +1,60 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Boxes, Building2, CalendarDays, CheckCircle2, ClipboardList, Cpu, Eye, PackagePlus, Palette, Plus, Printer, RefreshCw, Search, Send, Share2, UserRound, X, XCircle } from "lucide-react";
-import { getBranchesAction } from "@/modules/configuracion/actions/branch";
-import { createWarehouseRequestAction, getWarehouseProductsAction, getWarehouseRequestsAction, updateWarehouseRequestStatusAction } from "../actions/warehouse";
+import { useEffect, useRef, useState } from "react";
+import { Boxes, Building2, CalendarDays, CheckCircle2, ClipboardList, Cpu, Eye, FilePenLine, Palette, Plus, Printer, RefreshCw, Search, Send, Share2, UserRound, X, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getWarehouseRequestsAction, updateWarehouseRequestStatusAction } from "../actions/warehouse";
+import { emptyWarehouseRequest, useWarehouseRequestDraft } from "../hooks/useWarehouseRequestDraft";
+import { WarehouseRequestForm } from "./WarehouseRequestForm";
 
-type MovementType = "ENTRY" | "EXIT";
-type Measure = "BOXES" | "UNITS";
-type SelectedChoice = { quantity: number | ""; measure: Measure };
+type WarehouseRequest = NonNullable<Awaited<ReturnType<typeof getWarehouseRequestsAction>>["data"]>[number];
+type RequestItem = WarehouseRequest["items"][number];
+type RequestProduct = RequestItem["product"];
 
-function availableQuantity(product: any, measure: Measure) {
-  if (measure === "BOXES") return Math.max(0, Number(product.boxes) || 0);
-  const boxes = Math.max(0, Number(product.boxes) || 0);
-  const looseUnits = Math.max(0, Number(product.looseUnits) || 0);
-  // Compatibilidad con registros antiguos que conservaron el total, pero
-  // no dejaron reflejadas esas unidades en looseUnits cuando no había cajas.
-  return boxes === 0 ? Math.max(looseUnits, Number(product.totalUnits) || 0) : looseUnits;
-}
+const draftDateFormat = new Intl.DateTimeFormat("es-DO", {
+  dateStyle: "medium", timeStyle: "short", timeZone: "America/Santo_Domingo",
+});
 
-export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: string }) {
+export function WarehouseRequestsManager({ roleCode, draftOwnerId }: { roleCode: string; draftOwnerId?: string }) {
   const isAdmin = roleCode === "ADMIN";
-  const [requests, setRequests] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
+  const [requests, setRequests] = useState<WarehouseRequest[]>([]);
   const [search, setSearch] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [historyError, setHistoryError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [type, setType] = useState<MovementType>("EXIT");
-  const [branch, setBranch] = useState("");
-  const [reason, setReason] = useState("");
-  const [selected, setSelected] = useState<Record<string, SelectedChoice>>({});
-  const [productSearch, setProductSearch] = useState("");
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [sentCode, setSentCode] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [voucherRequest, setVoucherRequest] = useState<any | null>(null);
+  const [voucherRequest, setVoucherRequest] = useState<WarehouseRequest | null>(null);
   const [sharingVoucher, setSharingVoucher] = useState(false);
-  const [detailRequest, setDetailRequest] = useState<any | null>(null);
+  const [detailRequest, setDetailRequest] = useState<WarehouseRequest | null>(null);
+  const actionButton = useRef<HTMLButtonElement>(null);
+  const { draft, ready, storageError, saveDraft, discardDraft, clearDraftAfterSend } = useWarehouseRequestDraft(draftOwnerId);
 
-  const load = async () => {
-    const [r, p, b] = await Promise.all([getWarehouseRequestsAction(search, "ALL"), getWarehouseProductsAction(), getBranchesAction(true)]);
-    if (r.success) setRequests(r.data ?? []);
-    if (p.success) setProducts(p.data ?? []);
-    if (b.success) {
-      setBranches(b.data ?? []);
-      setBranch((current) => current || b.data?.[0]?.name || "");
-    }
+  useEffect(() => {
+    let active = true;
+    const failed = () => { if (active) setHistoryError("No se pudo cargar el historial de solicitudes."); };
+    void getWarehouseRequestsAction(search, "ALL").then((result) => {
+      if (!active) return;
+      if (!result.success) return failed();
+      setRequests(result.data ?? []);
+      setHistoryError("");
+    }).catch(failed);
+    return () => { active = false; };
+  }, [search, refresh]);
+
+  const openForm = () => {
+    setConfirmDiscard(false);
+    setSentCode("");
+    setError("");
+    setShowCreate(true);
   };
 
-  useEffect(() => { void load(); }, [search]);
-
-  const availableProducts = useMemo(() => products.filter((p) => type === "ENTRY" || Number(p.totalUnits) > 0), [products, type]);
-  const filtered = useMemo(() => {
-    const terms = productSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return availableProducts.filter((p) => {
-      if (selected[p.id]) return false;
-      if (terms.length === 0) return true;
-      const searchableText = `${p.name} ${p.brand ?? ""} ${p.code} ${p.color ?? ""} ${p.capacity ?? ""}`.toLowerCase();
-      return terms.every((term) => searchableText.includes(term));
-    });
-  }, [availableProducts, productSearch, selected]);
-  const selectedItems = Object.entries(selected).map(([productId, choice]) => {
-    const product = products.find((p) => p.id === productId);
-    const quantity = choice.quantity === "" ? 0 : choice.quantity;
-    return product ? { product, choice, unitsCount: choice.measure === "BOXES" ? quantity * (product.unitsPerBox || 1) : quantity } : null;
-  }).filter(Boolean) as Array<{ product: any; choice: SelectedChoice; unitsCount: number }>;
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    const items = Object.entries(selected).filter(([, choice]) => Number(choice.quantity) > 0).map(([productId, choice]) => {
-      const product = products.find((item) => item.id === productId);
-      const quantity = Number(choice.quantity);
-      const unitsCount = choice.measure === "BOXES" ? quantity * (product?.unitsPerBox || 1) : quantity;
-      return { productId, unitsCount, measure: choice.measure, quantity };
-    });
-    if (!branch) {
-      setError("Selecciona una sucursal.");
-      return;
-    }
-    if (items.length === 0) {
-      setError("Añade al menos un producto y define su cantidad.");
-      return;
-    }
-    const reference = reason.trim() || `Solicitud de ${type === "ENTRY" ? "entrada" : "salida"}`;
-    setSaving(true);
-    const result = await createWarehouseRequestAction({ title: reference, branch, type, details: reason.trim() || null, items, status: "PENDING" });
-    setSaving(false);
-    if (!result.success) {
-      setError(result.error ?? "No se pudo enviar la solicitud.");
-      return;
-    }
+  const closeForm = () => {
     setShowCreate(false);
-    setSelected({});
-    setReason("");
-    setProductSearch("");
-    await load();
+    requestAnimationFrame(() => actionButton.current?.focus());
   };
 
   const update = async (id: string, status: "APPROVED" | "REJECTED") => {
@@ -104,25 +64,16 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     try {
       const result = await updateWarehouseRequestStatusAction(id, status);
       if (!result.success) setError(result.error ?? "No se pudo procesar la solicitud.");
-      await load();
+      setRefresh((current) => current + 1);
+    } catch {
+      setError("No se pudo procesar la solicitud.");
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const setQuantity = (productId: string, value: number | "", measure: Measure, max?: number) => {
-    const quantity = value === "" ? "" : Math.max(1, Math.min(Number.isFinite(value) ? value : 1, max ?? Number.MAX_SAFE_INTEGER));
-    setSelected((current) => ({ ...current, [productId]: { quantity, measure } }));
-  };
-
-  const removeSelected = (productId: string) => setSelected((current) => {
-    const next = { ...current };
-    delete next[productId];
-    return next;
-  });
-
   // Detalle estructurado de una solicitud: el campo details guarda un JSON con reason + items por producto
-  const parseRequestDetails = (request: any) => {
+  const parseRequestDetails = (request: WarehouseRequest) => {
     let reason = request.details || request.title || "";
     let itemsMap: Record<string, { measure?: string; quantity?: number; unitsCount?: number }> = {};
     try {
@@ -140,7 +91,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     return new Date(value).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Santo_Domingo" });
   };
 
-  const formatItemPresentation = (item: any, detail?: { measure?: string; quantity?: number; unitsCount?: number }) => {
+  const formatItemPresentation = (item: RequestItem, detail?: { measure?: string; quantity?: number; unitsCount?: number }) => {
     const measure = detail?.measure ?? (item.unitsCount % (item.product?.unitsPerBox || 1) === 0 && item.unitsCount > 0 ? "BOXES" : "UNITS");
     if (measure === "BOXES") {
       const perBox = item.product?.unitsPerBox || 1;
@@ -150,7 +101,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     return `${item.unitsCount} uds sueltas`;
   };
 
-  const formatProductVariant = (product: any) => {
+  const formatProductVariant = (product: RequestProduct | null | undefined) => {
     const attributes = [
       product?.capacity,
       product?.color,
@@ -158,23 +109,23 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     return attributes.join(" · ");
   };
 
-  const formatProductLabel = (product: any, fallback = "Producto") => {
+  const formatProductLabel = (product: RequestProduct | null | undefined, fallback = "Producto") => {
     return [product?.brand, product?.name ?? fallback, formatProductVariant(product)]
       .filter(Boolean)
       .join(" ");
   };
 
-  const voucherText = (request: any) => {
-    const lines = (request.items ?? []).map((item: any) => {
+  const voucherText = (request: WarehouseRequest) => {
+    const lines = (request.items ?? []).map((item: RequestItem) => {
       return `${formatProductLabel(item.product, item.productId)}: ${item.unitsCount} uds`;
     }).join("\n");
     return `BOUCHER DE SOLICITUD ${request.requestCode}\n${request.type === "ENTRY" ? "ENTRADA" : "SALIDA"}\nSucursal: ${request.branch}\nSolicitante: ${request.requestedBy}\nProductos:\n${lines}\nEstado: ${request.status === "PENDING" ? "Pendiente de aprobación" : request.status === "APPROVED" ? "Aprobada" : "Rechazada"}`;
   };
 
-  const createVoucherImage = async (request: any) => {
+  const createVoucherImage = async (request: WarehouseRequest) => {
     const width = 900;
     const items = request.items ?? [];
-    const lines = items.flatMap((item: any) => {
+    const lines = items.flatMap((item: RequestItem) => {
       const label = `${item.product?.code ?? item.productId} · ${formatProductLabel(item.product)}`;
       const words = label.split(" ");
       const wrapped: string[] = [];
@@ -209,7 +160,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     return blob;
   };
 
-  const shareVoucherImage = async (request: any) => {
+  const shareVoucherImage = async (request: WarehouseRequest) => {
     setSharingVoucher(true);
     try {
       const blob = await createVoucherImage(request);
@@ -232,13 +183,68 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
     }
   };
 
+  if (showCreate && draftOwnerId) {
+    return (
+      <WarehouseRequestForm
+        form={draft?.form ?? emptyWarehouseRequest}
+        saved={!!draft}
+        storageError={storageError}
+        onChange={saveDraft}
+        onClose={closeForm}
+        onSent={(code) => {
+          clearDraftAfterSend();
+          setSentCode(code);
+          setSearch("");
+          setRefresh((current) => current + 1);
+          closeForm();
+        }}
+      />
+    );
+  }
+
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div><h1 className="text-xl font-bold text-slate-900">Solicitudes de almacén</h1><p className="mt-1 text-sm text-slate-500">{isAdmin ? "Revisa, aprueba y procesa las solicitudes de movimiento." : "Envía solicitudes y espera la aprobación del administrador."}</p></div>
-      <button onClick={() => { setError(""); setShowCreate(true); }} className="inline-flex items-center gap-2 rounded-xl bg-[#5750f1] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#4841d7]"><Plus className="h-4 w-4" />Nueva solicitud</button>
+    <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-5 shadow-sm sm:px-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">Solicitudes de almacén</h1>
+        <p className="mt-1 text-sm text-slate-600">{isAdmin ? "Revisa, aprueba y procesa las solicitudes de movimiento." : "Consulta el estado de tus solicitudes de movimiento."}</p>
+      </div>
+      {draftOwnerId && !draft && <Button ref={actionButton} type="button" disabled={!ready} onClick={openForm}><Plus />Nueva solicitud</Button>}
+    </header>
+    {draft && <section aria-labelledby="warehouse-draft-title" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-4 sm:px-6">
+      <div className="flex min-w-0 items-start gap-3">
+        <FilePenLine aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-indigo-700" />
+        <div className="min-w-0">
+          <h2 id="warehouse-draft-title" className="text-sm font-bold text-slate-900">Solicitud en borrador</h2>
+          <p className="mt-0.5 wrap-break-word text-sm text-indigo-950">
+            {[draft.form.type === "ENTRY" ? "Entrada" : "Salida", draft.form.branch, `${draft.form.items.length} ${draft.form.items.length === 1 ? "producto" : "productos"}`].filter(Boolean).join(" · ")}
+          </p>
+          <p className="mt-1 text-xs text-indigo-800">
+            {storageError ? "Cambios sin guardar en el navegador" : `Guardado el ${draftDateFormat.format(new Date(draft.savedAt))}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant={confirmDiscard ? "destructive" : "ghost"} onClick={() => {
+          if (confirmDiscard) discardDraft();
+          setConfirmDiscard(!confirmDiscard);
+          requestAnimationFrame(() => actionButton.current?.focus());
+        }}>{confirmDiscard ? "Sí, descartar" : "Descartar"}</Button>
+        <Button ref={actionButton} type="button" variant={confirmDiscard ? "outline" : "default"} onClick={confirmDiscard ? () => setConfirmDiscard(false) : openForm}>
+          {confirmDiscard ? "Conservar borrador" : "Continuar borrador"}
+        </Button>
+      </div>
+    </section>}
+    {storageError && !draft && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">El navegador no pudo eliminar el borrador guardado.</p>}
+    {sentCode && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Solicitud {sentCode} enviada para aprobación.</p>}
+    {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+    <div className="relative w-full max-w-md">
+      <Search aria-hidden="true" className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-slate-500" />
+      <Input aria-label="Buscar solicitudes" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar solicitudes…" className="pl-9 placeholder:text-slate-500" />
     </div>
-    {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
-    <div className="flex items-center gap-2"><Search className="h-4 w-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar solicitudes..." className="w-full max-w-md rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#5750f1] focus:ring-2 focus:ring-[#5750f1]/10" /></div>
+    {historyError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-rose-800">
+      {historyError}
+      <Button type="button" size="sm" variant="outline" onClick={() => setRefresh((current) => current + 1)}>Reintentar</Button>
+    </div>}
     <div className="space-y-3 md:hidden">
       {requests.map((r) => {
         const isUpdating = updatingId === r.id;
@@ -257,7 +263,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
             </div>
           </div>
           <div className="space-y-3 p-4">
-            {(r.items ?? []).map((item: any) => <div key={item.id} className="rounded-xl border border-slate-100 bg-white">
+            {(r.items ?? []).map((item: RequestItem) => <div key={item.id} className="rounded-xl border border-slate-100 bg-white">
               <div className="flex items-start justify-between gap-3 p-3">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-bold text-slate-900">{item.product?.brand ? `${item.product.brand} · ` : ""}{item.product?.name ?? item.productId}</p>
@@ -286,19 +292,8 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
       })}
       {requests.length === 0 && <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"><Send className="mx-auto mb-2 h-8 w-8 text-slate-300" />No hay solicitudes.</div>}
     </div>
-    <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block"><table className="w-full text-left text-sm"><thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4">Código</th><th className="p-4">Tipo</th><th className="p-4">Productos</th><th className="p-4">Solicitante</th><th className="p-4">Estado</th><th className="p-4 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((r) => { const isUpdating = updatingId === r.id; const statusLabel = r.status === "PENDING" ? (isAdmin ? "PENDIENTE" : "Esperando aprobación") : r.status === "APPROVED" ? "APROBADA" : "RECHAZADA"; const statusClass = r.status === "PENDING" ? "border-amber-200 bg-amber-50 text-amber-700" : r.status === "APPROVED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"; return <tr key={r.id} className="hover:bg-slate-50/70"><td className="p-4"><button type="button" onClick={() => setDetailRequest(r)} className="font-mono text-xs font-bold text-[#5750f1] hover:underline" title="Ver detalle de la solicitud">{r.requestCode}</button></td><td className="p-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${r.type === "ENTRY" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{r.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span></td><td className="p-4"><div className="space-y-1">{(r.items ?? []).slice(0, 2).map((item: any) => <p key={item.id} className="text-xs text-slate-600"><span className="font-semibold text-slate-800">{formatProductLabel(item.product, item.productId)}</span> · {item.unitsCount} uds</p>)}{(r.items ?? []).length > 2 && <p className="text-xs font-semibold text-[#5750f1]">+{r.items.length - 2} más</p>}{(r.items ?? []).length === 0 && <span className="text-xs text-slate-500">Sin productos</span>}</div></td><td className="p-4">{r.requestedBy}<span className="mt-1 block text-xs text-slate-500">{r.branch}</span></td><td className="p-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass}`}>{statusLabel}</span></td><td className="p-4 text-right"><span className="inline-flex flex-wrap justify-end gap-1">{<button type="button" onClick={() => setDetailRequest(r)} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 font-bold text-slate-700 hover:bg-slate-200"><Eye className="h-3.5 w-3.5" />Ver</button>}{<button onClick={() => setVoucherRequest(r)} className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 font-bold text-indigo-700 hover:bg-indigo-100"><Printer className="h-3.5 w-3.5" />Boucher</button>}{isAdmin && r.status === "PENDING" && <><button disabled={!!updatingId} onClick={() => void update(r.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-700 disabled:cursor-wait disabled:opacity-60">{isUpdating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{isUpdating ? "Procesando..." : "Aprobar"}</button><button disabled={!!updatingId} onClick={() => void update(r.id, "REJECTED")} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1.5 font-bold text-red-700 disabled:cursor-wait disabled:opacity-60"><XCircle className="h-3.5 w-3.5" />Rechazar</button></>}{!isAdmin && r.status === "PENDING" && <span className="self-center text-xs font-semibold text-slate-400">Esperando aprobación</span>}</span></td></tr>; })}</tbody></table>{requests.length === 0 && <div className="p-12 text-center text-sm text-slate-500"><Send className="mx-auto mb-2 h-8 w-8 text-slate-300" />No hay solicitudes.</div>}</div>
+    <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block"><table className="w-full text-left text-sm"><thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-4">Código</th><th className="p-4">Tipo</th><th className="p-4">Productos</th><th className="p-4">Solicitante</th><th className="p-4">Estado</th><th className="p-4 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((r) => { const isUpdating = updatingId === r.id; const statusLabel = r.status === "PENDING" ? (isAdmin ? "PENDIENTE" : "Esperando aprobación") : r.status === "APPROVED" ? "APROBADA" : "RECHAZADA"; const statusClass = r.status === "PENDING" ? "border-amber-200 bg-amber-50 text-amber-700" : r.status === "APPROVED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"; return <tr key={r.id} className="hover:bg-slate-50/70"><td className="p-4"><button type="button" onClick={() => setDetailRequest(r)} className="font-mono text-xs font-bold text-[#5750f1] hover:underline" title="Ver detalle de la solicitud">{r.requestCode}</button></td><td className="p-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${r.type === "ENTRY" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{r.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span></td><td className="p-4"><div className="space-y-1">{(r.items ?? []).slice(0, 2).map((item: RequestItem) => <p key={item.id} className="text-xs text-slate-600"><span className="font-semibold text-slate-800">{formatProductLabel(item.product, item.productId)}</span> · {item.unitsCount} uds</p>)}{(r.items ?? []).length > 2 && <p className="text-xs font-semibold text-[#5750f1]">+{r.items.length - 2} más</p>}{(r.items ?? []).length === 0 && <span className="text-xs text-slate-500">Sin productos</span>}</div></td><td className="p-4">{r.requestedBy}<span className="mt-1 block text-xs text-slate-500">{r.branch}</span></td><td className="p-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass}`}>{statusLabel}</span></td><td className="p-4 text-right"><span className="inline-flex flex-wrap justify-end gap-1">{<button type="button" onClick={() => setDetailRequest(r)} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 font-bold text-slate-700 hover:bg-slate-200"><Eye className="h-3.5 w-3.5" />Ver</button>}{<button onClick={() => setVoucherRequest(r)} className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 font-bold text-indigo-700 hover:bg-indigo-100"><Printer className="h-3.5 w-3.5" />Boucher</button>}{isAdmin && r.status === "PENDING" && <><button disabled={!!updatingId} onClick={() => void update(r.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-700 disabled:cursor-wait disabled:opacity-60">{isUpdating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{isUpdating ? "Procesando..." : "Aprobar"}</button><button disabled={!!updatingId} onClick={() => void update(r.id, "REJECTED")} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1.5 font-bold text-red-700 disabled:cursor-wait disabled:opacity-60"><XCircle className="h-3.5 w-3.5" />Rechazar</button></>}{!isAdmin && r.status === "PENDING" && <span className="self-center text-xs font-semibold text-slate-400">Esperando aprobación</span>}</span></td></tr>; })}</tbody></table>{requests.length === 0 && <div className="p-12 text-center text-sm text-slate-500"><Send className="mx-auto mb-2 h-8 w-8 text-slate-300" />No hay solicitudes.</div>}</div>
 
-    {showCreate && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"><form onSubmit={submit} className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-      <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5 sm:px-8"><div><div className="mb-1 flex items-center gap-2 text-[#5750f1]"><PackagePlus className="h-5 w-5" /><span className="text-xs font-bold uppercase tracking-wider">Almacén</span></div><h2 className="text-2xl font-bold text-slate-900">Nueva solicitud de movimiento</h2><p className="mt-1 text-sm text-slate-500">Añade productos y después indica la presentación y cantidad.</p></div><button type="button" onClick={() => setShowCreate(false)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button></div>
-      <div className="space-y-5 overflow-y-auto px-6 py-6 sm:px-8">
-        <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold text-slate-700">Tipo<select value={type} onChange={(e) => { setType(e.target.value as MovementType); setSelected({}); }} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#5750f1]"><option value="EXIT">Salida de cajas o sueltas</option><option value="ENTRY">Entrada de cajas o sueltas</option></select></label><label className="text-sm font-semibold text-slate-700">Sucursal<select value={branch} onChange={(e) => setBranch(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#5750f1]">{branches.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}</select></label></div>
-        <label className="block text-sm font-semibold text-slate-700">Motivo o referencia <span className="font-normal text-slate-400">(opcional)</span><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Puedes agregar una referencia..." className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[#5750f1] focus:bg-white" /></label>
-        <div className="rounded-2xl border border-[#dcd9ff] bg-[#f7f7ff] p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-800">Productos añadidos a la solicitud</p><p className="mt-0.5 text-xs text-slate-500">Añade primero los productos y define aquí la presentación y cantidad.</p></div><span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-[#5750f1]">{selectedItems.length}</span></div>{selectedItems.length === 0 ? <div className="rounded-xl border border-dashed border-[#bdb8ff] bg-white px-4 py-5 text-center text-sm text-slate-500">Todavía no has añadido productos.</div> : <div className="space-y-2">{selectedItems.map(({ product, choice, unitsCount }) => <div key={product.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e5e3ff] bg-white px-3 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{product.name}</p><p className="text-xs text-slate-500">{product.code} · <span className="font-semibold text-[#5750f1]">{unitsCount} uds solicitadas</span></p><div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">{product.color && <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700"><Palette className="h-3 w-3 text-indigo-500" />Color: {product.color}</span>}{product.capacity && <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700"><Cpu className="h-3 w-3 text-emerald-600" />Capacidad: {product.capacity}</span>}</div></div><div className="flex items-center gap-2"><select aria-label={`Presentación de ${product.name}`} value={choice.measure} onChange={(e) => { const nextMeasure = e.target.value as Measure; setQuantity(product.id, choice.quantity, nextMeasure, type === "EXIT" ? availableQuantity(product, nextMeasure) : undefined); }} className="rounded-xl border border-slate-200 px-2 py-2 text-xs font-semibold"><option value="BOXES">Cajas</option><option value="UNITS">Sueltas</option></select><input aria-label={`Cantidad de ${product.name}`} type="number" min={1} max={type === "EXIT" ? availableQuantity(product, choice.measure) : undefined} value={choice.quantity} onChange={(e) => setQuantity(product.id, e.target.value === "" ? "" : Number(e.target.value), choice.measure, type === "EXIT" ? availableQuantity(product, choice.measure) : undefined)} className="w-20 rounded-xl border border-slate-200 px-2 py-2 text-center text-sm font-bold outline-none focus:border-[#5750f1]" /><button type="button" aria-label={`Quitar ${product.name}`} onClick={() => removeSelected(product.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button></div></div>)}</div>}<div className="mt-3 flex justify-between border-t border-[#e5e3ff] pt-3 text-sm font-bold text-slate-900"><span>Total solicitado</span><span>{selectedItems.reduce((sum, item) => sum + item.unitsCount, 0)} uds</span></div></div>
-        <div><label className="block text-sm font-semibold text-slate-700">Añadir productos</label><div className="relative mt-2"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder={type === "EXIT" ? "Buscar código, modelo, color o GB..." : "Buscar código, modelo, color o GB..."} className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#5750f1] focus:bg-white" /></div><div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-200">{filtered.length === 0 ? <p className="p-5 text-center text-sm text-slate-500">{type === "EXIT" ? "No hay más productos con unidades disponibles." : "No se encontraron productos."}</p> : filtered.map((p) => <div key={p.id} className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-0 hover:bg-slate-50"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{p.name}</p><p className="mt-0.5 text-xs text-slate-500">{p.code} · <span className="font-semibold text-emerald-600">{p.totalUnits} uds disponibles</span></p><div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">{p.color && <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700"><Palette className="h-3 w-3 text-indigo-500" />Color: {p.color}</span>}{p.capacity && <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700"><Cpu className="h-3 w-3 text-emerald-600" />Capacidad: {p.capacity}</span>}</div></div><button type="button" onClick={() => setSelected((current) => ({ ...current, [p.id]: { quantity: 1, measure: p.boxes > 0 ? "BOXES" : "UNITS" } }))} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#5750f1] px-3 py-2 text-xs font-bold text-white hover:bg-[#4841d7]"><Plus className="h-3.5 w-3.5" />Añadir</button></div>)}</div></div>
-        {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
-      </div>
-      <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4 sm:px-8"><button type="button" onClick={() => setShowCreate(false)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200">Cancelar</button><button disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[#5750f1] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#4841d7] disabled:opacity-60">{saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Enviar solicitud</button></div>
-    </form></div>}
     {detailRequest && (() => { const detail = parseRequestDetails(detailRequest); const items = detailRequest.items ?? []; return <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"><div className="bg-white border border-slate-200 text-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]" role="dialog" aria-modal="true" aria-label={`Detalle de ${detailRequest.requestCode}`}>
       <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
         <div className="flex items-center gap-3">
@@ -323,7 +318,7 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
           <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-2.5 font-bold">Código</th><th className="px-4 py-2.5 font-bold">Producto</th><th className="px-4 py-2.5 font-bold">Presentación</th><th className="px-4 py-2.5 text-right font-bold">Unidades</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{items.map((item: any) => <tr key={item.id} className="hover:bg-slate-50/70"><td className="px-4 py-3 font-mono text-xs font-bold text-[#5750f1]">{item.product?.code ?? "—"}</td><td className="px-4 py-3 font-semibold text-slate-800"><span className="block">{item.product?.brand ? `${item.product.brand} · ` : ""}{item.product?.name ?? item.productId}</span><span className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-bold text-slate-700">{item.product?.capacity ? <span className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5"><Cpu className="h-3 w-3 text-emerald-600" />Capacidad: {item.product.capacity}</span> : null}<span className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5"><Palette className="h-3 w-3 text-indigo-500" />Color: {item.product?.color || "—"}</span></span></td><td className="px-4 py-3 text-xs text-slate-600">{formatItemPresentation(item, detail.itemsMap[item.productId])}</td><td className="px-4 py-3 text-right font-bold text-slate-800">{item.unitsCount} uds</td></tr>)}</tbody>
+              <tbody className="divide-y divide-slate-100">{items.map((item: RequestItem) => <tr key={item.id} className="hover:bg-slate-50/70"><td className="px-4 py-3 font-mono text-xs font-bold text-[#5750f1]">{item.product?.code ?? "—"}</td><td className="px-4 py-3 font-semibold text-slate-800"><span className="block">{item.product?.brand ? `${item.product.brand} · ` : ""}{item.product?.name ?? item.productId}</span><span className="mt-1 flex flex-wrap gap-1.5 text-[11px] font-bold text-slate-700">{item.product?.capacity ? <span className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5"><Cpu className="h-3 w-3 text-emerald-600" />Capacidad: {item.product.capacity}</span> : null}<span className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 px-1.5 py-0.5"><Palette className="h-3 w-3 text-indigo-500" />Color: {item.product?.color || "—"}</span></span></td><td className="px-4 py-3 text-xs text-slate-600">{formatItemPresentation(item, detail.itemsMap[item.productId])}</td><td className="px-4 py-3 text-right font-bold text-slate-800">{item.unitsCount} uds</td></tr>)}</tbody>
             </table>
             {items.length === 0 && <p className="p-6 text-center text-sm text-slate-500">Esta solicitud no tiene productos registrados.</p>}
           </div>
@@ -340,6 +335,6 @@ export function WarehouseRequestsManager({ roleCode = "ADMIN" }: { roleCode?: st
         <button type="button" onClick={() => setDetailRequest(null)} className="rounded-xl bg-[#5750f1] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 transition hover:bg-[#463ec5]">Entendido</button>
       </div>
     </div></div>; })()}
-    {voucherRequest && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" role="dialog" aria-modal="true" aria-label={`Voucher de ${voucherRequest.requestCode}`}><div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-6 pb-4"><div><p className={`text-xs font-bold ${voucherRequest.type === "ENTRY" ? "text-emerald-600" : "text-rose-600"}`}>BOUCHER DE SOLICITUD</p><h2 className="text-xl font-black text-slate-900">{voucherRequest.requestCode}</h2><p className="mt-1 text-xs text-slate-500">{voucherRequest.branch} · {voucherRequest.requestedBy}</p></div><button type="button" onClick={() => setVoucherRequest(null)} className="-mr-2 -mt-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800" aria-label="Cerrar voucher"><X className="h-5 w-5" /></button></div><div className="space-y-2 p-6 pt-4">{(voucherRequest.items ?? []).map((item: any) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span><strong>{item.product?.code}</strong> · {formatProductLabel(item.product, item.productId)}</span><strong>{item.unitsCount} uds</strong></div>)}</div><div className="mx-6 flex justify-between border-t border-slate-200 pt-3 text-sm font-black"><span>{voucherRequest.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span><span>{voucherRequest.status === "PENDING" ? "Esperando aprobación" : voucherRequest.status === "APPROVED" ? "Aprobada" : "Rechazada"}</span></div><div className="flex flex-wrap justify-end gap-2 p-6"><button type="button" onClick={() => window.print()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700"><Printer className="h-4 w-4" />Imprimir / PDF</button><button type="button" disabled={sharingVoucher} onClick={() => void shareVoucherImage(voucherRequest)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{sharingVoucher ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}{sharingVoucher ? "Preparando imagen..." : "Enviar imagen por WhatsApp"}</button></div></div></div>}
+    {voucherRequest && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" role="dialog" aria-modal="true" aria-label={`Voucher de ${voucherRequest.requestCode}`}><div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-6 pb-4"><div><p className={`text-xs font-bold ${voucherRequest.type === "ENTRY" ? "text-emerald-600" : "text-rose-600"}`}>BOUCHER DE SOLICITUD</p><h2 className="text-xl font-black text-slate-900">{voucherRequest.requestCode}</h2><p className="mt-1 text-xs text-slate-500">{voucherRequest.branch} · {voucherRequest.requestedBy}</p></div><button type="button" onClick={() => setVoucherRequest(null)} className="-mr-2 -mt-2 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800" aria-label="Cerrar voucher"><X className="h-5 w-5" /></button></div><div className="space-y-2 p-6 pt-4">{(voucherRequest.items ?? []).map((item: RequestItem) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span><strong>{item.product?.code}</strong> · {formatProductLabel(item.product, item.productId)}</span><strong>{item.unitsCount} uds</strong></div>)}</div><div className="mx-6 flex justify-between border-t border-slate-200 pt-3 text-sm font-black"><span>{voucherRequest.type === "ENTRY" ? "ENTRADA" : "SALIDA"}</span><span>{voucherRequest.status === "PENDING" ? "Esperando aprobación" : voucherRequest.status === "APPROVED" ? "Aprobada" : "Rechazada"}</span></div><div className="flex flex-wrap justify-end gap-2 p-6"><button type="button" onClick={() => window.print()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700"><Printer className="h-4 w-4" />Imprimir / PDF</button><button type="button" disabled={sharingVoucher} onClick={() => void shareVoucherImage(voucherRequest)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">{sharingVoucher ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}{sharingVoucher ? "Preparando imagen..." : "Enviar imagen por WhatsApp"}</button></div></div></div>}
   </div>;
 }
