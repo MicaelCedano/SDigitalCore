@@ -190,6 +190,23 @@ export function planWarehouseRequestLines(input: {
   return { lines, errors };
 }
 
+const SNAPSHOT_FIELDS_TOUCHED_BY_THE_CLAIM = new Set(["estado", "actualizado"]);
+
+function canonicalSnapshot(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalSnapshot(item)).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !SNAPSHOT_FIELDS_TOUCHED_BY_THE_CLAIM.has(key))
+      .sort(([left], [right]) => left.localeCompare(right));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalSnapshot(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+export function warehouseDecisionSnapshotsMatch(current: Record<string, unknown>, expected: Record<string, unknown>) {
+  return canonicalSnapshot(current) === canonicalSnapshot(expected);
+}
+
 function isoStamp(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();

@@ -16,6 +16,7 @@ import {
   buildWarehouseDecisionPreview,
   planWarehouseRequestLines,
   projectStockAfterMovement,
+  warehouseDecisionSnapshotsMatch,
   warehouseRequestVersionSnapshot,
   type WarehouseRequestView,
 } from "../modules/almacen/lib/warehouse-request-plan";
@@ -191,6 +192,15 @@ async function run() {
     ...request,
     items: [{ ...request.items[0], product: { ...product, totalUnits: 4, looseUnits: 0 } }, request.items[1]],
   })));
+  const approved = warehouseRequestVersionSnapshot(request);
+  assert.equal(warehouseDecisionSnapshotsMatch(approved, { ...approved, estado: "APPROVED", actualizado: "2099-01-01T00:00:00.000Z" }), true);
+  const drifted = warehouseRequestVersionSnapshot({
+    ...request,
+    items: request.items.map((item) => item.productId === "p2" && item.product
+      ? { ...item, product: { ...item.product, unitsPerBox: 20 } }
+      : item),
+  });
+  assert.equal(warehouseDecisionSnapshotsMatch(approved, drifted), false);
 
   console.log("Pruebas del MCP de SDigitalCore pasaron.");
 }

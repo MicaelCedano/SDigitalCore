@@ -17,7 +17,7 @@ function stripImports(source) {
 const action = stripImports(planSource) + "\n" + statusSource.slice(statusSource.indexOf("const inputSchema"));
 const js = ts.transpileModule(action, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 
-async function run({ claimed = 1, status = "APPROVED", stock = 100, notifyFails = false } = {}) {
+async function run({ claimed = 1, status = "APPROVED", stock = 100, notifyFails = false, expectedSnapshot = undefined } = {}) {
   const calls = { stock: 0, moves: 0, audit: 0 };
   const items = Array.from({ length: 33 }, (_, i) => ({ productId: String(i), unitsCount: 2 }));
   const tx = {
@@ -80,7 +80,13 @@ async function run({ claimed = 1, status = "APPROVED", stock = 100, notifyFails 
     { error() {} },
   );
   try {
-    await mod.exports.updateWarehouseRequestStatus({ id: "r", status, actorId: "admin", source: "web" });
+    await mod.exports.updateWarehouseRequestStatus({
+      id: "r",
+      status,
+      actorId: "admin",
+      source: "web",
+      ...(expectedSnapshot ? { expectedSnapshot } : {}),
+    });
     return { result: { success: true }, calls };
   } catch (error) {
     return { result: { success: false, error: error instanceof Error ? error.message : String(error) }, calls };
@@ -105,5 +111,9 @@ report = await run({ notifyFails: true });
 assert.equal(report.result.success, true);
 report = await run({ status: "INVALID" });
 assert.equal(report.result.success, false);
+assert.equal(report.calls.stock, 0);
+report = await run({ expectedSnapshot: { id: "otro", items: [] } });
+assert.equal(report.result.success, false);
+assert.match(report.result.error, /cambiaron desde el preview/);
 assert.equal(report.calls.stock, 0);
 console.log("Warehouse approval: 33 lines, duplicate claim, rejection, insufficient stock, notification failure and invalid status passed.");

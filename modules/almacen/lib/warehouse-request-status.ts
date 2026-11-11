@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { sendPushToUsers } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { planWarehouseRequestLines, warehouseRequestVersionSnapshot, type StockProduct, type WarehouseRequestView } from "./warehouse-request-plan";
+import { planWarehouseRequestLines, warehouseDecisionSnapshotsMatch, warehouseRequestVersionSnapshot, type StockProduct, type WarehouseRequestView } from "./warehouse-request-plan";
 import { applyStockDelta } from "./warehouse-stock";
 
 const inputSchema = z.object({
@@ -10,6 +10,7 @@ const inputSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
   actorId: z.string().trim().min(1).max(100),
   source: z.enum(["web", "chatgpt", "mcp"]),
+  expectedSnapshot: z.record(z.string(), z.unknown()).optional(),
 });
 
 function toStockProduct(product: {
@@ -79,7 +80,7 @@ export async function readWarehouseRequestDecision(idOCodigo: string) {
 }
 
 export async function updateWarehouseRequestStatus(input: z.input<typeof inputSchema>) {
-  const { id, status, actorId, source } = inputSchema.parse(input);
+  const { id, status, actorId, source, expectedSnapshot } = inputSchema.parse(input);
   const updated = await prisma.$transaction(async (tx) => {
     const claimed = await tx.warehouseRequest.updateMany({ where: { id, status: "PENDING" }, data: { status } });
     if (claimed.count !== 1) throw new Error("La solicitud no existe o ya fue procesada. Actualiza la lista.");
@@ -100,23 +101,32 @@ export async function updateWarehouseRequestStatus(input: z.input<typeof inputSc
           : { status, source },
       },
     });
-    if (status === "REJECTED") return request;
+    if (status === "REJECTED" && !expectedSnapshot) return request;
 
     const products = await tx.warehouseProduct.findMany({
       where: { id: { in: request.items.map((item) => item.productId) } },
     });
+    const viewedItems = request.items.map((item) => {
+      const product = products.find((candidate) => candidate.id === item.productId);
+      return {
+        productId: item.productId,
+        unitsCount: item.unitsCount,
+        product: product ? toStockProduct(product) : null,
+      };
+    });
+    if (expectedSnapshot) {
+      const currentSnapshot = warehouseRequestVersionSnapshot(toWarehouseRequestView({ ...request, items: viewedItems }));
+      if (!warehouseDecisionSnapshotsMatch(currentSnapshot, expectedSnapshot)) {
+        throw new Error("La solicitud o el stock cambiaron desde el preview. Vuelve a preparar los cambios.");
+      }
+    }
+    if (status === "REJECTED") return request;
+
     const plan = planWarehouseRequestLines({
       type: request.type,
       details: request.details,
       statusDecision: "APPROVED",
-      items: request.items.map((item) => {
-        const product = products.find((candidate) => candidate.id === item.productId);
-        return {
-          productId: item.productId,
-          unitsCount: item.unitsCount,
-          product: product ? toStockProduct(product) : null,
-        };
-      }),
+      items: viewedItems,
     });
     if (plan.errors.length > 0) throw new Error(plan.errors[0]);
 
@@ -124,6 +134,25 @@ export async function updateWarehouseRequestStatus(input: z.input<typeof inputSc
     for (const line of plan.lines) {
       if (line.measure === null || line.quantity === null || line.movementUnits === null || line.boxesCount === null) {
         throw new Error(line.error || "Uno de los productos de la solicitud ya no existe.");
+      }
+      if (expectedSnapshot) {
+        if (line.unitsPerBox === null || !line.stockActual) {
+          throw new Error("La solicitud o el stock cambiaron desde el preview. Vuelve a preparar los cambios.");
+        }
+        const held = await tx.warehouseProduct.updateMany({
+          where: {
+            id: line.productId,
+            status: "ACTIVE",
+            unitsPerBox: line.unitsPerBox,
+            boxes: line.stockActual.cajas,
+            looseUnits: line.stockActual.sueltas,
+            totalUnits: line.stockActual.total,
+          },
+          data: { unitsPerBox: line.unitsPerBox },
+        });
+        if (held.count !== 1) {
+          throw new Error("La solicitud o el stock cambiaron desde el preview. Vuelve a preparar los cambios.");
+        }
       }
       await applyStockDelta(
         tx,

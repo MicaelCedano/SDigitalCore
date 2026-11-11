@@ -137,14 +137,27 @@ function assess(entidad: WriteEntity, row: Awaited<ReturnType<typeof loadEntity>
   );
 }
 
-async function applyChange(actor: McpActor, entidad: WriteEntity, idOCodigo: string, cambios: Record<string, unknown>) {
+async function applyChange(
+  actor: McpActor,
+  entidad: WriteEntity,
+  idOCodigo: string,
+  cambios: Record<string, unknown>,
+  expectedSnapshot?: Record<string, unknown>,
+) {
   if (entidad === "solicitud_almacen") {
     if (actor.roleCode !== "ADMIN") fail("Solo un administrador puede aprobar o rechazar solicitudes de almacén.");
     const decision = cambios.estado === "APPROVED" || cambios.estado === "REJECTED" ? cambios.estado : null;
     if (!decision) fail("La decisión no es válida.");
+    if (!expectedSnapshot) fail("Falta el snapshot aprobado. Vuelve a preparar los cambios.");
     const loaded = await readWarehouseRequestDecision(idOCodigo);
     if (!loaded) fail("No se encontró la solicitud de almacén.");
-    await updateWarehouseRequestStatus({ id: loaded.request.id, status: decision, actorId: actor.id, source: "mcp" });
+    await updateWarehouseRequestStatus({
+      id: loaded.request.id,
+      status: decision,
+      actorId: actor.id,
+      source: "mcp",
+      expectedSnapshot,
+    });
     return;
   }
   if (entidad === "garantia") {
@@ -509,7 +522,11 @@ export async function confirmarCambios(input: {
     }
     fail("El registro cambió desde el preview. Vuelve a leerlo y a preparar los cambios.");
   }
-  const applied = await applyChange(actor, input.entidad, input.idOCodigo, cambios);
+  const approvedSnapshot = input.entidad === "solicitud_almacen" && operacion.snapshotAntes && typeof operacion.snapshotAntes === "object" && !Array.isArray(operacion.snapshotAntes)
+    ? operacion.snapshotAntes as Record<string, unknown>
+    : undefined;
+  if (input.entidad === "solicitud_almacen" && !approvedSnapshot) fail("La operación no tiene el snapshot aprobado.");
+  const applied = await applyChange(actor, input.entidad, input.idOCodigo, cambios, approvedSnapshot);
   const fresh = await loadEntity(input.entidad, input.idOCodigo);
   const after = snapshotOf(input.entidad, fresh as never);
   const commentEventId = applied && typeof applied === "object" && "commentEventId" in applied ? applied.commentEventId : null;
