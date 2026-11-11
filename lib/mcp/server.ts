@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { REVERT_ENTITIES, WRITE_ENTITIES } from "@/lib/mcp/validation";
 
 const limite = z.number().int().min(1).max(20).optional().default(5).describe("Cantidad máxima de resultados (por defecto 5)");
 const consulta = z.string().min(1).describe("Texto a buscar");
@@ -9,6 +10,11 @@ const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: 
 
 function textResult(value: unknown, isError = false) {
   return { isError, content: [{ type: "text" as const, text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }] };
+}
+
+function preparedResult(value: unknown) {
+  const rejected = Boolean(value && typeof value === "object" && "rechazado" in value && (value as { rechazado?: unknown }).rechazado === true);
+  return textResult(value, rejected);
 }
 
 export function createSdigitalMcpServer() {
@@ -46,8 +52,8 @@ export function createSdigitalMcpServer() {
   read("obtener_lote_qc", "Obtener lote QC", "Detalle de un lote QC y una muestra de sus equipos.", { id_o_codigo: idOCodigo });
   read("buscar_producto", "Buscar producto de almacén", "Busca productos por código, nombre o marca. Incluye existencias, sin modificarlas.", { query: consulta, limite });
   read("obtener_producto", "Obtener producto de almacén", "Ficha de stock de un producto. Esta versión no mueve inventario.", { id_o_codigo: idOCodigo });
-  read("buscar_solicitud_almacen", "Buscar solicitud de almacén", "Busca solicitudes de entrada o salida. No las aprueba.", { query: consulta, limite, estado: z.string().optional() });
-  read("obtener_solicitud_almacen", "Obtener solicitud de almacén", "Detalle de una solicitud y sus productos.", { id_o_codigo: idOCodigo });
+  read("buscar_solicitud_almacen", "Buscar solicitud de almacén", "Busca solicitudes de entrada o salida. Para aprobar o rechazar usa preparar_cambios con entidad solicitud_almacen.", { query: consulta, limite, estado: z.string().optional() });
+  read("obtener_solicitud_almacen", "Obtener solicitud de almacén", "Detalle de una solicitud y sus productos, sin mover stock.", { id_o_codigo: idOCodigo });
   read("buscar_recibo", "Buscar recibo", "Busca recibos de mercancía por número, suplidor o sucursal.", { query: consulta, limite, estado: z.string().optional() });
   read("obtener_recibo", "Obtener recibo", "Recibo con sus líneas. No importa el recibo al inventario.", { id_o_codigo: idOCodigo });
   read("buscar_conteo", "Buscar conteo", "Busca conteos físicos de stock.", { query: consulta, limite, estado: z.string().optional() });
@@ -73,9 +79,9 @@ export function createSdigitalMcpServer() {
     "preparar_cambios",
     {
       title: "Preparar cambios",
-      description: "Valida una propuesta para garantia, equipo_qc, lote_qc o tarea. Devuelve operacion_id, diff y version_hash. No escribe.",
+      description: "Valida una propuesta para garantia, equipo_qc, lote_qc, tarea o solicitud_almacen. En almacén la propuesta es { estado: APPROVED | REJECTED } sobre una solicitud PENDING: devuelve la vista previa con ítems, stock actual, stock resultante y errores. No mueve inventario. Si hay error, no crea la operación.",
       inputSchema: {
-        entidad: z.enum(["garantia", "equipo_qc", "lote_qc", "tarea"]),
+        entidad: z.enum(WRITE_ENTITIES),
         id_o_codigo: idOCodigo,
         propuesta,
         justificacion: z.string().max(1000).optional(),
@@ -85,7 +91,7 @@ export function createSdigitalMcpServer() {
     async ({ entidad, id_o_codigo, propuesta: patch, justificacion }) => {
       try {
         const { prepararCambios } = await import("@/lib/mcp/operations");
-        return textResult(await prepararCambios(entidad, String(id_o_codigo), patch, justificacion));
+        return preparedResult(await prepararCambios(entidad, String(id_o_codigo), patch, justificacion));
       } catch (error) {
         return textResult(error instanceof Error ? error.message : "No se pudo preparar.", true);
       }
@@ -96,9 +102,9 @@ export function createSdigitalMcpServer() {
     "confirmar_cambios",
     {
       title: "Confirmar cambios",
-      description: "Aplica solo el preview ya validado. Exige operacion_id, version_hash, los cambios aprobados y aprobacion_explicita true.",
+      description: "Aplica solo el preview ya validado. Exige operacion_id, version_hash, los cambios aprobados y aprobacion_explicita true. En una solicitud de almacén revalida el stock dentro de una transacción y no cambia nada si ya no alcanza. Solo la clave del propietario (u OAuth del propietario) y un actor ADMIN.",
       inputSchema: {
-        entidad: z.enum(["garantia", "equipo_qc", "lote_qc", "tarea"]),
+        entidad: z.enum(WRITE_ENTITIES),
         id_o_codigo: idOCodigo,
         operacion_id: z.string().uuid(),
         version_hash: z.string().min(8),
@@ -128,9 +134,9 @@ export function createSdigitalMcpServer() {
     "verificar_cambios",
     {
       title: "Verificar cambios",
-      description: "Vuelve a leer el registro y compara campo por campo contra la operación o contra campos esperados.",
+      description: "Vuelve a leer el registro y compara campo por campo contra la operación o contra campos esperados. En almacén comprueba el estado APPROVED o REJECTED.",
       inputSchema: {
-        entidad: z.enum(["garantia", "equipo_qc", "lote_qc", "tarea"]),
+        entidad: z.enum(WRITE_ENTITIES),
         id_o_codigo: idOCodigo,
         operacion_id: z.string().uuid().optional(),
         campos_esperados: z.record(z.string(), z.unknown()).optional(),
@@ -151,9 +157,9 @@ export function createSdigitalMcpServer() {
     "revertir_cambios",
     {
       title: "Revertir cambios",
-      description: "Restaura el snapshot anterior de una operación aplicada si nadie escribió después. Exige aprobacion_explicita true.",
+      description: "Restaura el snapshot anterior de una operación aplicada si nadie escribió después. Exige aprobacion_explicita true. No revierte solicitudes de almacén: esa decisión mueve inventario y deshacerla no es segura.",
       inputSchema: {
-        entidad: z.enum(["garantia", "equipo_qc", "lote_qc", "tarea"]),
+        entidad: z.enum(REVERT_ENTITIES),
         id_o_codigo: idOCodigo,
         operacion_id: z.string().uuid(),
         aprobacion_explicita: z.boolean(),
