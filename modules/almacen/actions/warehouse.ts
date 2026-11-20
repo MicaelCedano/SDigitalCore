@@ -15,6 +15,7 @@ import {
   WarehouseRequestInput,
 } from "@/lib/validation/warehouse";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
+import { generateWarehouseProductCode } from "../lib/warehouse-product-code";
 import { sendPushToRole } from "@/lib/mobile/push";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -119,7 +120,6 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
       const updated = await prisma.warehouseProduct.update({
         where: { id: validated.id },
         data: {
-          code: validated.code.toUpperCase().trim(),
           name: validated.name.trim(),
           brand: validated.brand?.trim() || null,
           color: validated.color?.trim() || null,
@@ -138,19 +138,9 @@ export async function createWarehouseProductAction(input: WarehouseProductInput)
       return { success: true, data: { ...updated, status: "ACTIVE" }, message: "Producto actualizado exitosamente" };
     }
 
-    // Verificar código duplicado
-    const existing = await prisma.warehouseProduct.findUnique({
-      where: { code: validated.code.toUpperCase().trim() },
-      select: { id: true },
-    });
-
-    if (existing) {
-      return { success: false, error: "El código de producto ya existe en almacén" };
-    }
-
     const created = await prisma.warehouseProduct.create({
       data: {
-        code: validated.code.toUpperCase().trim(),
+        code: generateWarehouseProductCode(),
         name: validated.name.trim(),
         brand: validated.brand?.trim() || null,
         color: validated.color?.trim() || null,
@@ -305,15 +295,7 @@ export async function getWarehouseMovementsAction(query?: string) {
       where.OR = [
         { reason: { contains: q, mode: "insensitive" } },
         { createdBy: { contains: q, mode: "insensitive" } },
-        {
-          product: {
-            OR: [
-              { name: { contains: q, mode: "insensitive" } },
-              { code: { contains: q, mode: "insensitive" } },
-              { brand: { contains: q, mode: "insensitive" } },
-            ],
-          },
-        },
+        { product: buildWarehouseProductSearchWhere(q) },
       ];
     }
 

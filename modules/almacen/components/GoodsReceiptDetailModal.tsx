@@ -57,7 +57,7 @@ type WarehouseReceiptImport = {
   importedAt: string | Date;
   status: "ACTIVE" | "CANCELLED";
   cancelledAt?: string | Date | null;
-  lines: Array<{ id: string; code: string; name: string; brand?: string | null; capacity?: string | null; color?: string | null; boxesCount: number; looseUnits: number; totalUnits: number }>;
+  lines: Array<{ id: string; name: string; brand?: string | null; capacity?: string | null; color?: string | null; boxesCount: number; looseUnits: number; totalUnits: number }>;
 };
 
 type ModelSummary = {
@@ -460,7 +460,7 @@ export function GoodsReceiptDetailModal({
                 {latestWarehouseImport.status === "ACTIVE" && onCancelWarehouseImport ? <button type="button" onClick={() => setCancelImportOpen(true)} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-50"><Ban className="h-4 w-4" /> Cancelar entrada</button> : null}
               </div>
               <div className="mt-4 overflow-x-auto rounded-xl border border-indigo-100 bg-white">
-                <table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Código de almacén</th><th className="px-3 py-2">Producto</th><th className="px-3 py-2 text-right">Cajas</th><th className="px-3 py-2 text-right">Sueltas</th><th className="px-3 py-2 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-100">{latestWarehouseImport.lines.map((line) => <tr key={line.id}><td className="px-3 py-2 font-mono font-bold text-indigo-700">{line.code}</td><td className="px-3 py-2 font-semibold text-slate-700">{[line.brand, line.name, line.capacity, line.color].filter(Boolean).join(" ")}</td><td className="px-3 py-2 text-right text-slate-600">{line.boxesCount}</td><td className="px-3 py-2 text-right text-slate-600">{line.looseUnits}</td><td className="px-3 py-2 text-right font-bold text-slate-900">{line.totalUnits}</td></tr>)}</tbody></table>
+                <table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Producto</th><th className="px-3 py-2 text-right">Cajas</th><th className="px-3 py-2 text-right">Sueltas</th><th className="px-3 py-2 text-right">Total</th></tr></thead><tbody className="divide-y divide-slate-100">{latestWarehouseImport.lines.map((line) => <tr key={line.id}><td className="px-3 py-2 font-semibold text-slate-700">{[line.brand, line.name, line.capacity, line.color].filter(Boolean).join(" ")}</td><td className="px-3 py-2 text-right text-slate-600">{line.boxesCount}</td><td className="px-3 py-2 text-right text-slate-600">{line.looseUnits}</td><td className="px-3 py-2 text-right font-bold text-slate-900">{line.totalUnits}</td></tr>)}</tbody></table>
               </div>
             </section>
           )}

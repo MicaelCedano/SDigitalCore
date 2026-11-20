@@ -2,8 +2,7 @@ import { z } from "zod";
 
 export const warehouseProductSchema = z.object({
   id: z.string().optional(),
-  code: z.string().min(1, "El código del producto es requerido"),
-  name: z.string().min(1, "El nombre del producto es requerido"),
+  name: z.string().trim().min(1, "El nombre del producto es requerido"),
   brand: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
   capacity: z.string().optional().nullable(),

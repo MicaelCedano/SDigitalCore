@@ -181,7 +181,7 @@ export function WarehouseMovementsManager({ roleCode = "ADMIN" }: { roleCode?: s
                 <tr>
                   <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Fecha & Hora</th>
-                  <th className="px-4 py-3">Producto / Código</th>
+                  <th className="px-4 py-3">Producto</th>
                   <th className="px-4 py-3 text-center">Impacto Unidades</th>
                   <th className="px-4 py-3">Motivo / Razón</th>
                   <th className="px-4 py-3">Registrado Por</th>
@@ -225,8 +225,8 @@ export function WarehouseMovementsManager({ roleCode = "ADMIN" }: { roleCode?: s
                         <span className="font-bold text-slate-800 block text-xs">
                           {m.product?.name || "Producto eliminado"}
                         </span>
-                        <span className="text-[11px] font-mono text-slate-500">
-                          {m.product?.code || "-"}
+                        <span className="text-[11px] text-slate-500">
+                          {[m.product?.brand, m.product?.capacity, m.product?.color].filter(Boolean).join(" · ")}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
@@ -299,7 +299,7 @@ export function WarehouseMovementsManager({ roleCode = "ADMIN" }: { roleCode?: s
                 >
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.code} — {p.name} (Stock: {p.boxes} cajas)
+                      {[p.brand, p.name, p.capacity, p.color].filter(Boolean).join(" · ")} (Stock: {p.boxes} cajas)
                     </option>
                   ))}
                 </select>

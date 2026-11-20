@@ -90,7 +90,7 @@ export function WarehouseRequestForm({ form, saved, storageError, onChange, onCl
   function addProduct(product: Product) {
     const item: DraftItem = {
       productId: product.id,
-      label: [product.name, product.capacity, product.color, product.code].filter(Boolean).join(" · "),
+      label: [product.brand, product.name, product.capacity, product.color].filter(Boolean).join(" · "),
       measure: product.boxes > 0 ? "BOXES" : "UNITS",
       quantity: "1",
     };
@@ -176,7 +176,7 @@ export function WarehouseRequestForm({ form, saved, storageError, onChange, onCl
             <h2 id="warehouse-product-search-title" className="mb-2 text-sm font-bold text-slate-900">Añadir productos</h2>
             <div className="relative">
               <Search aria-hidden="true" className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-slate-500" />
-              <Input ref={productSearch} type="search" aria-label="Buscar productos" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Código, modelo, color o capacidad" className="pl-9 placeholder:text-slate-500" />
+              <Input ref={productSearch} type="search" aria-label="Buscar productos" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Modelo, marca, color o capacidad" className="pl-9 placeholder:text-slate-500" />
             </div>
             {options === "error" ? (
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-rose-800" role="alert">
@@ -193,10 +193,10 @@ export function WarehouseRequestForm({ form, saved, storageError, onChange, onCl
                   <li key={product.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0">
                       <p className="wrap-break-word text-sm font-semibold text-slate-900">{[product.brand, product.name].filter(Boolean).join(" · ")}</p>
-                      <p className="mt-0.5 wrap-break-word text-xs text-slate-600">{[product.code, product.capacity, product.color].filter(Boolean).join(" · ")}</p>
+                      <p className="mt-0.5 wrap-break-word text-xs text-slate-600">{[product.brand, product.capacity, product.color].filter(Boolean).join(" · ")}</p>
                       {isExit && <p className="mt-0.5 text-xs text-slate-600">{unitFormat.format(product.totalUnits)} uds disponibles</p>}
                     </div>
-                    <Button type="button" variant="secondary" className="min-h-11 shrink-0" aria-label={`Añadir ${product.name} (${product.code})`} onClick={() => addProduct(product)}><Plus />Añadir</Button>
+                    <Button type="button" variant="secondary" className="min-h-11 shrink-0" aria-label={`Añadir ${[product.brand, product.name, product.capacity, product.color].filter(Boolean).join(" · ")}`} onClick={() => addProduct(product)}><Plus />Añadir</Button>
                   </li>
                 ))}
               </ul>
@@ -217,7 +217,7 @@ export function WarehouseRequestForm({ form, saved, storageError, onChange, onCl
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 pt-1">
                         <p className="wrap-break-word text-sm font-semibold text-slate-900">{product?.name ?? item.label}</p>
-                        {product && <p className="mt-0.5 wrap-break-word text-xs text-slate-600">{[product.code, product.capacity, product.color].filter(Boolean).join(" · ")}</p>}
+                        {product && <p className="mt-0.5 wrap-break-word text-xs text-slate-600">{[product.brand, product.capacity, product.color].filter(Boolean).join(" · ")}</p>}
                       </div>
                       <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0 hover:bg-rose-50 hover:text-rose-700" aria-label={`Quitar ${product?.name ?? item.label}`} onClick={() => edit((current) => ({ ...current, items: current.items.filter((choice) => choice.productId !== item.productId) }))}><X /></Button>
                     </div>

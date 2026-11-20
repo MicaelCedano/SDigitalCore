@@ -42,7 +42,6 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
-  const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [color, setColor] = useState("");
@@ -75,7 +74,6 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
   const handleOpenCreate = () => {
     setSelectedProduct(null);
-    setCode("");
     setName("");
     setBrand("");
     setColor("");
@@ -90,7 +88,6 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
   const handleOpenEdit = (prod: any) => {
     setSelectedProduct(prod);
-    setCode(prod.code || "");
     setName(prod.name || "");
     setBrand(prod.brand || "");
     setColor(prod.color || "");
@@ -107,10 +104,6 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!code.trim()) {
-      setErrorMsg("El código de producto es obligatorio.");
-      return;
-    }
     if (!name.trim()) {
       setErrorMsg("El nombre del producto es obligatorio.");
       return;
@@ -121,7 +114,6 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
     try {
       const payload: WarehouseProductInput = {
         id: selectedProduct?.id,
-        code: code.trim(),
         name: name.trim(),
         brand: brand.trim() || undefined,
         color: color.trim() || undefined,
@@ -242,7 +234,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por código, nombre, marca, color o capacidad..."
+            placeholder="Buscar por modelo, marca, color o capacidad..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
           />
         </div>
@@ -295,8 +287,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
               <article key={p.id} className={`p-4 space-y-3 ${isOutOfStock ? "bg-red-50/70" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <span className="font-mono text-xs font-bold text-[#5750f1]">#{p.code}</span>
-                    <h2 className={`mt-1 break-words text-base font-bold leading-tight ${isOutOfStock ? "text-red-800" : "text-slate-800"}`}>{p.name}</h2>
+                    <h2 className={`break-words text-base font-bold leading-tight ${isOutOfStock ? "text-red-800" : "text-slate-800"}`}>{p.name}</h2>
                     {p.brand && (
                       <p className="mt-1 flex items-start gap-1.5 text-xs font-semibold text-slate-500">
                         <Tag className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -351,8 +342,7 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 text-slate-600 font-bold text-[11px] uppercase border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3">Código</th>
-                  <th className="px-4 py-3">Producto / Nombre</th>
+                  <th className="px-4 py-3">Producto</th>
                   <th className="px-4 py-3">Especificaciones</th>
                   <th className="px-4 py-3 text-center">Cajas en Stock</th>
                   <th className="px-4 py-3 text-center">Uds por Caja</th>
@@ -368,9 +358,6 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
 
                   return (
                   <tr key={p.id} className={`transition-colors ${isOutOfStock ? "bg-red-50/70 hover:bg-red-100/80" : "hover:bg-slate-50/80"}`}>
-                    <td className={`px-4 py-3.5 font-mono font-bold ${isOutOfStock ? "text-red-700" : "text-[#5750f1]"}`}>
-                      {p.code}
-                    </td>
                     <td className="px-4 py-3.5">
                       <span className="font-bold text-slate-800 block text-xs">{p.name}</span>
                       {p.brand && (
@@ -477,32 +464,18 @@ export function WarehouseProductsManager({ roleCode = "ADMIN" }: { roleCode?: st
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Código / SKU <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="Ej. IP15PM-256-AZ"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-[#5750f1]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Nombre del Producto <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ej. iPhone 15 Pro Max"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-[#5750f1]"
-                  />
-                </div>
+              <div>
+                <label htmlFor="warehouse-product-name" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre del Producto <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="warehouse-product-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej. iPhone 15 Pro Max"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-[#5750f1]"
+                />
               </div>
 
               <div className="grid grid-cols-3 gap-3">

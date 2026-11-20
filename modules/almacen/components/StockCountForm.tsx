@@ -781,7 +781,7 @@ export function StockCountForm({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar producto por nombre, marca o código..."
+                placeholder="Buscar producto por modelo o marca..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-8 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#5750f1]"
               />
               {searchTerm && (
@@ -921,18 +921,9 @@ export function StockCountForm({
                       <h4 className="text-xs sm:text-sm font-bold text-slate-800 leading-tight">
                         {item.description}
                       </h4>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 flex-wrap">
-                        {item.code && (
-                          <span className="font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-slate-200/60">
-                            {item.code}
-                          </span>
-                        )}
-                        {item.notes && (
-                          <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
-                            {item.notes}
-                          </span>
-                        )}
-                      </div>
+                      {item.notes && (
+                        <p className="mt-1 truncate text-[10px] italic text-slate-500">{item.notes}</p>
+                      )}
                     </div>
 
                     {/* Status Badge */}

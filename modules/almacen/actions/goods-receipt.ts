@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
+import { generateWarehouseProductCode } from "../lib/warehouse-product-code";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
@@ -660,7 +660,7 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
           })
           : await tx.warehouseProduct.create({
             data: {
-              ...identity, code: `ALM-${randomBytes(8).toString("hex").toUpperCase()}`,
+              ...identity, code: generateWarehouseProductCode(),
               boxes, unitsPerBox, looseUnits, totalUnits: line.quantity,
             },
           });
