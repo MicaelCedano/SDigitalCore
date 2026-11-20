@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { getWarehouseProductSuggestionAction, importGoodsReceiptToWarehouseAction } from "../actions/goods-receipt";
+import { useEffect, useState } from "react";
+import { getWarehouseProductSuggestionsAction, importGoodsReceiptToWarehouseAction } from "../actions/goods-receipt";
 import type { GoodsReceiptWarehouseImportInput } from "@/lib/validation/goods-receipt";
 import { AlertCircle, ArrowRight, CheckCircle2, LockKeyhole, PackagePlus, Send, ShieldCheck, Sparkles, X } from "lucide-react";
 
 type ImportReceipt = {
   id: string;
   receiptNumber: string;
-  items?: Array<{ id?: string; code?: string | null; description?: string | null; model?: string | null; brand?: string | null; capacity?: string | null; quantity?: number | null; colorVariants?: Array<{ color?: string | null; quantity?: number | null; model?: string | null; brand?: string | null; capacity?: string | null }> | null }>;
+  items?: Array<{ id?: string; description?: string | null; model?: string | null; brand?: string | null; capacity?: string | null; quantity?: number | null; colorVariants?: Array<{ color?: string | null; quantity?: number | null; model?: string | null; brand?: string | null; capacity?: string | null }> | null }>;
 };
-type ImportLine = GoodsReceiptWarehouseImportInput["lines"][number];
-type ProductSuggestion = { code: string; unitsPerBox: number; boxes: number; looseUnits: number; totalUnits: number };
+type ImportLine = Omit<GoodsReceiptWarehouseImportInput["lines"][number], "unitsPerBox">;
+type ProductSuggestions = Awaited<ReturnType<typeof getWarehouseProductSuggestionsAction>>;
+
+const identityInputClass = "mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500";
 
 function splitProductDescription(description: string | null | undefined) {
   const source = description?.trim() || "Modelo sin nombre";
@@ -27,47 +29,41 @@ function buildLines(receipt: ImportReceipt): ImportLine[] {
   return (receipt.items || []).flatMap((item) => {
     const variants = item.colorVariants && item.colorVariants.length > 0 ? item.colorVariants : [{ color: "", quantity: item.quantity || 1 }];
     const parsed = splitProductDescription(item.model || item.description);
-    return variants.map((variant, variantIndex) => ({ variantIndex, itemId: item.id || "", code: item.code || "", name: variant.model?.trim() || item.model?.trim() || parsed.model, brand: variant.brand?.trim() || item.brand?.trim() || parsed.brand, capacity: variant.capacity?.trim() || item.capacity?.trim() || parsed.capacity, color: variant.color?.trim() || "", quantity: Number(variant.quantity) || Number(item.quantity) || 1, unitsPerBox: 1 }));
+    return variants.map((variant, variantIndex) => ({ variantIndex, itemId: item.id || "", name: variant.model?.trim() || item.model?.trim() || parsed.model, brand: variant.brand?.trim() || item.brand?.trim() || parsed.brand, capacity: variant.capacity?.trim() || item.capacity?.trim() || parsed.capacity, color: variant.color?.trim() || "", quantity: Number(variant.quantity) || Number(item.quantity) || 1 }));
   });
 }
 
 export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }: { receipt: ImportReceipt; onClose: () => void; onSuccess: () => void }) {
   const [lines, setLines] = useState<ImportLine[]>(() => buildLines(receipt));
-  const [selected, setSelected] = useState(() => buildLines(receipt).map(() => true));
-  const [quantities, setQuantities] = useState(() => buildLines(receipt).map((line) => String(line.quantity)));
-  const selectedLines = lines.flatMap((line, index) => selected[index] ? [{ ...line, quantity: Number(quantities[index]) }] : []);
+  const [selected, setSelected] = useState(() => lines.map(() => true));
+  const [quantities, setQuantities] = useState(() => lines.map((line) => String(line.quantity)));
+  const [packSizes, setPackSizes] = useState(() => lines.map(() => "1"));
+  const [lookup, setLookup] = useState<{ lines: ImportLine[]; results: ProductSuggestions } | null>(null);
+  const suggestions = lookup?.lines === lines ? lookup.results : null;
+  const selectedLines = lines.flatMap((line, index) => selected[index]
+    ? [{ ...line, quantity: Number(quantities[index]), unitsPerBox: suggestions?.[index].product?.unitsPerBox ?? Number(packSizes[index]) }]
+    : []);
   const selectedUnits = selectedLines.reduce((sum, line) => sum + line.quantity, 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<Record<number, ProductSuggestion>>({});
-  const [lookupDone, setLookupDone] = useState(false);
-  const totalUnits = useMemo(() => lines.reduce((sum, line) => sum + line.quantity, 0), [lines]);
+  const totalUnits = lines.reduce((sum, line) => sum + line.quantity, 0);
 
   useEffect(() => {
     let cancelled = false;
-    async function loadSuggestions() {
-      const results = await Promise.all(lines.map((line) => getWarehouseProductSuggestionAction({ brand: line.brand, name: line.name, capacity: line.capacity, color: line.color })));
-      if (cancelled) return;
-      const found: Record<number, ProductSuggestion> = {};
-      results.forEach((result, index) => {
-        if (result.success && result.matchCount === 1 && result.data) found[index] = result.data;
-      });
-      setSuggestions(found);
-      setLines((current) => current.map((line, index) => {
-        const suggestion = found[index];
-        if (!suggestion) return line;
-        return { ...line, code: line.code || suggestion.code, unitsPerBox: suggestion.unitsPerBox };
-      }));
-      setLookupDone(true);
-    }
-    void loadSuggestions();
-    return () => { cancelled = true; };
-  }, [receipt.id]);
-
-  const updateLine = (index: number, field: "code" | "unitsPerBox", value: string) => {
-    setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: field === "unitsPerBox" ? Math.max(1, Number(value) || 1) : value } : line));
-  };
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await getWarehouseProductSuggestionsAction(lines.map(({ brand, name, capacity, color }) => ({ brand, name, capacity, color })));
+        if (!cancelled) setLookup({ lines, results });
+      } catch {
+        if (!cancelled) setLookup({ lines, results: null });
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [lines]);
 
   const updateIdentity = (index: number, field: "brand" | "name" | "capacity" | "color", value: string) => {
     setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
@@ -80,16 +76,25 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
       setError("Selecciona al menos un producto e indica una cantidad válida, sin superar lo recibido.");
       return;
     }
+    if (suggestions?.some((suggestion, index) => selected[index] && suggestion.matchCount > 1)) {
+      setError("Hay productos con varias coincidencias. Revisa los duplicados en Almacén antes de importar.");
+      return;
+    }
     setConfirmOpen(true);
   };
 
   const confirmImport = async () => {
     setConfirmOpen(false);
     setSaving(true);
-    const result = await importGoodsReceiptToWarehouseAction({ receiptId: receipt.id, lines: selectedLines });
-    setSaving(false);
-    if (!result.success) { setError(result.error || "No se pudo importar el recibo."); return; }
-    onSuccess();
+    try {
+      const result = await importGoodsReceiptToWarehouseAction({ receiptId: receipt.id, lines: selectedLines });
+      if (!result.success) { setError(result.error || "No se pudo importar el recibo."); return; }
+      onSuccess();
+    } catch {
+      setError("No se pudo conectar con el almacén. Actualiza el recibo para verificar si se registró la entrada.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -105,7 +110,74 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
             {error && <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
             <p className="mb-3 text-sm font-semibold text-slate-700">{selectedLines.length} seleccionados · {selectedUnits} unidades al almacén · {Math.max(0, totalUnits - selectedUnits)} fuera</p>
             <div className="mb-3 flex gap-3 text-xs font-semibold text-indigo-700"><button type="button" disabled={saving} onClick={() => setSelected(lines.map(() => true))}>Seleccionar todos</button><button type="button" disabled={saving} onClick={() => setSelected(lines.map(() => false))}>Desmarcar todos</button></div>
-            <div className="space-y-3">{lines.map((line, index) => { const entering = selected[index] ? Number(quantities[index]) || 0 : 0; const boxes = Math.floor(entering / line.unitsPerBox); const looseUnits = entering % line.unitsPerBox; const suggestion = suggestions[index]; return <div key={`${line.itemId}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs"><label className="mb-3 flex items-center gap-2 text-sm font-bold text-indigo-700"><input type="checkbox" checked={selected[index]} disabled={saving} onChange={(event) => setSelected((current) => current.map((value, i) => i === index ? event.target.checked : value))} /> Ingresar a la casita</label><div className="mb-3 flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-500">Producto identificado</p><p className="mt-1 text-sm font-bold text-slate-800">{line.brand || "Marca pendiente"} {line.name} {line.capacity && <span className="font-semibold text-slate-500">{line.capacity}</span>}</p></div>{line.color ? <span className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{line.color}</span> : null}</div>{suggestion ? <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span><strong>Ya existe en almacén.</strong> Código <strong>{suggestion.code}</strong> · {suggestion.totalUnits.toLocaleString("es-DO")} uds actuales. Esta importación se sumará a ese producto.</span></div> : lookupDone ? <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">No hay una coincidencia exacta; completa el código Kaptas para crear o vincular el producto.</div> : null}<fieldset disabled={!selected[index] || saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 disabled:opacity-50"><label className="text-xs font-semibold text-slate-700">Marca<input required value={line.brand} onChange={(event) => updateIdentity(index, "brand", event.target.value)} placeholder="Ej. Oukitel" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Modelo<input required value={line.name} onChange={(event) => updateIdentity(index, "name", event.target.value)} placeholder="Ej. WP210" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">RAM y almacenamiento<input value={line.capacity} onChange={(event) => updateIdentity(index, "capacity", event.target.value)} placeholder="Ej. 12+512GB" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Color <span className="font-normal text-slate-400">(opcional)</span><input value={line.color ?? ""} onChange={(event) => updateIdentity(index, "color", event.target.value)} placeholder="Déjalo vacío si no aplica" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700 sm:col-span-2 lg:col-span-1">Código Kaptas<input required value={line.code} onChange={(event) => updateLine(index, "code", event.target.value)} placeholder="Ej. SAM-A16-AZ" className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Unidades por caja<input required type="number" min={1} value={line.unitsPerBox} onChange={(event) => updateLine(index, "unitsPerBox", event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" /></label><label className="text-xs font-semibold text-slate-700">Unidades a ingresar<input required type="number" min={1} max={line.quantity} step={1} value={quantities[index]} onChange={(event) => setQuantities((current) => current.map((value, i) => i === index ? event.target.value : value))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs" /></label><div className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="block text-[10px] font-semibold uppercase text-slate-500">Recibido</span><strong className="text-slate-800">{line.quantity} uds</strong><span className="block text-[10px] text-slate-500">Ingresan: {boxes} cajas · {looseUnits} sueltas</span></div></fieldset></div>; })}</div>
+            <div className="space-y-3">
+              {lines.map((line, index) => {
+                const entering = selected[index] ? Number(quantities[index]) || 0 : 0;
+                const suggestion = suggestions?.[index];
+                const product = suggestion?.product;
+                const unitsPerBox = product?.unitsPerBox ?? (Number(packSizes[index]) || 1);
+                const boxes = Math.floor(entering / unitsPerBox);
+                const looseUnits = entering % unitsPerBox;
+                return (
+                  <div key={`${line.itemId}-${line.variantIndex}`} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                    <label className="mb-3 flex items-center gap-2 text-sm font-bold text-indigo-700">
+                      <input type="checkbox" checked={selected[index]} disabled={saving} onChange={(event) => setSelected((current) => current.map((value, i) => i === index ? event.target.checked : value))} />
+                      Ingresar a la casita
+                    </label>
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-500">Producto identificado</p>
+                        <p className="mt-1 text-sm font-bold text-slate-800">{line.brand || "Marca pendiente"} {line.name} {line.capacity && <span className="font-semibold text-slate-500">{line.capacity}</span>}</p>
+                      </div>
+                      {line.color && <span className="shrink-0 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700">{line.color}</span>}
+                    </div>
+                    {product && (
+                      <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                        <span><strong>Ya existe en almacén.</strong> Las unidades se sumarán a las {product.totalUnits.toLocaleString("es-DO")} que hay actualmente.</span>
+                      </div>
+                    )}
+                    {suggestion?.matchCount === 0 && (
+                      <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">Se creará un producto en el almacén con estos datos.</p>
+                    )}
+                    {suggestion && suggestion.matchCount > 1 && (
+                      <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Hay varias fichas con estos datos. Revisa los duplicados en Almacén.</p>
+                    )}
+                    <fieldset disabled={!selected[index] || saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 disabled:opacity-50">
+                      <label className="text-xs font-semibold text-slate-700">
+                        Marca
+                        <input required value={line.brand} onChange={(event) => updateIdentity(index, "brand", event.target.value)} placeholder="Ej. Oukitel" className={identityInputClass} />
+                      </label>
+                      <label className="text-xs font-semibold text-slate-700">
+                        Modelo
+                        <input required value={line.name} onChange={(event) => updateIdentity(index, "name", event.target.value)} placeholder="Ej. WP210" className={identityInputClass} />
+                      </label>
+                      <label className="text-xs font-semibold text-slate-700">
+                        RAM y almacenamiento
+                        <input value={line.capacity} onChange={(event) => updateIdentity(index, "capacity", event.target.value)} placeholder="Ej. 12+512GB" className={identityInputClass} />
+                      </label>
+                      <label className="text-xs font-semibold text-slate-700">
+                        Color <span className="font-normal text-slate-400">(opcional)</span>
+                        <input value={line.color ?? ""} onChange={(event) => updateIdentity(index, "color", event.target.value)} placeholder="Déjalo vacío si no aplica" className={identityInputClass} />
+                      </label>
+                      <label className="text-xs font-semibold text-slate-700">
+                        Unidades por caja
+                        <input required type="number" min={1} readOnly={Boolean(product)} value={product?.unitsPerBox ?? packSizes[index]} onChange={(event) => setPackSizes((current) => current.map((value, i) => i === index ? event.target.value : value))} className={identityInputClass} />
+                      </label>
+                      <label className="text-xs font-semibold text-slate-700">
+                        Unidades a ingresar
+                        <input required type="number" min={1} max={line.quantity} step={1} value={quantities[index]} onChange={(event) => setQuantities((current) => current.map((value, i) => i === index ? event.target.value : value))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs" />
+                      </label>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs lg:col-span-2">
+                        <span className="block text-[10px] font-semibold uppercase text-slate-500">Recibido</span>
+                        <strong className="text-slate-800">{line.quantity} uds</strong>
+                        <span className="block text-[10px] text-slate-500">Ingresan: {boxes} cajas · {looseUnits} sueltas</span>
+                      </div>
+                    </fieldset>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end sm:px-6"><button type="button" onClick={onClose} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Cancelar</button><button type="submit" disabled={saving || !selectedLines.length} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#5750f1] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#5750f1]/20 disabled:opacity-50">{saving ? "Importando..." : <><CheckCircle2 className="h-4 w-4" /> Ingresar selección al almacén</>}</button></div>
         </form>
@@ -132,7 +204,7 @@ export function GoodsReceiptWarehouseImportModal({ receipt, onClose, onSuccess }
                 <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                 <div><p className="text-sm font-bold">Solo se ingresará lo seleccionado</p><p className="mt-1 text-xs leading-5 text-amber-800">{totalUnits - selectedUnits} unidades quedan fuera del almacén. Esta entrada cierra el envío del recibo; para cambiar la selección después, debes cancelar la entrada y volver a ingresarla.</p></div>
               </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Revisa que las cantidades y códigos estén correctos.</div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Revisa los productos y las cantidades antes de confirmar.</div>
               <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end"><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50">Volver a revisar</button><button type="button" onClick={() => void confirmImport()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700"><Send className="h-4 w-4" /> Confirmar envío</button></div>
             </div>
           </div>

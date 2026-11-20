@@ -1,17 +1,18 @@
 "use server";
 
-import { validateWarehouseSelection } from "@/lib/validation/goods-receipt";
-
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/helpers";
 import { logAudit } from "@/lib/audit";
 import { sendPushToRole } from "@/lib/mobile/push";
 import { revalidatePath } from "next/cache";
 import {
+  goodsReceiptWarehouseImportLineSchema,
   goodsReceiptSchema,
   GoodsReceiptInput,
   goodsReceiptWarehouseImportSchema,
   GoodsReceiptWarehouseImportInput,
+  validateWarehouseSelection,
 } from "@/lib/validation/goods-receipt";
 import { nextOperationalNumber } from "@/lib/db/daily-sequence";
 import {
@@ -40,8 +41,9 @@ function normalizedBrandKey(value: string | null | undefined) {
 }
 
 function normalizedColorKey(value: string | null | undefined) {
-  const key = normalizedKey(value).replace(/\s+/g, " ");
+  const key = normalizedKey(value).normalize("NFD").replace(/\p{M}/gu, "");
   const aliases: Record<string, string> = {
+    general: "",
     black: "black", negro: "black",
     gray: "gray", grey: "gray", gris: "gray",
     white: "white", blanco: "white",
@@ -49,24 +51,56 @@ function normalizedColorKey(value: string | null | undefined) {
     green: "green", verde: "green",
     orange: "orange", naranja: "orange",
     red: "red", rojo: "red",
-    purple: "purple", morado: "purple", violeta: "purple", violet: "purple",
+    purple: "purple", morado: "purple", purpura: "purple", violeta: "purple", violet: "purple",
     pink: "pink", rosado: "pink", rosa: "pink",
-    gold: "gold", dorado: "gold",
+    gold: "gold", golden: "gold", dorado: "gold",
     silver: "silver", silvery: "silver", plateado: "silver",
   };
-  return aliases[key] || key;
+  return Object.hasOwn(aliases, key) ? aliases[key] : key;
 }
 
 function colorParts(value: string | null | undefined) {
   return normalizeReceiptText(value).split("/").map((part) => part.trim()).filter(Boolean);
 }
 
-const warehouseProductIdentitySchema = z.object({
-  brand: z.string().trim().min(1),
-  name: z.string().trim().min(1),
-  capacity: z.string().trim().optional().default(""),
-  color: z.string().trim().optional().default(""),
+const warehouseProductIdentitySchema = goodsReceiptWarehouseImportLineSchema.pick({
+  brand: true, name: true, capacity: true, color: true,
 });
+
+const receiptProductSelect = {
+  id: true, code: true, name: true, brand: true, capacity: true, color: true,
+  unitsPerBox: true, totalUnits: true,
+} satisfies Prisma.WarehouseProductSelect;
+
+type ReceiptProduct = Prisma.WarehouseProductGetPayload<{ select: typeof receiptProductSelect }>;
+
+function findWarehouseProductMatches(
+  products: ReceiptProduct[],
+  identity: z.infer<typeof warehouseProductIdentitySchema>,
+) {
+  const name = normalizedKey(identity.name);
+  const brand = normalizedBrandKey(identity.brand);
+  const capacity = normalizedKey(identity.capacity).replace(/\s/g, "");
+  const [color, ...colorCodeParts] = colorParts(identity.color);
+  const colorCode = normalizedKey(colorCodeParts.join(" "));
+
+  return products.filter((product) => {
+    if (normalizedBrandKey(product.brand) !== brand || normalizedKey(product.capacity).replace(/\s/g, "") !== capacity) {
+      return false;
+    }
+
+    const productName = normalizedKey(product.name);
+    const [productColor, ...productColorCodeParts] = colorParts(product.color);
+    const productColorCode = normalizedKey(productColorCodeParts.join(" "));
+    const namedByColorCode = Boolean(colorCode) && productName === `${name} ${colorCode}`;
+    const namedByColor = Boolean(productColor) && productName === `${name} ${normalizedKey(productColor)}`;
+    if (productName !== name && !namedByColor && !namedByColorCode) return false;
+    if (colorCode && productColorCode && colorCode !== productColorCode) return false;
+
+    return normalizedColorKey(productColor) === normalizedColorKey(color)
+      || (Boolean(colorCode) && (colorCode === normalizedKey(productColor) || namedByColorCode));
+  });
+}
 
 async function autoIndexCatalogModels(models: string[]) {
   try {
@@ -490,50 +524,28 @@ export async function getGoodsReceiptModelSuggestionsAction(search?: string, bra
   }
 }
 
-export async function getWarehouseProductSuggestionAction(input: unknown) {
+export async function getWarehouseProductSuggestionsAction(input: unknown) {
   try {
     await requirePermission("warehouse.read");
-    const identity = warehouseProductIdentitySchema.parse(input);
-    const candidates = await prisma.warehouseProduct.findMany({
-      where: {
-        status: "ACTIVE",
-        // La marca puede venir escrita como "M HORSE" en inventario y
-        // "M-Horse" en el recibo; traemos candidatos por modelo y
-        // verificamos la identidad normalizada abajo.
-        name: { contains: identity.name, mode: "insensitive" },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 20,
+    const identities = z.array(warehouseProductIdentitySchema).parse(input);
+    const products = await prisma.warehouseProduct.findMany({
+      where: { status: "ACTIVE" },
+      select: receiptProductSelect,
     });
-    const requestedColorParts = colorParts(identity.color);
-    const requestedColorName = requestedColorParts[0] || "";
-    const requestedColorCode = normalizedKey(requestedColorParts.slice(1).join(" ")).replace(/\s+/g, "");
-    const requestedName = normalizedKey(identity.name);
-    const matches = candidates.filter((product) => {
-      const productName = normalizedKey(product.name);
-      const productIdentityText = normalizedKey(`${product.name} ${product.color}`).replace(/\s+/g, "");
-      const sameModel = productName === requestedName || productName.startsWith(`${requestedName} `);
-      const sameBrand = normalizedBrandKey(product.brand) === normalizedBrandKey(identity.brand);
-      const sameColorName = normalizedColorKey(product.color) === normalizedColorKey(requestedColorName || identity.color);
-      const sameColorCode = Boolean(requestedColorCode) && productIdentityText.includes(requestedColorCode);
-      return sameBrand && normalizedKey(product.capacity) === normalizedKey(identity.capacity) && sameModel && (sameColorName || sameColorCode);
+
+    return identities.map((identity) => {
+      const matches = findWarehouseProductMatches(products, identity);
+      const [product] = matches;
+      return {
+        matchCount: matches.length,
+        product: matches.length === 1
+          ? { unitsPerBox: product.unitsPerBox, totalUnits: product.totalUnits }
+          : null,
+      };
     });
-    if (matches.length !== 1) return { success: true, data: null, matchCount: matches.length };
-    const product = matches[0];
-    return {
-      success: true,
-      data: {
-        code: product.code,
-        unitsPerBox: product.unitsPerBox,
-        boxes: product.boxes,
-        looseUnits: product.looseUnits,
-        totalUnits: product.totalUnits,
-      },
-      matchCount: 1,
-    };
   } catch (error) {
-    console.error("Error al buscar producto existente para importar recibo:", error);
-    return { success: false, data: null, matchCount: 0 };
+    console.error("Error al buscar productos existentes para importar recibo:", error);
+    return null;
   }
 }
 
@@ -586,7 +598,9 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
     const persisted = await prisma.user.findUnique({ where: { id: actor.id }, select: { roleCode: true } });
     if (persisted?.roleCode !== "ADMIN") return { success: false, error: "Solo un administrador puede importar productos al almacén." };
 
-    const validated = goodsReceiptWarehouseImportSchema.parse(input);
+    const parsed = goodsReceiptWarehouseImportSchema.safeParse(input);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+    const validated = parsed.data;
     const receipt = await prisma.goodsReceipt.findUnique({ where: { id: validated.receiptId }, include: { items: true } });
     if (!receipt) return { success: false, error: "Recibo no encontrado." };
     if (receipt.status !== "COMPLETED") return { success: false, error: "Solo puedes importar recibos completados." };
@@ -594,8 +608,6 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
     const receiptItemIds = new Set(receipt.items.map((item) => item.id));
     if (validated.lines.some((line) => !receiptItemIds.has(line.itemId))) return { success: false, error: "Una de las líneas no pertenece a este recibo." };
 
-    const codes = validated.lines.map((line) => line.code.toUpperCase());
-    if (new Set(codes).size !== codes.length) return { success: false, error: "Cada modelo/color debe tener un código Kaptas diferente." };
     const created = await prisma.$transaction(async (tx) => {
       const claimed = await tx.goodsReceipt.updateMany({
         where: { id: receipt.id, status: "COMPLETED", warehouseImportedAt: null },
@@ -605,6 +617,12 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
 
       const currentItems = await tx.goodsReceiptItem.findMany({ where: { receiptId: receipt.id } });
       validateWarehouseSelection(currentItems, validated.lines);
+      // Serializa la búsqueda y el alta entre importaciones, incluso al cambiar el día.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('warehouse_receipt_import'))`;
+      const candidates = await tx.warehouseProduct.findMany({
+        where: { status: "ACTIVE" },
+        select: receiptProductSelect,
+      });
       const importNumber = await nextOperationalNumber(tx, "WAREHOUSE_RECEIPT_IMPORT", "ENT");
       const products = [];
       const importLines: Array<{
@@ -621,17 +639,34 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
         totalUnits: number;
       }> = [];
       for (const line of validated.lines) {
-        const code = line.code.toUpperCase();
-        const existing = await tx.warehouseProduct.findUnique({ where: { code } });
-        const unitsPerBox = existing?.unitsPerBox || line.unitsPerBox;
+        const matches = findWarehouseProductMatches(candidates, line);
+        const description = [line.brand, line.name, line.capacity, line.color].filter(Boolean).join(" ");
+        if (matches.length > 1) {
+          throw new Error(`Hay varios productos activos para ${description}. Revisa los duplicados en Almacén antes de importar.`);
+        }
+
+        const [existing] = matches;
+        const unitsPerBox = existing?.unitsPerBox ?? line.unitsPerBox;
         const boxes = Math.floor(line.quantity / unitsPerBox);
         const looseUnits = line.quantity % unitsPerBox;
+        const identity = { name: line.name, brand: line.brand, capacity: line.capacity || null, color: line.color || null };
         const product = existing
-          ? await tx.warehouseProduct.update({ where: { id: existing.id }, data: { name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } } })
-          : await tx.warehouseProduct.create({ data: { code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, boxes, unitsPerBox: line.unitsPerBox, looseUnits, totalUnits: line.quantity } });
+          ? await tx.warehouseProduct.update({
+            where: {
+              id: existing.id, status: "ACTIVE", unitsPerBox,
+              name: existing.name, brand: existing.brand, capacity: existing.capacity, color: existing.color,
+            },
+            data: { boxes: { increment: boxes }, looseUnits: { increment: looseUnits }, totalUnits: { increment: line.quantity } },
+          })
+          : await tx.warehouseProduct.create({
+            data: {
+              ...identity, code: `ALM-${randomBytes(8).toString("hex").toUpperCase()}`,
+              boxes, unitsPerBox, looseUnits, totalUnits: line.quantity,
+            },
+          });
+        if (!existing) candidates.push(product);
         await tx.warehouseMovement.create({ data: { productId: product.id, type: "ENTRY", boxesCount: boxes, totalUnits: line.quantity, reason: `Entrada ${importNumber} · recibo ${receipt.receiptNumber}`, createdBy: actor.id } });
-        await tx.goodsReceiptItem.update({ where: { id: line.itemId }, data: { code } });
-        importLines.push({ productId: product.id, itemId: line.itemId, code, name: line.name, brand: line.brand || null, capacity: line.capacity || null, color: line.color || null, unitsPerBox, boxesCount: boxes, looseUnits, totalUnits: line.quantity });
+        importLines.push({ ...identity, productId: product.id, itemId: line.itemId, code: product.code, unitsPerBox, boxesCount: boxes, looseUnits, totalUnits: line.quantity });
         products.push(product);
       }
       const voucher = await tx.warehouseReceiptImport.create({
@@ -644,16 +679,21 @@ export async function importGoodsReceiptToWarehouseAction(input: GoodsReceiptWar
         include: { lines: true },
       });
       return { products, voucher };
-    });
+    }, { isolationLevel: "ReadCommitted", timeout: 15_000 });
 
     await logAudit({ userId: actor.id, action: "goods_receipt.import_to_warehouse", module: "almacen", entityType: "goods_receipt", entityId: receipt.id, afterData: { receiptNumber: receipt.receiptNumber, importNumber: created.voucher.importNumber, productIds: created.products.map((product) => product.id), lineCount: created.products.length, selectedUnits: validated.lines.reduce((sum, line) => sum + line.quantity, 0), selection: validated.lines.map(({ itemId, variantIndex, quantity }) => ({ itemId, variantIndex, quantity })) } });
     revalidatePath("/almacen");
     revalidatePath("/almacen/recibos");
     revalidatePath("/dashboard");
     return { success: true, data: created.products, importNumber: created.voucher.importNumber, message: `${created.products.length} producto(s) enviado(s) al almacén. Comprobante ${created.voucher.importNumber} generado.` };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error al importar recibo al almacén:", error);
-    return { success: false, error: error.message || "No se pudo importar el recibo al almacén." };
+    return {
+      success: false,
+      error: error instanceof Error && !("code" in error)
+        ? error.message
+        : "No se pudo importar el recibo al almacén. Actualiza la página e inténtalo nuevamente.",
+    };
   }
 }
 

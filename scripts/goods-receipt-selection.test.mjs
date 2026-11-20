@@ -9,7 +9,7 @@ const mod = { exports: {} };
 new Function("require", "module", "exports", compiled)(createRequire(import.meta.url), mod, mod.exports);
 const { validateWarehouseSelection, goodsReceiptWarehouseImportSchema } = mod.exports;
 const items = [{ id: "a", quantity: 10, colorVariants: [{ quantity: 6 }, { quantity: 4 }] }, { id: "b", quantity: 3, colorVariants: null }];
-const line = { itemId: "a", variantIndex: 0, quantity: 2, code: "A", name: "Modelo", unitsPerBox: 1 };
+const line = { itemId: "a", variantIndex: 0, quantity: 2, brand: "Cubot", name: "A50", unitsPerBox: 1 };
 assert.doesNotThrow(() => validateWarehouseSelection(items, [line]));
 assert.doesNotThrow(() => validateWarehouseSelection(items, [line, { ...line, variantIndex: 1, quantity: 4 }]));
 assert.doesNotThrow(() => validateWarehouseSelection(items, [{ ...line, itemId: "b", quantity: 3 }]));
@@ -18,6 +18,7 @@ for (const lines of [[{ ...line, quantity: 7 }], [line, line], [{ ...line, itemI
 }
 assert.equal(goodsReceiptWarehouseImportSchema.safeParse({ receiptId: "r", lines: [] }).success, false);
 assert.equal(goodsReceiptWarehouseImportSchema.safeParse({ receiptId: "r", lines: [line] }).success, true);
+assert.equal(goodsReceiptWarehouseImportSchema.safeParse({ receiptId: "r", lines: [{ ...line, brand: " " }] }).success, false);
 assert.equal(mod.exports.goodsReceiptSchema.safeParse({ supplierName: "Proveedor", branch: "Principal", receivedDate: "2026-09-12", items: [{ model: "A16", quantity: 1 }] }).success, true);
 assert.equal(mod.exports.goodsReceiptSchema.safeParse({ supplierName: "Proveedor", branch: "Principal", receivedDate: "2026-02-30", items: [{ model: "A16", quantity: 1 }] }).success, false);
 console.log("Goods receipt selection tests passed");

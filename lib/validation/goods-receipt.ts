@@ -61,11 +61,10 @@ export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;
 export const goodsReceiptWarehouseImportLineSchema = z.object({
   itemId: z.string().min(1),
   variantIndex: z.number().int().min(0),
-  code: z.string().trim().min(1, "El código Kaptas es requerido"),
-  name: z.string().trim().min(1, "El modelo es requerido"),
-  brand: z.string().trim().optional().default(""),
-  capacity: z.string().trim().optional().default(""),
-  color: z.string().trim().optional().nullable(),
+  name: z.string().trim().min(1, "El modelo es requerido").max(160),
+  brand: z.string().trim().min(1, "La marca es requerida").max(100),
+  capacity: z.string().trim().max(80).optional().default(""),
+  color: z.string().trim().max(100).optional().nullable(),
   quantity: z.number().int().min(1, "La cantidad debe venir del recibo"),
   unitsPerBox: z.number().int().min(1, "Indica cuántas unidades trae una caja"),
 });
