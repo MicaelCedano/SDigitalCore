@@ -14,7 +14,6 @@ import { FisicoVerifierModal } from "./FisicoVerifierModal";
 import { NoFuncionalesModal } from "./NoFuncionalesModal";
 import { AddDevicesModal } from "./AddDevicesModal";
 import { PurchaseDeviceEditModal } from "./PurchaseDeviceEditModal";
-import { exportRevisionBatchToExcel } from "../lib/excel-export";
 import {
   ArrowLeft,
   Package,
@@ -29,6 +28,8 @@ import {
   AlertTriangle,
   RefreshCw,
   FileSpreadsheet,
+  FileText,
+  Printer,
   ClipboardCheck,
   UserCheck,
   Fingerprint,
@@ -43,6 +44,8 @@ interface RevisionBatchDetailViewProps {
   isAdmin?: boolean;
 }
 
+type ReportAction = "excel" | "pdf" | "print";
+
 export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }: RevisionBatchDetailViewProps) {
   const [batch, setBatch] = useState(initialBatch);
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -54,6 +57,8 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
   const [showNoFuncionales, setShowNoFuncionales] = useState(false);
   const [showAddDevices, setShowAddDevices] = useState(false);
   const [editDevice, setEditDevice] = useState<any>(null);
+  const [reportAction, setReportAction] = useState<ReportAction | null>(null);
+  const [reportError, setReportError] = useState("");
   const router = useRouter();
 
   const refreshBatch = async () => {
@@ -89,15 +94,51 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
     }
   };
 
-  const handleExportExcel = async () => {
-    await exportRevisionBatchToExcel({
+  const handleReport = async (action: ReportAction) => {
+    setReportError("");
+    // La pestaña debe abrirse durante el clic para que el navegador permita mostrar el PDF.
+    const preview = action === "print" ? window.open("", "_blank") : null;
+    if (action === "print" && !preview) {
+      setReportError("El navegador bloqueó la vista previa. Puedes descargar el PDF y abrirlo para imprimir.");
+      return;
+    }
+    if (preview) preview.opener = null;
+
+    const report = {
       batchNumber: batch.batchNumber,
       supplierName: batch.supplierName,
       branch: batch.branch,
       receivedAt: batch.receivedAt || batch.createdAt,
       status: batch.status,
       devices: batch.devices || [],
-    });
+    };
+    setReportAction(action);
+    try {
+      if (action === "excel") {
+        const { exportRevisionBatchToExcel } = await import("../lib/excel-export");
+        await exportRevisionBatchToExcel(report);
+        return;
+      }
+
+      const { createRevisionBatchPdf } = await import("../lib/pdf-export");
+      const pdf = createRevisionBatchPdf(report);
+      if (preview) {
+        if (preview.closed) return;
+        const url = URL.createObjectURL(pdf.output("blob"));
+        window.setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+        preview.location.replace(url);
+      } else {
+        await pdf.save(`Compra_QC_${report.batchNumber}.pdf`, { returnPromise: true });
+      }
+    } catch (error) {
+      preview?.close();
+      console.error("Error al exportar el lote QC:", error);
+      setReportError(action === "excel"
+        ? "No se pudo exportar el Excel. Intenta de nuevo."
+        : "No se pudo preparar el PDF. Intenta de nuevo.");
+    } finally {
+      setReportAction(null);
+    }
   };
 
   // Filtrar equipos del lote
@@ -292,7 +333,7 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
       </div>
 
       {/* Barra de Búsqueda de Equipos dentro del Lote */}
-      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-2xs flex flex-wrap items-center justify-between gap-4">
         <div className="relative w-full sm:w-96">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
@@ -307,14 +348,34 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
         <div className="text-xs text-slate-500 font-medium">
           Mostrando <span className="font-bold text-slate-800">{devices.length}</span> de {batch.totalDevices} equipos
         </div>
-        <button
-          type="button"
-          onClick={handleExportExcel}
-          disabled={!batch.devices?.length}
-          className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Exportar Excel
-        </button>
+        <div className="flex flex-wrap items-center gap-2" aria-busy={reportAction !== null}>
+          <button
+            type="button"
+            onClick={() => void handleReport("excel")}
+            disabled={!batch.devices?.length || reportAction !== null}
+            className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> {reportAction === "excel" ? "Preparando Excel…" : "Exportar Excel"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleReport("pdf")}
+            disabled={!batch.devices?.length || reportAction !== null}
+            className="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileText className="w-4 h-4" /> {reportAction === "pdf" ? "Preparando PDF…" : "Descargar PDF"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleReport("print")}
+            disabled={!batch.devices?.length || reportAction !== null}
+            title="Abre el PDF en otra pestaña para imprimirlo"
+            className="px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Printer className="w-4 h-4" /> {reportAction === "print" ? "Abriendo PDF…" : "Ver e imprimir PDF"}
+          </button>
+        </div>
+        {reportError ? <p role="alert" className="w-full text-xs font-medium text-red-700">{reportError}</p> : null}
       </div>
 
       {/* Tabla de Equipos del Lote */}
