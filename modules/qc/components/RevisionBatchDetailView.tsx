@@ -73,8 +73,9 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
     const res = await updateRevisionBatchStatusAction({ id: batch.id, status: newStatus });
     setLoadingStatus(false);
 
-    if (res.success && res.data) {
-      setBatch((prev: any) => ({ ...prev, status: res.data.status, completedAt: res.data.completedAt }));
+    if (res.success && "data" in res && res.data) {
+      const { status, completedAt } = res.data;
+      setBatch((prev: any) => ({ ...prev, status, completedAt }));
     } else {
       alert(res.error || "No se pudo actualizar el estado del lote.");
     }
