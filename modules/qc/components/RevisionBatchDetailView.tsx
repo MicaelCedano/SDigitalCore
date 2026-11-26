@@ -14,6 +14,7 @@ import { FisicoVerifierModal } from "./FisicoVerifierModal";
 import { NoFuncionalesModal } from "./NoFuncionalesModal";
 import { AddDevicesModal } from "./AddDevicesModal";
 import { PurchaseDeviceEditModal } from "./PurchaseDeviceEditModal";
+import { qcPdfScopes, type QcPdfScope } from "../lib/revision-batch-report";
 import {
   ArrowLeft,
   Package,
@@ -57,9 +58,16 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
   const [showNoFuncionales, setShowNoFuncionales] = useState(false);
   const [showAddDevices, setShowAddDevices] = useState(false);
   const [editDevice, setEditDevice] = useState<any>(null);
+  const [pdfScope, setPdfScope] = useState<QcPdfScope>("all");
   const [reportAction, setReportAction] = useState<ReportAction | null>(null);
   const [reportError, setReportError] = useState("");
   const router = useRouter();
+  const reportCounts = {
+    all: batch.devices?.length ?? 0,
+    FUNCTIONAL: batch.functionalCount ?? 0,
+    NON_FUNCTIONAL: batch.nonFunctionalCount ?? 0,
+  };
+  const canExportPdf = reportCounts[pdfScope] > 0 && reportAction === null;
 
   const refreshBatch = async () => {
     const res = await getRevisionBatchDetailAction(batch.id);
@@ -122,14 +130,14 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
       }
 
       const { createRevisionBatchPdf } = await import("../lib/pdf-export");
-      const pdf = createRevisionBatchPdf(report);
+      const pdf = createRevisionBatchPdf(report, pdfScope);
       if (preview) {
         if (preview.closed) return;
         const url = URL.createObjectURL(pdf.output("blob"));
         window.setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
         preview.location.replace(url);
       } else {
-        await pdf.save(`Compra_QC_${report.batchNumber}.pdf`, { returnPromise: true });
+        await pdf.save(`Compra_QC_${report.batchNumber}${qcPdfScopes[pdfScope].suffix}.pdf`, { returnPromise: true });
       }
     } catch (error) {
       preview?.close();
@@ -353,15 +361,36 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
           <button
             type="button"
             onClick={() => void handleReport("excel")}
-            disabled={!batch.devices?.length || reportAction !== null}
+            disabled={!reportCounts.all || reportAction !== null}
             className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FileSpreadsheet className="w-4 h-4" /> {reportAction === "excel" ? "Preparando Excel…" : "Exportar Excel"}
           </button>
+          <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white pl-3 text-xs font-semibold text-slate-700">
+            <span className="sr-only">Contenido del PDF</span>
+            <span aria-hidden="true" className="text-slate-500">PDF</span>
+            <select
+              value={pdfScope}
+              onChange={(event) => {
+                setPdfScope(event.target.value as QcPdfScope);
+                setReportError("");
+              }}
+              disabled={!reportCounts.all || reportAction !== null}
+              className="min-h-9 rounded-xl bg-white py-2 pr-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+            >
+              <option value="all">{qcPdfScopes.all.label}</option>
+              <option value="FUNCTIONAL" disabled={!reportCounts.FUNCTIONAL}>
+                {qcPdfScopes.FUNCTIONAL.label} ({reportCounts.FUNCTIONAL})
+              </option>
+              <option value="NON_FUNCTIONAL" disabled={!reportCounts.NON_FUNCTIONAL}>
+                {qcPdfScopes.NON_FUNCTIONAL.label} ({reportCounts.NON_FUNCTIONAL})
+              </option>
+            </select>
+          </label>
           <button
             type="button"
             onClick={() => void handleReport("pdf")}
-            disabled={!batch.devices?.length || reportAction !== null}
+            disabled={!canExportPdf}
             className="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FileText className="w-4 h-4" /> {reportAction === "pdf" ? "Preparando PDF…" : "Descargar PDF"}
@@ -369,7 +398,7 @@ export function RevisionBatchDetailView({ batch: initialBatch, isAdmin = false }
           <button
             type="button"
             onClick={() => void handleReport("print")}
-            disabled={!batch.devices?.length || reportAction !== null}
+            disabled={!canExportPdf}
             title="Abre el PDF en otra pestaña para imprimirlo"
             className="px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >

@@ -28,6 +28,14 @@ const resultLabels = new Map([
   ["NON_FUNCTIONAL", "DEFECTUOSO"],
 ]);
 
+export const qcPdfScopes = {
+  all: { label: "Todo el lote", suffix: "" },
+  FUNCTIONAL: { label: "Funcionales", suffix: "_Funcionales" },
+  NON_FUNCTIONAL: { label: "Defectuosos", suffix: "_Defectuosos" },
+} as const;
+
+export type QcPdfScope = keyof typeof qcPdfScopes;
+
 export const qcReportColumns = [
   "#", "IMEI / Serie", "Marca", "Modelo", "Capacidad (GB)", "Resultado QC", "Grado", "Batería", "Observaciones",
 ];
@@ -50,7 +58,7 @@ function normalizeModelName(value: string) {
     .replace(/\s+/g, " ");
 }
 
-export function getRevisionBatchReport(batch: RevisionBatchReport) {
+export function getRevisionBatchReport(batch: RevisionBatchReport, scope: QcPdfScope = "all") {
   const date = batch.receivedAt ? new Date(batch.receivedAt) : null;
   const formattedDate = date && Number.isFinite(date.getTime())
     ? date.toLocaleString("es-DO", {
@@ -60,8 +68,12 @@ export function getRevisionBatchReport(batch: RevisionBatchReport) {
     }).replace(/[\u00a0\u202f]/g, " ")
     : "";
 
-  const totals = { devices: batch.devices.length, reviewed: 0, functional: 0, nonFunctional: 0 };
-  const rows = sortQcDevicesByModel(batch.devices).map((device, index) => {
+  const devices = scope === "all" ? batch.devices : batch.devices.filter(({ inspections }) => {
+    const inspection = inspections?.[0];
+    return inspection?.status === "COMPLETED" && inspection.result === scope;
+  });
+  const totals = { devices: devices.length, reviewed: 0, functional: 0, nonFunctional: 0 };
+  const rows = sortQcDevicesByModel(devices).map((device, index) => {
     const inspection = device.inspections?.[0];
     const reviewed = inspection?.status === "COMPLETED";
     const result = inspection?.result ?? "";

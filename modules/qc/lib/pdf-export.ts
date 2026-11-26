@@ -1,6 +1,12 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
-import { getRevisionBatchReport, qcReportColumns, type RevisionBatchReport } from "./revision-batch-report";
+import {
+  getRevisionBatchReport,
+  qcPdfScopes,
+  qcReportColumns,
+  type QcPdfScope,
+  type RevisionBatchReport,
+} from "./revision-batch-report";
 
 const statusLabels = new Map([
   ["DRAFT", "Borrador"],
@@ -11,8 +17,8 @@ const statusLabels = new Map([
   ["CANCELLED", "Cancelado"],
 ]);
 
-export function createRevisionBatchPdf(batch: RevisionBatchReport) {
-  const { formattedDate, rows, totals } = getRevisionBatchReport(batch);
+export function createRevisionBatchPdf(batch: RevisionBatchReport, scope: QcPdfScope = "all") {
+  const { formattedDate, rows, totals } = getRevisionBatchReport(batch, scope);
   const pdf = new jsPDF({
     orientation: "landscape",
     format: "letter",
@@ -24,7 +30,8 @@ export function createRevisionBatchPdf(batch: RevisionBatchReport) {
   const right = pdf.internal.pageSize.getWidth() - margin;
   const bottom = pdf.internal.pageSize.getHeight() - margin;
   const width = right - margin;
-  const title = `Informe de control de calidad | ${batch.batchNumber}`;
+  const scopeTitle = scope === "all" ? "" : ` | ${qcPdfScopes[scope].label}`;
+  const title = `Informe de control de calidad | ${batch.batchNumber}${scopeTitle}`;
   pdf.setProperties({ title, creator: "SDigitalCore" });
 
   pdf.setFont("helvetica", "bold").setFontSize(17).setTextColor(20);
@@ -40,10 +47,10 @@ export function createRevisionBatchPdf(batch: RevisionBatchReport) {
 
   const summaryY = 25 + metadata.length * 4.1 + 2;
   pdf.setFont("helvetica", "bold");
-  pdf.text(
-    `Total: ${totals.devices}   |   Revisados: ${totals.reviewed}   |   Funcionales: ${totals.functional}   |   Defectuosos: ${totals.nonFunctional}   |   Pendientes: ${totals.devices - totals.reviewed}`,
-    margin, summaryY,
-  );
+  const summary = scope === "all"
+    ? `Total: ${totals.devices}   |   Revisados: ${totals.reviewed}   |   Funcionales: ${totals.functional}   |   Defectuosos: ${totals.nonFunctional}   |   Pendientes: ${totals.devices - totals.reviewed}`
+    : `Equipos incluidos: ${totals.devices}`;
+  pdf.text(summary, margin, summaryY);
 
   autoTable(pdf, {
     head: [qcReportColumns],
@@ -53,7 +60,7 @@ export function createRevisionBatchPdf(batch: RevisionBatchReport) {
     startY: summaryY + 5,
     margin: { top: 22, right: margin, bottom: margin + 6, left: margin },
     showHead: "everyPage",
-    rowPageBreak: "avoid",
+    rowPageBreak: "auto",
     theme: "grid",
     styles: {
       fontSize: 9,
@@ -61,7 +68,7 @@ export function createRevisionBatchPdf(batch: RevisionBatchReport) {
       textColor: 20,
       lineColor: 175,
       lineWidth: 0.15,
-      valign: "middle",
+      valign: "top",
     },
     headStyles: { fillColor: 238, textColor: 20, lineColor: 175, lineWidth: 0.15 },
     columnStyles: {
